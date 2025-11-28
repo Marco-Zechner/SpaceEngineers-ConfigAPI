@@ -13,15 +13,18 @@ namespace mz.NewTemplateMod
         private bool _initialized;
 
         public static TestConfig TestConfig { get; private set; }
+        public static UselessConfig UselessConfig { get; private set; }
+
+        public override void LoadData()
+        {
+            base.LoadData();
+            TestConfig = ConfigStorage.Register<TestConfig>(ConfigStorageKind.Local);
+            UselessConfig = ConfigStorage.Register<UselessConfig>(ConfigStorageKind.World);
+        }
 
         public override void Init(MyObjectBuilder_SessionComponent sessionComponent)
         {
             base.Init(sessionComponent);
-
-            TestConfig = ConfigStorage.Register<TestConfig>(ConfigStorageKind.Local);
-            ConfigStorage.OnAnyConfigChanged += Change;
-            TestConfig.RespondToHello.Changed += Change;
-            TestConfig.RespondToHello2.Changed += Change;
 
             try
             {
@@ -36,18 +39,10 @@ namespace mz.NewTemplateMod
             }
             catch (Exception)
             {
+                ConfigStorage.TryLog("Failed to initialize NewTemplateModMain.", "NewTemplateMod");
             }
         }
 
-        private void Change()
-        {
-            MyAPIGateway.Utilities.ShowMessage("NewTemplateMod", "A configuration value has changed.");
-        }
-
-        private void Change<T>(T oldValue, T newValue)
-        {
-            MyAPIGateway.Utilities.ShowMessage("NewTemplateMod", $"A configuration value has changed from '{oldValue}' to '{newValue}'.");
-        }
 
         protected override void UnloadData()
         {
@@ -63,70 +58,57 @@ namespace mz.NewTemplateMod
             }
             catch (Exception)
             {
+                ConfigStorage.TryLog("Failed to unload NewTemplateModMain.", "NewTemplateMod");
             }
         }
 
         private void HandleCommands(ulong sender, string[] arguments)
         {
-            MyAPIGateway.Utilities.ShowMessage("NewTemplateMod", $"Received command from {sender}: {string.Join(" ", arguments)}");
-
             if (arguments.Length == 0)
+            {
+                ConfigStorage.TryLog("Available commands: help, greet, version, sethello, togglehello", "NewTemplateMod");
                 return;
+            }
 
             switch (arguments[0].ToLowerInvariant())
             {
                 case "help":
-                    MyAPIGateway.Utilities.ShowMessage("NewTemplateMod", "Available commands: help, greet, greet2, version, sethello, togglehello, togglehello2");
+                    ConfigStorage.TryLog("Available commands: help, greet, version, sethello, togglehello", "NewTemplateMod");
                     break;
                 case "greet":
                     if (TestConfig.RespondToHello)
                     {
-                        MyAPIGateway.Utilities.ShowMessage("NewTemplateMod", TestConfig.GreetingMessage);
+                        ConfigStorage.TryLog(TestConfig.GreetingMessage, "NewTemplateMod");
                     }
                     else
                     {
-                        MyAPIGateway.Utilities.ShowMessage("NewTemplateMod", "Greeting is disabled in the config.");
-                    }
-                    break;
-                case "greet2":
-                    if (TestConfig.RespondToHello2)
-                    {
-                        MyAPIGateway.Utilities.ShowMessage("NewTemplateMod", TestConfig.GreetingMessage);
-                    }
-                    else
-                    {
-                        MyAPIGateway.Utilities.ShowMessage("NewTemplateMod", "Greeting2 is disabled in the config.");
+                        ConfigStorage.TryLog("Greeting is disabled in the config.", "NewTemplateMod");
                     }
                     break;
 
                 case "version":
-                    MyAPIGateway.Utilities.ShowMessage("NewTemplateMod", $"Mod version: {ModMeta.Version}");
+                    ConfigStorage.TryLog($"Mod version: {ModMeta.Version}", "NewTemplateMod");
                     break;
 
                 case "sethello":
                     if (arguments.Length < 2)
                     {
-                        MyAPIGateway.Utilities.ShowMessage("NewTemplateMod", "Usage: sethello <greetingString>");
+                        ConfigStorage.TryLog("Usage: sethello <greetingString>", "NewTemplateMod");
                         break;
                     }
 
                     var greeting = string.Join(" ", arguments.Skip(1));
                     TestConfig.GreetingMessage.Value = greeting;
-                    MyAPIGateway.Utilities.ShowMessage("NewTemplateMod", $"Greeting message set to: {greeting}");
+                    ConfigStorage.TryLog($"Greeting message set to: {greeting}", "NewTemplateMod");
                     break;
 
                 case "togglehello":
                     TestConfig.RespondToHello.Value = !TestConfig.RespondToHello;
-                    MyAPIGateway.Utilities.ShowMessage("NewTemplateMod", $"RespondToHello set to: {TestConfig.RespondToHello}");
-                    break;
-
-                case "togglehello2":
-                    TestConfig.RespondToHello2.Value = !TestConfig.RespondToHello2;
-                    MyAPIGateway.Utilities.ShowMessage("NewTemplateMod", $"RespondToHello2 set to: {TestConfig.RespondToHello2}");
+                    ConfigStorage.TryLog($"RespondToHello set to: {TestConfig.RespondToHello}", "NewTemplateMod");
                     break;
 
                 default:
-                    MyAPIGateway.Utilities.ShowMessage("NewTemplateMod", $"Unknown command: {arguments[0]}");
+                    ConfigStorage.TryLog($"Unknown command: {arguments[0]}", "NewTemplateMod");
                     break;
             }
         }

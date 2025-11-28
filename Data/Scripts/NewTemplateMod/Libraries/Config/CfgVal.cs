@@ -56,5 +56,87 @@ namespace mz.Config
         {
             _value = defaultValue;
         }
+
+        // -------------------- Overrides & Operators --------------------
+
+        public override string ToString()
+        {
+            return _value?.ToString();
+        }
+
+        public override int GetHashCode()
+        {
+            return _value?.GetHashCode() ?? 0;
+        }
+
+        public override bool Equals(object obj)
+        {
+            if (ReferenceEquals(this, obj))
+                return true;
+
+            if (obj is CfgVal<T>)
+                return Equals((CfgVal<T>)obj);
+
+            if (obj is T)
+                return EqualsValue((T)obj);
+
+            return false;
+        }
+
+        public bool Equals(CfgVal<T> other)
+        {
+            if (ReferenceEquals(other, null))
+                return false;
+
+            if (ReferenceEquals(this, other))
+                return true;
+
+            return EqualsValue(other._value);
+        }
+
+        private bool EqualsValue(T otherValue)
+        {
+            return Equals(_value, otherValue);
+        }
+
+        public static bool operator ==(CfgVal<T> a, CfgVal<T> b)
+        {
+            if (ReferenceEquals(a, b))
+                return true;
+
+            if (ReferenceEquals(a, null) || ReferenceEquals(b, null))
+                return false;
+
+            return Equals(a._value, b._value);
+        }
+
+        public static bool operator !=(CfgVal<T> a, CfgVal<T> b)
+        {
+            return !(a == b);
+        }
+
+        // Compare CfgVal<T> with raw T (CfgVal<T> == 42)
+        public static bool operator ==(CfgVal<T> a, T b)
+        {
+            if (ReferenceEquals(a, null))
+                return false;
+
+            return Equals(a._value, b);
+        }
+
+        public static bool operator !=(CfgVal<T> a, T b)
+        {
+            return !(a == b);
+        }
+
+        public static bool operator ==(T a, CfgVal<T> b)
+        {
+            return b == a;
+        }
+
+        public static bool operator !=(T a, CfgVal<T> b)
+        {
+            return !(b == a);
+        }
     }
 }

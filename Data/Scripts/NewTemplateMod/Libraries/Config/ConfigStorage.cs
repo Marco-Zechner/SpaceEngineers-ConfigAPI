@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Text;
 using mz.SemanticVersioning;
 using Sandbox.ModAPI;
 using VRage.Game.Components;
@@ -21,15 +22,20 @@ namespace mz.Config
     /// DO NOT create instances of ConfigBase or derived types directly.
     /// Instead, use ConfigStorage.Register<T>() to get an instance of T.
     /// </summary>
-    [MySessionComponentDescriptor(MyUpdateOrder.NoUpdate)]  
+    [MySessionComponentDescriptor(MyUpdateOrder.NoUpdate)]
     public class ConfigStorage : MySessionComponentBase
     {
-        private const string Extension = ".xml";
+        private const string EXTENSION = ".xml";
 
         private class ConfigEntry
         {
             public ConfigBase Instance;
             public Action Save;
+            public Func<ConfigBase> Reload;
+
+            public ConfigStorageKind StorageKind;
+            public string Name;      // base name
+            public string FileName;  // MakeFileName(kind, cfg, name)
         }
 
         private static readonly Dictionary<Type, Dictionary<ConfigStorageKind, ConfigEntry>> _configs
@@ -69,8 +75,13 @@ namespace mz.Config
             var entry = new ConfigEntry
             {
                 Instance = cfg,
-                Save = () => Save(storageKind, cfg, name)
+                StorageKind = storageKind,
+                Name = name,
+                FileName = MakeFileName(storageKind, cfg, name),
             };
+
+            entry.Save = () => Save(storageKind, (T)entry.Instance, name);
+            entry.Reload = () => Load(storageKind, new T(), name);
 
             byKind[storageKind] = entry;
             return cfg;
@@ -96,14 +107,14 @@ namespace mz.Config
 
         protected override void UnloadData()
         {
-            SaveAll();
+            SaveAllConfigs();
         }
 
         /// <summary>
         /// Save all configs that have been registered.
         /// Called automatically on unload.
         /// </summary>
-        public static void SaveAll()
+        public static void SaveAllConfigs()
         {
             foreach (var byKind in _configs.Values)
             {
@@ -113,98 +124,437 @@ namespace mz.Config
         }
 
         /// <summary>
-        /// Called by ConfigValue when any config value is changed.
+        /// Save configs with optional filter.
+        /// Filter receives (kind, virtualPath). If filter is null, all configs are saved.
+        /// Virtual path looks like: SpaceEngineers/WorldStorage/MyConfig.xml
+        /// Returns true if at least one registered config matched and was saved.
+        /// </summary>
+        public static bool SaveConfigs(Func<ConfigStorageKind, string, bool> filter = null)
+        {
+            bool anySaved = false;
+
+            foreach (var byKind in _configs.Values)
+            {
+                foreach (var entry in byKind.Values)
+                {
+                    string vpath = MakeVirtualPath(entry.StorageKind, entry.FileName);
+                    if (filter != null && !filter(entry.StorageKind, vpath))
+                        continue;
+
+                    entry.Save();
+                    anySaved = true;
+                }
+            }
+
+            return anySaved;
+        }
+
+        /// <summary>
+        /// Reload configs with optional filter.
+        /// Filter receives (kind, virtualPath). If filter is null, all configs are reloaded.
+        /// Returns true if at least one registered config matched and was reloaded.
+        /// </summary>
+        public static bool ReloadConfigs(Func<ConfigStorageKind, string, bool> filter = null)
+        {
+            bool anyReloaded = false;
+            foreach (var byKind in _configs.Values)
+            {
+                foreach (var entry in byKind.Values)
+                {
+                    string vpath = MakeVirtualPath(entry.StorageKind, entry.FileName);
+                    if (filter != null && !filter(entry.StorageKind, vpath))
+                        continue;
+
+                    if (entry.Reload == null)
+                        continue;
+
+                    var newInstance = entry.Reload();
+                    entry.Instance = newInstance;
+                    anyReloaded = true;
+                }
+            }
+            return anyReloaded;
+        }
+
+        /// <summary>
+        /// Lists all registered configs as virtual paths, grouped by storage kind.
+        /// Virtual paths look like: SpaceEngineers/WorldStorage/MyConfig.xml
+        /// </summary>
+        public static Dictionary<ConfigStorageKind, List<string>> ListConfigs()
+        {
+            var result = new Dictionary<ConfigStorageKind, List<string>>();
+
+            foreach (var byKind in _configs.Values)
+            {
+                foreach (var entry in byKind.Values)
+                {
+                    var kind = entry.StorageKind;
+                    List<string> list;
+                    if (!result.TryGetValue(kind, out list))
+                    {
+                        list = new List<string>();
+                        result[kind] = list;
+                    }
+
+                    string vpath = MakeVirtualPath(kind, entry.FileName);
+                    list.Add(vpath);
+                }
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Called by CfgVal when any config value is changed.
         /// </summary>
         internal static void NotifyChanged()
         {
-            SaveAll();
+            if (_isLoading)
+                return; // Suppress auto-save during load
+
+            SaveAllConfigs();
             OnAnyConfigChanged?.Invoke();
+        }
+
+        // ------------------ Command handler ------------------
+
+        /// <summary>
+        /// Handles config management commands.
+        /// /{prefix} list
+        /// /{prefix} save &lt;virtualPath&gt;
+        /// /{prefix} save &lt;local|global|world&gt; &lt;fileName[.xml]&gt;
+        /// /{prefix} reload ... (same as save)
+        ///
+        /// virtualPath looks like: SpaceEngineers/WorldStorage/MyConfig.xml
+        /// </summary>
+        public static void HandleConfigCommands(string commandPrefix, ulong sender, string command, ref bool sendToOthers)
+        {
+            if (string.IsNullOrWhiteSpace(commandPrefix) || string.IsNullOrWhiteSpace(command))
+                return;
+
+            var text = command.Trim();
+            var prefixWithSlash = "/" + commandPrefix;
+
+            if (!text.StartsWith(prefixWithSlash + " ", StringComparison.OrdinalIgnoreCase) &&
+                !text.Equals(prefixWithSlash, StringComparison.OrdinalIgnoreCase))
+                return;
+
+            // this is our command; don't send it to chat
+            sendToOthers = false;
+
+            var rest = text.Substring(prefixWithSlash.Length).TrimStart();
+            if (string.IsNullOrEmpty(rest))
+            {
+                TryLog($"Config command usage: /{commandPrefix} list | save ... | reload ...");
+                return;
+            }
+
+            var parts = rest.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+            var cmd = parts[0].ToLowerInvariant();
+
+            switch (cmd)
+            {
+                case "list":
+                    HandleListCommand();
+                    break;
+
+                case "save":
+                    HandleSaveOrReloadCommand(true, parts);
+                    break;
+
+                case "reload":
+                    HandleSaveOrReloadCommand(false, parts);
+                    break;
+
+                default:
+                    TryLog($"Unknown config command '{cmd}'. Use: /{commandPrefix} list | save | reload");
+                    break;
+            }
+        }
+
+        private static void HandleListCommand()
+        {
+            var dict = ListConfigs();
+            if (dict.Count == 0)
+            {
+                TryLog("No configs registered.");
+                return;
+            }
+
+            foreach (var kv in dict)
+            {
+                StringBuilder sb = new StringBuilder();
+                sb.AppendLine($"{kv.Key}:");
+                foreach (var path in kv.Value)
+                    sb.AppendLine(path);
+                TryLog(sb.ToString());
+            }
+        }
+
+        private static void HandleSaveOrReloadCommand(bool isSave, string[] parts)
+        {
+            if (parts.Length < 2)
+            {
+                TryLog($"Usage: ... {(isSave ? "save" : "reload")} <SpaceEngineers/...> OR <local|global|world> <fileName[.xml]>");
+                return;
+            }
+
+            // detect "path mode" vs "kind+name mode"
+            // path mode: second arg contains "SpaceEngineers" or a '/'
+            var second = parts[1];
+
+            if (second.IndexOf("SpaceEngineers", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                second.Contains("/") || second.Contains("\\"))
+            {
+                // path mode: everything after the subcommand is the path
+                var pathArg = string.Join(" ", parts, 1, parts.Length - 1).Trim();
+
+                ConfigStorageKind kind;
+                string fileName;
+                if (!TryParseVirtualPath(pathArg, out kind, out fileName))
+                {
+                    TryLog($"Could not parse path '{pathArg}'. Expected something like SpaceEngineers/WorldStorage/MyConfig.xml");
+                    return;
+                }
+
+                Func<ConfigStorageKind, string, bool> filter = (k, vpath) =>
+                {
+                    if (k != kind) return false;
+                    var fn = GetFileNameFromVirtualPath(vpath);
+                    return fn.Equals(fileName, StringComparison.OrdinalIgnoreCase);
+                };
+
+                if (isSave)
+                {
+                    if (SaveConfigs(filter))
+                        TryLog($"Saved config: {kind} {fileName}");
+                    else
+                        TryLog($"No matching config found to save for: {kind} {fileName}");
+                }
+                else
+                {
+                    if (ReloadConfigs(filter))
+                        TryLog($"Reloaded config: {kind} {fileName}");
+                    else
+                        TryLog($"No matching config found to reload for: {kind} {fileName}");
+                }
+            }
+            else
+            {
+                // kind + name mode: save local MyConfig[.xml]
+                if (parts.Length < 3)
+                {
+                    TryLog($"Usage: ... {(isSave ? "save" : "reload")} <local|global|world> <fileName[.xml]>");
+                    return;
+                }
+
+                ConfigStorageKind kind;
+                if (!TryParseKind(parts[1], out kind))
+                {
+                    TryLog($"Unknown storage kind '{parts[1]}'. Use local, global or world.");
+                    return;
+                }
+
+                var fileName = parts[2];
+                if (!fileName.EndsWith(EXTENSION, StringComparison.OrdinalIgnoreCase))
+                    fileName += EXTENSION;
+
+                Func<ConfigStorageKind, string, bool> filter = (k, vpath) =>
+                {
+                    if (k != kind) return false;
+                    var fn = GetFileNameFromVirtualPath(vpath);
+                    return fn.Equals(fileName, StringComparison.OrdinalIgnoreCase);
+                };
+
+                if (isSave)
+                {
+                    if (SaveConfigs(filter))
+                        TryLog($"Saved config: {kind} {fileName}");
+                    else
+                        TryLog($"No matching config found to save for: {kind} {fileName}");
+                }
+                else
+                {
+                    if (ReloadConfigs(filter))
+                        TryLog($"Reloaded config: {kind} {fileName}");
+                    else
+                        TryLog($"No matching config found to reload for: {kind} {fileName}");
+                }
+            }
+        }
+
+        private static bool TryParseKind(string text, out ConfigStorageKind kind)
+        {
+            kind = ConfigStorageKind.Local;
+            if (string.IsNullOrWhiteSpace(text))
+                return false;
+
+            text = text.Trim().ToLowerInvariant();
+
+            switch (text)
+            {
+                case "local":
+                    kind = ConfigStorageKind.Local;
+                    return true;
+                case "global":
+                    kind = ConfigStorageKind.Global;
+                    return true;
+                case "world":
+                    kind = ConfigStorageKind.World;
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
+        private static string MakeVirtualPath(ConfigStorageKind kind, string fileName)
+        {
+            switch (kind)
+            {
+                case ConfigStorageKind.Global:
+                    return "SpaceEngineers/GlobalStorage/" + fileName;
+                case ConfigStorageKind.Local:
+                    return "SpaceEngineers/LocalStorage/" + fileName;
+                case ConfigStorageKind.World:
+                    return "SpaceEngineers/WorldStorage/" + fileName;
+                default:
+                    return "SpaceEngineers/Unknown/" + fileName;
+            }
+        }
+
+        private static bool TryParseVirtualPath(string virtualPath, out ConfigStorageKind kind, out string fileName)
+        {
+            kind = ConfigStorageKind.Local;
+            fileName = null;
+
+            if (string.IsNullOrWhiteSpace(virtualPath))
+                return false;
+
+            var trimmed = virtualPath.Trim().Replace('\\', '/');
+
+            var idx = trimmed.IndexOf("SpaceEngineers/", StringComparison.OrdinalIgnoreCase);
+            if (idx >= 0)
+                trimmed = trimmed.Substring(idx + "SpaceEngineers/".Length);
+
+            if (trimmed.StartsWith("GlobalStorage/", StringComparison.OrdinalIgnoreCase))
+            {
+                kind = ConfigStorageKind.Global;
+                fileName = trimmed.Substring("GlobalStorage/".Length);
+                return !string.IsNullOrWhiteSpace(fileName);
+            }
+
+            if (trimmed.StartsWith("LocalStorage/", StringComparison.OrdinalIgnoreCase))
+            {
+                kind = ConfigStorageKind.Local;
+                fileName = trimmed.Substring("LocalStorage/".Length);
+                return !string.IsNullOrWhiteSpace(fileName);
+            }
+
+            if (trimmed.StartsWith("WorldStorage/", StringComparison.OrdinalIgnoreCase))
+            {
+                kind = ConfigStorageKind.World;
+                fileName = trimmed.Substring("WorldStorage/".Length);
+                return !string.IsNullOrWhiteSpace(fileName);
+            }
+
+            return false;
+        }
+
+        private static string GetFileNameFromVirtualPath(string vpath)
+        {
+            if (string.IsNullOrWhiteSpace(vpath))
+                return vpath;
+
+            var s = vpath.Replace('\\', '/');
+            var idx = s.LastIndexOf('/');
+            if (idx < 0) return s;
+            return s.Substring(idx + 1);
         }
 
         // ------------------ internals ------------------
 
-        private static T Load<T>(ConfigStorageKind storageKind, T cfgTemplate, string name) where T : ConfigBase, new()
+        private static bool _isLoading = false;
+
+        private static T Load<T>(ConfigStorageKind storageKind, T cfgTemplate, string name)
+            where T : ConfigBase, new()
         {
             var utils = MyAPIGateway.Utilities;
             if (utils == null)
                 throw new Exception("MyAPIGateway.Utilities is null (too early for config load).");
 
             string file = MakeFileName(storageKind, cfgTemplate, name);
+            string xml = null;
 
+            if (Exists<T>(utils, file, storageKind))
+            {
+                using (var reader = OpenRead<T>(utils, file, storageKind))
+                {
+                    xml = reader.ReadToEnd();
+                }
+            }
+
+            _isLoading = true;
             try
             {
-                if (Exists<T>(utils, file, storageKind))
+                if (string.IsNullOrWhiteSpace(xml))
                 {
-                    using (var reader = OpenRead<T>(utils, file, storageKind))
-                    {
-                        var xml = reader.ReadToEnd();
-
-                        if (string.IsNullOrWhiteSpace(xml))
-                        {
-                            InitializeVersionInfo(cfgTemplate, file);
-                            Save(storageKind, cfgTemplate, name);
-                            return cfgTemplate;
-                        }
-
-                        try
-                        {
-                            var loaded = utils.SerializeFromXML<T>(xml);
-
-                            if (!VersionAndHashOk(loaded, file))
-                            {
-                                CreateBackupForCorrupted<T>(utils, file, storageKind, xml);
-                                InitializeVersionInfo(cfgTemplate, file);
-                                TryLog($"Config {file}: tampered or invalid version data. Reset to defaults.");
-                                Save(storageKind, cfgTemplate, name);
-                                return cfgTemplate;
-                            }
-
-                            var storedVer = SemanticVersion.Parse(loaded.StoredVersion ?? "0.0.0");
-                            var currentVer = loaded.ConfigVersion;
-
-                            if (storedVer.Major != currentVer.Major)
-                            {
-                                // Major mismatch: backup and reset
-                                CreateBackupForCorrupted<T>(utils, file, storageKind, xml);
-                                InitializeVersionInfo(cfgTemplate, file);
-                                TryLog($"Config {file}: major version mismatch ({storedVer} -> {currentVer}). Reset to defaults, please review settings.");
-                                Save(storageKind, cfgTemplate, name);
-                                return cfgTemplate;
-                            }
-
-                            bool minorOrPatchChanged =
-                                storedVer.Minor != currentVer.Minor ||
-                                storedVer.Patch != currentVer.Patch;
-
-                            if (minorOrPatchChanged)
-                            {
-                                // Minor/patch mismatch: keep values, bump version & hash
-                                InitializeVersionInfo(loaded, file);
-                                TryLog($"Config {file}: version upgraded ({storedVer} -> {currentVer}), keeping existing values.");
-                                Save(storageKind, loaded, name);
-                                return loaded;
-                            }
-
-                            // Same version: ensure hash up to date (in case algo changed)
-                            InitializeVersionInfo(loaded, file);
-                            Save(storageKind, loaded, name);
-                            return loaded;
-                        }
-                        catch (Exception e)
-                        {
-                            CreateBackupForCorrupted<T>(utils, file, storageKind, xml);
-                            InitializeVersionInfo(cfgTemplate, file);
-                            TryLog($"Config parse error {file}: {e}. Reset to defaults.");
-                            Save(storageKind, cfgTemplate, name);
-                            return cfgTemplate;
-                        }
-                    }
+                    InitializeVersionInfo(cfgTemplate, file);
+                    Save(storageKind, cfgTemplate, name);
+                    return cfgTemplate;
                 }
 
-                // No file: fresh default
-                InitializeVersionInfo(cfgTemplate, file);
-                Save(storageKind, cfgTemplate, name);
-                return cfgTemplate;
+                try
+                {
+                    var loaded = utils.SerializeFromXML<T>(xml);
+
+                    if (!VersionAndHashOk(loaded, file))
+                    {
+                        CreateBackupForCorrupted<T>(utils, file, storageKind, xml);
+                        InitializeVersionInfo(cfgTemplate, file);
+                        TryLog($"Config {file}: tampered or invalid version data. Reset to defaults.");
+                        Save(storageKind, cfgTemplate, name);
+                        return cfgTemplate;
+                    }
+
+                    var storedVer = SemanticVersion.Parse(loaded.StoredVersion ?? "0.0.0");
+                    var currentVer = loaded.ConfigVersion;
+
+                    if (storedVer.Major != currentVer.Major)
+                    {
+                        // Major mismatch: backup and reset
+                        CreateBackupForCorrupted<T>(utils, file, storageKind, xml);
+                        InitializeVersionInfo(cfgTemplate, file);
+                        TryLog($"Config {file}: major version mismatch ({storedVer} -> {currentVer}). Reset to defaults, please review settings.");
+                        Save(storageKind, cfgTemplate, name);
+                        return cfgTemplate;
+                    }
+
+                    bool minorOrPatchChanged =
+                        storedVer.Minor != currentVer.Minor ||
+                        storedVer.Patch != currentVer.Patch;
+
+                    if (minorOrPatchChanged)
+                    {
+                        // Minor/patch mismatch: keep values, bump version & hash
+                        InitializeVersionInfo(loaded, file);
+                        TryLog($"Config {file}: version upgraded ({storedVer} -> {currentVer}), keeping existing values.");
+                        Save(storageKind, loaded, name);
+                        return loaded;
+                    }
+
+                    // Same version: ensure hash up to date (in case algo changed)
+                    InitializeVersionInfo(loaded, file);
+                    Save(storageKind, loaded, name);
+                    return loaded;
+                }
+                catch (Exception e)
+                {
+                    CreateBackupForCorrupted<T>(utils, file, storageKind, xml);
+                    InitializeVersionInfo(cfgTemplate, file);
+                    TryLog($"Config parse error {file}: {e}. Reset to defaults.");
+                    Save(storageKind, cfgTemplate, name);
+                    return cfgTemplate;
+                }
             }
             catch (Exception e)
             {
@@ -212,6 +562,10 @@ namespace mz.Config
                 InitializeVersionInfo(cfgTemplate, file);
                 Save(storageKind, cfgTemplate, name);
                 return cfgTemplate;
+            }
+            finally
+            {
+                _isLoading = false;
             }
         }
 
@@ -228,7 +582,7 @@ namespace mz.Config
                 // Make sure version info is consistent before saving
                 InitializeVersionInfo(cfg, file);
 
-                using (var writer = OpenWrite<T>(utils, file,storageKind))
+                using (var writer = OpenWrite<T>(utils, file, storageKind))
                 {
                     var xml = utils.SerializeToXML(cfg);
                     writer.Write(xml);
@@ -315,9 +669,9 @@ namespace mz.Config
         private static string MakeFileName(ConfigStorageKind storageKind, ConfigBase cfg, string name)
         {
             if (storageKind == ConfigStorageKind.Global)
-                return cfg.GetType().FullName + "." + name + Extension;
+                return cfg.GetType().FullName + "." + name + EXTENSION;
 
-            return name + Extension;
+            return name + EXTENSION;
         }
 
         private static bool Exists<T>(IMyUtilities utils, string fileName, ConfigStorageKind kind)
@@ -377,7 +731,7 @@ namespace mz.Config
                     return utils.WriteFileInLocalStorage(fileName, t);
 
                 default:
-                    TryLog($"Config open read: unknown storage kind {kind}");
+                    TryLog($"Config open write: unknown storage kind {kind}");
                     return null;
             }
         }
@@ -390,7 +744,7 @@ namespace mz.Config
                     Path.GetFileNameWithoutExtension(fileName)
                     + ".backup_"
                     + DateTime.Now.ToString("yyyyMMdd_HHmmssfff")
-                    + Extension;
+                    + EXTENSION;
 
                 using (var writer = OpenWrite<T>(utils, backupName, kind))
                 {
@@ -406,18 +760,19 @@ namespace mz.Config
             }
         }
 
-        private static void TryLog(string msg)
+        public static void TryLog(string msg, string sender = "ConfigStorage")
         {
             if (MyAPIGateway.Session?.Player?.Character == null)
             {
                 logQueue.Enqueue(msg);
                 return;
-            } else while (logQueue.Count > 0)
+            }
+            else while (logQueue.Count > 0)
             {
                 var queuedMsg = logQueue.Dequeue();
                 try
                 {
-                    MyAPIGateway.Utilities?.ShowMessage("ConfigStorage", queuedMsg);
+                    MyAPIGateway.Utilities?.ShowMessage(sender, queuedMsg);
                 }
                 catch
                 {
@@ -427,7 +782,7 @@ namespace mz.Config
 
             try
             {
-                MyAPIGateway.Utilities?.ShowMessage("ConfigStorage", msg);
+                MyAPIGateway.Utilities?.ShowMessage(sender, msg);
             }
             catch
             {
@@ -435,6 +790,6 @@ namespace mz.Config
             }
         }
 
-        private static readonly Queue<string> logQueue = new Queue<string>();
+        public static readonly Queue<string> logQueue = new Queue<string>();
     }
 }
