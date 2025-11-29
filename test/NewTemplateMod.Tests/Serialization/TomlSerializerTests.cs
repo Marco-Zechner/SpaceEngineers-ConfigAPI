@@ -1,0 +1,104 @@
+using mz.Config.Core;
+using mz.Config.Domain;
+using mz.Config.Abstractions;
+
+namespace NewTemplateMod.Tests.Serialization
+{
+    [TestFixture]
+    public class TomlConfigSerializerTests
+    {
+        private TomlConfigSerializer _serializer;
+        private IConfigDefinition _definition;
+
+        [SetUp]
+        public void SetUp()
+        {
+            _serializer = new TomlConfigSerializer();
+            _definition = new ConfigDefinition<ExampleConfig>("ExampleConfig");
+        }
+
+        [Test]
+        public void Serialize_DefaultExampleConfig_ContainsExpectedLines()
+        {
+            // Arrange
+            var config = new ExampleConfig();
+
+            // Act
+            var toml = _serializer.Serialize(config);
+
+            // Assert (loose on whitespace / order, strict on content)
+            Assert.That(toml, Contains.Substring("[ExampleConfig]"));
+            Assert.That(toml, Contains.Substring("StoredVersion"));
+            Assert.That(toml, Contains.Substring("\"0.1.0\""));
+
+            Assert.That(toml, Contains.Substring("RespondToHello"));
+            Assert.That(toml, Contains.Substring("false"));
+            Assert.That(toml, Contains.Substring("# false"));
+
+            Assert.That(toml, Contains.Substring("GreetingMessage"));
+            Assert.That(toml, Contains.Substring("\"hello\""));
+            Assert.That(toml, Contains.Substring("# \"hello\""));
+        }
+
+        [Test]
+        public void Serialize_ModifiedExampleConfig_ContainsUpdatedValues_AndSameDefaults()
+        {
+            // Arrange
+            var config = new ExampleConfig();
+            config.RespondToHello = true;
+            config.GreetingMessage = "hi";
+
+            // Act
+            var toml = _serializer.Serialize(config);
+
+            // Assert: values reflect current config
+            Assert.That(toml, Contains.Substring("RespondToHello"));
+            Assert.That(toml, Contains.Substring("true"));
+            Assert.That(toml, Contains.Substring("# false")); // default is still false in comment
+
+            Assert.That(toml, Contains.Substring("GreetingMessage"));
+            Assert.That(toml, Contains.Substring("\"hi\""));
+            Assert.That(toml, Contains.Substring("# \"hello\"")); // default is still "hello"
+        }
+
+        [Test]
+        public void Deserialize_RoundTrip_ProducesEquivalentConfig()
+        {
+            // Arrange
+            var original = new ExampleConfig();
+            original.RespondToHello = true;
+            original.GreetingMessage = "hi";
+
+            var toml = _serializer.Serialize(original);
+
+            // Act
+            var result = _serializer.Deserialize(_definition, toml);
+            var cfg = result as ExampleConfig;
+
+            // Assert
+            Assert.That(cfg, Is.Not.Null);
+            Assert.That(cfg.RespondToHello, Is.True);
+            Assert.That(cfg.GreetingMessage, Is.EqualTo("hi"));
+        }
+
+        [Test]
+        public void Deserialize_HandWrittenToml_UsesProvidedValues()
+        {
+            // Arrange: simulate a file
+            var toml = 
+                "[ExampleConfig]\n" +
+                "StoredVersion = \"0.1.0\"\n" +
+                "RespondToHello = true # false\n" +
+                "GreetingMessage = \"custom\" # \"hello\"\n";
+
+            // Act
+            var result = _serializer.Deserialize(_definition, toml);
+            var cfg = result as ExampleConfig;
+
+            // Assert
+            Assert.That(cfg, Is.Not.Null);
+            Assert.That(cfg.RespondToHello, Is.True);
+            Assert.That(cfg.GreetingMessage, Is.EqualTo("custom"));
+        }
+    }
+}
