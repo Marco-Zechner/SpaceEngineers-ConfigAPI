@@ -4,39 +4,28 @@ using mz.Config.Domain;
 
 namespace mz.Config.Core
 {
-    public class ConfigDefinition<T> : IConfigDefinition
+    /// <summary>
+    /// Minimal generic definition used internally by ConfigStorage.
+    /// TypeName is always typeof(T).Name; SectionName is TypeName.
+    /// </summary>
+    public sealed class ConfigDefinition<T> : IConfigDefinition
         where T : ConfigBase, new()
     {
-        private readonly string _typeName;
-        private readonly string _sectionName;
-
         public ConfigDefinition(string sectionName)
         {
             if (string.IsNullOrEmpty(sectionName))
                 throw new ArgumentNullException("sectionName");
 
-            _typeName = typeof(T).Name;
-            _sectionName = sectionName;
+            TypeName = typeof(T).Name;
+            SectionName = sectionName;
         }
 
-        public string TypeName
-        {
-            get { return _typeName; }
-        }
+        public string TypeName { get; }
 
-        public string SectionName
-        {
-            get { return _sectionName; }
-        }
+        public string SectionName { get; }
 
-        public Type ConfigType
-        {
-            get { return typeof(T); }
-        }
+        public Type ConfigType => typeof(T);
 
-        public ConfigBase CreateDefaultInstance()
-        {
-            return new T();
-        }
+        public ConfigBase CreateDefaultInstance() => new T();
     }
 }

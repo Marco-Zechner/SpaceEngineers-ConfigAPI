@@ -10,21 +10,13 @@ namespace mz.Config.Core
         private static IConfigFileSystem _fileSystem;
         private static IConfigSerializer _serializer;
 
-        // key: id (usually typeof(T).Name or alias) -> definition
+        // TypeName -> definition (for metadata + default instance)
         private static readonly Dictionary<string, IConfigDefinition> _definitions =
             new Dictionary<string, IConfigDefinition>();
 
-        // key: (location|id) -> current filename
-        private static readonly Dictionary<string, string> _currentFiles =
-            new Dictionary<string, string>();
-
-        // key: (location|id) -> in-memory instance
-        private static readonly Dictionary<string, ConfigBase> _instances =
-            new Dictionary<string, ConfigBase>();
-
-        // optional: track which ids are registered in which locations
-        private static readonly Dictionary<string, HashSet<ConfigLocationType>> _registeredLocations =
-            new Dictionary<string, HashSet<ConfigLocationType>>();
+        // Location -> (TypeName -> Slot)
+        private static readonly Dictionary<ConfigLocationType, Dictionary<string, ConfigSlot>> _slots =
+            new Dictionary<ConfigLocationType, Dictionary<string, ConfigSlot>>();
 
         private static bool _initialized;
 
@@ -37,9 +29,7 @@ namespace mz.Config.Core
             _serializer = serializer;
 
             _definitions.Clear();
-            _currentFiles.Clear();
-            _instances.Clear();
-            _registeredLocations.Clear();
+            _slots.Clear();
 
             _initialized = true;
         }
@@ -50,147 +40,106 @@ namespace mz.Config.Core
                 throw new InvalidOperationException("ConfigStorage.Initialize must be called before use.");
         }
 
-        // ----------------- registration API -----------------
+        // ----------------- registration -----------------
 
-        public static void Register<T>(ConfigLocationType location) where T : ConfigBase, new()
+        /// <summary>
+        /// Register a config type for a given location. File name defaults to
+        /// the file system's default file name (usually TypeNameDefault.toml).
+        /// </summary>
+        public static void Register<T>(ConfigLocationType location)
+            where T : ConfigBase, new()
         {
             Register<T>(location, null);
         }
 
-        public static void Register<T>(ConfigLocationType location, string id) where T : ConfigBase, new()
+        /// <summary>
+        /// Register a config type for a given location and initial file name.
+        /// CurrentFileName is set to user-provided name or default; if the file
+        /// exists, ConfigStorage will try to load it once at registration time.
+        /// </summary>
+        public static void Register<T>(ConfigLocationType location, string initialFileName)
+            where T : ConfigBase, new()
         {
             EnsureInitialized();
 
             string typeName = typeof(T).Name;
-            string keyId = string.IsNullOrEmpty(id) ? typeName : id;
 
-            // Ensure we have a definition for this id
             IConfigDefinition def;
-            if (!_definitions.TryGetValue(keyId, out def))
+            if (!_definitions.TryGetValue(typeName, out def))
             {
-                // section name for TOML – for now just type name or id; can adjust later
-                string sectionName = keyId;
-                def = new ConfigDefinition<T>(sectionName);
-                _definitions[keyId] = def;
+                // Section name for TOML is also type name for now.
+                def = new ConfigDefinition<T>(typeName);
+                _definitions[typeName] = def;
             }
-            else
+            else if (def.ConfigType != typeof(T))
             {
-                // sanity: make sure the existing definition matches the type
-                if (def.ConfigType != typeof(T))
-                    throw new InvalidOperationException(
-                        "Config id '" + keyId + "' is already registered with a different type.");
+                throw new InvalidOperationException(
+                    "Config type name '" + typeName + "' is already registered with a different type.");
             }
 
-            HashSet<ConfigLocationType> locations;
-            if (!_registeredLocations.TryGetValue(keyId, out locations))
-            {
-                locations = new HashSet<ConfigLocationType>();
-                _registeredLocations[keyId] = locations;
-            }
+            ConfigSlot slot = GetOrCreateSlot(location, typeName, def, initialFileName);
 
-            locations.Add(location);
-
-            // Lazily create default filename for this (location,id) pair
-            string key = MakeKey(location, keyId);
-            if (!_currentFiles.ContainsKey(key))
-            {
-                string defaultFileName = _fileSystem.GetDefaultFileName(def);
-                _currentFiles[key] = defaultFileName;
-            }
+            // If slot.Instance is null, we either failed to load or there was no file;
+            // keep it lazy: we will create default on first GetOrCreate/Save/Load success.
         }
 
-        // For listing / commands:
-        public static IConfigDefinition[] GetRegisteredDefinitions()
-        {
-            EnsureInitialized();
-            List<IConfigDefinition> list = new List<IConfigDefinition>(_definitions.Values);
-            return list.ToArray();
-        }
+        // ----------------- public API -----------------
 
-        public static ConfigLocationType[] GetRegisteredLocations(string id)
-        {
-            EnsureInitialized();
-            HashSet<ConfigLocationType> locations;
-            if (_registeredLocations.TryGetValue(id, out locations))
-            {
-                ConfigLocationType[] arr = new ConfigLocationType[locations.Count];
-                locations.CopyTo(arr);
-                return arr;
-            }
-            return new ConfigLocationType[0];
-        }
-
-        // ----------------- core API -----------------
-
-        public static T GetOrCreate<T>(ConfigLocationType location) where T : ConfigBase, new()
+        public static T GetOrCreate<T>(ConfigLocationType location)
+            where T : ConfigBase, new()
         {
             EnsureInitialized();
 
             string typeName = typeof(T).Name;
-            IConfigDefinition def = GetDefinitionById(typeName);
+            IConfigDefinition def = GetDefinitionByTypeName(typeName);
+            ConfigSlot slot = GetOrCreateSlot(location, typeName, def, null);
 
-            string key = MakeKey(location, typeName);
-
-            ConfigBase instance;
-            if (_instances.TryGetValue(key, out instance))
-                return (T)instance;
-
-            ConfigBase created = def.CreateDefaultInstance();
-            _instances[key] = created;
-
-            if (!_currentFiles.ContainsKey(key))
+            if (slot.Instance == null)
             {
-                string defaultFileName = _fileSystem.GetDefaultFileName(def);
-                _currentFiles[key] = defaultFileName;
+                slot.Instance = def.CreateDefaultInstance();
             }
 
-            return (T)created;
+            return (T)slot.Instance;
         }
 
-        public static string GetCurrentFileName(ConfigLocationType location, string id)
+        public static string GetCurrentFileName(ConfigLocationType location, string typeName)
         {
             EnsureInitialized();
 
-            if (string.IsNullOrEmpty(id))
-                throw new ArgumentNullException("id");
+            if (string.IsNullOrEmpty(typeName))
+                throw new ArgumentNullException("typeName");
 
-            IConfigDefinition def = GetDefinitionById(id);
-            string key = MakeKey(location, id);
+            IConfigDefinition def = GetDefinitionByTypeName(typeName);
+            ConfigSlot slot = GetOrCreateSlot(location, typeName, def, null);
 
-            string fileName;
-            if (_currentFiles.TryGetValue(key, out fileName))
-                return fileName;
-
-            string defaultFileName = _fileSystem.GetDefaultFileName(def);
-            _currentFiles[key] = defaultFileName;
-            return defaultFileName;
+            return slot.CurrentFileName;
         }
 
-        public static void SetCurrentFileName(ConfigLocationType location, string id, string fileName)
+        public static void SetCurrentFileName(ConfigLocationType location, string typeName, string fileName)
         {
             EnsureInitialized();
 
-            if (string.IsNullOrEmpty(id))
-                throw new ArgumentNullException("id");
+            if (string.IsNullOrEmpty(typeName))
+                throw new ArgumentNullException("typeName");
             if (string.IsNullOrEmpty(fileName))
                 throw new ArgumentNullException("fileName");
 
-            GetDefinitionById(id); // ensure id exists
-
-            string key = MakeKey(location, id);
-            _currentFiles[key] = fileName;
+            IConfigDefinition def = GetDefinitionByTypeName(typeName);
+            ConfigSlot slot = GetOrCreateSlot(location, typeName, def, null);
+            slot.CurrentFileName = fileName;
         }
 
-        public static bool Load(ConfigLocationType location, string id, string fileName)
+        public static bool Load(ConfigLocationType location, string typeName, string fileName)
         {
             EnsureInitialized();
 
-            if (string.IsNullOrEmpty(id))
-                throw new ArgumentNullException("id");
+            if (string.IsNullOrEmpty(typeName))
+                throw new ArgumentNullException("typeName");
             if (string.IsNullOrEmpty(fileName))
                 throw new ArgumentNullException("fileName");
 
-            IConfigDefinition def = GetDefinitionById(id);
+            IConfigDefinition def = GetDefinitionByTypeName(typeName);
+            ConfigSlot slot = GetOrCreateSlot(location, typeName, def, null);
 
             string content;
             if (!_fileSystem.TryReadFile(location, fileName, out content))
@@ -200,57 +149,51 @@ namespace mz.Config.Core
             if (config == null)
                 return false;
 
-            string key = MakeKey(location, id);
-            _instances[key] = config;
-            _currentFiles[key] = fileName;
-
+            slot.Instance = config;
+            slot.CurrentFileName = fileName;
             return true;
         }
 
-        public static bool Save(ConfigLocationType location, string id, string fileName)
+        public static bool Save(ConfigLocationType location, string typeName, string fileName)
         {
             EnsureInitialized();
 
-            if (string.IsNullOrEmpty(id))
-                throw new ArgumentNullException("id");
+            if (string.IsNullOrEmpty(typeName))
+                throw new ArgumentNullException("typeName");
             if (string.IsNullOrEmpty(fileName))
                 throw new ArgumentNullException("fileName");
 
-            IConfigDefinition def = GetDefinitionById(id);
-            string key = MakeKey(location, id);
+            IConfigDefinition def = GetDefinitionByTypeName(typeName);
+            ConfigSlot slot = GetOrCreateSlot(location, typeName, def, null);
 
-            ConfigBase instance;
-            if (!_instances.TryGetValue(key, out instance))
+            if (slot.Instance == null)
             {
-                instance = def.CreateDefaultInstance();
-                _instances[key] = instance;
+                slot.Instance = def.CreateDefaultInstance();
             }
 
-            string content = _serializer.Serialize(instance);
+            string content = _serializer.Serialize(slot.Instance);
             _fileSystem.WriteFile(location, fileName, content);
-            _currentFiles[key] = fileName;
+            slot.CurrentFileName = fileName;
 
             return true;
         }
 
-        public static string GetConfigAsText(ConfigLocationType location, string id)
+        public static string GetConfigAsText(ConfigLocationType location, string typeName)
         {
             EnsureInitialized();
 
-            if (string.IsNullOrEmpty(id))
-                throw new ArgumentNullException("id");
+            if (string.IsNullOrEmpty(typeName))
+                throw new ArgumentNullException("typeName");
 
-            IConfigDefinition def = GetDefinitionById(id);
-            string key = MakeKey(location, id);
+            IConfigDefinition def = GetDefinitionByTypeName(typeName);
+            ConfigSlot slot = GetOrCreateSlot(location, typeName, def, null);
 
-            ConfigBase instance;
-            if (!_instances.TryGetValue(key, out instance))
+            if (slot.Instance == null)
             {
-                instance = def.CreateDefaultInstance();
-                _instances[key] = instance;
+                slot.Instance = def.CreateDefaultInstance();
             }
 
-            return _serializer.Serialize(instance);
+            return _serializer.Serialize(slot.Instance);
         }
 
         public static string GetFileAsText(ConfigLocationType location, string fileName)
@@ -267,20 +210,68 @@ namespace mz.Config.Core
             return null;
         }
 
-        // ----------------- helpers -----------------
+        // ----------------- internal helpers -----------------
 
-        private static IConfigDefinition GetDefinitionById(string id)
+        private static IConfigDefinition GetDefinitionByTypeName(string typeName)
         {
             IConfigDefinition def;
-            if (!_definitions.TryGetValue(id, out def))
-                throw new InvalidOperationException("No config definition registered for id: " + id);
-
+            if (!_definitions.TryGetValue(typeName, out def))
+            {
+                throw new InvalidOperationException(
+                    "No config definition registered for type name: " + typeName);
+            }
             return def;
         }
 
-        private static string MakeKey(ConfigLocationType location, string id)
+        private static ConfigSlot GetOrCreateSlot(
+            ConfigLocationType location,
+            string typeName,
+            IConfigDefinition def,
+            string initialFileNameOverride)
         {
-            return ((int)location).ToString() + "|" + id;
+            Dictionary<string, ConfigSlot> byType;
+            if (!_slots.TryGetValue(location, out byType))
+            {
+                byType = new Dictionary<string, ConfigSlot>();
+                _slots[location] = byType;
+            }
+
+            ConfigSlot slot;
+            if (byType.TryGetValue(typeName, out slot))
+            {
+                // Already exists; Register<T> is idempotent. Do not override current filename here.
+                return slot;
+            }
+
+            slot = new ConfigSlot();
+            slot.TypeName = typeName;
+
+            string fileName;
+            if (!string.IsNullOrEmpty(initialFileNameOverride))
+            {
+                fileName = initialFileNameOverride;
+            }
+            else
+            {
+                fileName = _fileSystem.GetDefaultFileName(def);
+            }
+
+            slot.CurrentFileName = fileName;
+
+            // Attempt to load existing file once
+            string content;
+            if (_fileSystem.TryReadFile(location, fileName, out content))
+            {
+                ConfigBase config = _serializer.Deserialize(def, content);
+                if (config != null)
+                {
+                    slot.Instance = config;
+                }
+            }
+
+            // If no file or deserialization failed, Instance stays null.
+            byType[typeName] = slot;
+            return slot;
         }
     }
 }

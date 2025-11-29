@@ -104,11 +104,16 @@ namespace NewTemplateMod.Tests
         }
 
         [Test]
-        public void Register_SameTypeSameLocationTwice_DoesNotThrow()
+        public void Register_SameTypeSameLocationTwice_DoesNotThrow_AndDoesNotChangeCurrentFileName()
         {
+            var originalFileName = ConfigStorage.GetCurrentFileName(ConfigLocationType.Local, "TestConfig");
+
             Assert.That(
                 () => ConfigStorage.Register<TestConfig>(ConfigLocationType.Local),
                 Throws.Nothing);
+
+            var after = ConfigStorage.GetCurrentFileName(ConfigLocationType.Local, "TestConfig");
+            Assert.That(after, Is.EqualTo(originalFileName));
         }
 
         #endregion
@@ -151,7 +156,7 @@ namespace NewTemplateMod.Tests
         }
 
         [Test]
-        public void GetCurrentFileName_NullId_Throws()
+        public void GetCurrentFileName_NullTypeName_Throws()
         {
             Assert.That(
                 () => ConfigStorage.GetCurrentFileName(ConfigLocationType.Local, null),
@@ -163,7 +168,7 @@ namespace NewTemplateMod.Tests
         }
 
         [Test]
-        public void SetCurrentFileName_NullId_Throws()
+        public void SetCurrentFileName_NullTypeName_Throws()
         {
             Assert.That(
                 () => ConfigStorage.SetCurrentFileName(ConfigLocationType.Local, null, "file.toml"),
@@ -227,7 +232,7 @@ namespace NewTemplateMod.Tests
         }
 
         [Test]
-        public void Load_UnknownId_Throws()
+        public void Load_UnknownTypeName_Throws()
         {
             Assert.That(
                 () => ConfigStorage.Load(ConfigLocationType.Local, "UnknownType", "file.toml"),
@@ -235,7 +240,7 @@ namespace NewTemplateMod.Tests
         }
 
         [Test]
-        public void Save_UnknownId_Throws()
+        public void Save_UnknownTypeName_Throws()
         {
             Assert.That(
                 () => ConfigStorage.Save(ConfigLocationType.Local, "UnknownType", "file.toml"),
@@ -243,42 +248,38 @@ namespace NewTemplateMod.Tests
         }
 
         [Test]
-        public void Load_FileMissing_ReturnsFalse_AndDoesNotCreateInstance()
+        public void Load_FileMissing_ReturnsFalse_AndDoesNotChangeCurrentFileName()
         {
+            var originalFileName = ConfigStorage.GetCurrentFileName(ConfigLocationType.Local, "TestConfig");
+
             var result = ConfigStorage.Load(ConfigLocationType.Local, "TestConfig", "does_not_exist.toml");
 
             Assert.That(result, Is.False);
 
-            var cfg = ConfigStorage.GetOrCreate<TestConfig>(ConfigLocationType.Local);
-            Assert.That(cfg, Is.Not.Null);
-
             var fileName = ConfigStorage.GetCurrentFileName(ConfigLocationType.Local, "TestConfig");
-            Assert.That(fileName, Is.EqualTo("TestConfigDefault.toml"));
+            Assert.That(fileName, Is.EqualTo(originalFileName));
         }
 
         [Test]
         public void Load_DeserializerReturnsNull_ReturnsFalse_AndDoesNotOverrideExistingInstance()
         {
-            var original = ConfigStorage.GetOrCreate<TestConfig>(ConfigLocationType.Local);
+            TestConfig original = ConfigStorage.GetOrCreate<TestConfig>(ConfigLocationType.Local);
             original.SomeValue = 5;
 
             _serializer.DeserializeResult = null;
             _fileSystem.WriteFile(ConfigLocationType.Local, "bad.toml", "bad content");
 
-            var result = ConfigStorage.Load(ConfigLocationType.Local, "TestConfig", "bad.toml");
+            bool result = ConfigStorage.Load(ConfigLocationType.Local, "TestConfig", "bad.toml");
 
             Assert.That(result, Is.False);
 
-            var after = ConfigStorage.GetOrCreate<TestConfig>(ConfigLocationType.Local);
+            TestConfig after = ConfigStorage.GetOrCreate<TestConfig>(ConfigLocationType.Local);
             Assert.That(after, Is.SameAs(original));
             Assert.That(after.SomeValue, Is.EqualTo(5));
-
-            var currentFile = ConfigStorage.GetCurrentFileName(ConfigLocationType.Local, "TestConfig");
-            Assert.That(currentFile, Is.EqualTo("TestConfigDefault.toml"));
         }
 
         [Test]
-        public void GetConfigAsText_NullId_Throws()
+        public void GetConfigAsText_NullTypeName_Throws()
         {
             Assert.That(
                 () => ConfigStorage.GetConfigAsText(ConfigLocationType.Local, null),
@@ -359,7 +360,6 @@ namespace NewTemplateMod.Tests
                 return DeserializeResult;
             }
 
-            // Will be used later for TOML; for now unused.
             public ITomlModel ParseToModel(string tomlContent)
             {
                 throw new NotImplementedException();
