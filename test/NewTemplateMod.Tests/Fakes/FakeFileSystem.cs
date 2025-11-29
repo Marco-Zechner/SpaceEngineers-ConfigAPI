@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using mz.Config.Abstractions;
 using mz.Config.Domain;
 
@@ -5,7 +6,7 @@ namespace NewTemplateMod.Tests
 {
     public class FakeFileSystem : IConfigFileSystem
     {
-        private readonly Dictionary<string, string> _files = [];
+        private readonly Dictionary<string, string> _files = new Dictionary<string, string>();
 
         public bool TryReadFile(ConfigLocationType location, string fileName, out string content)
         {

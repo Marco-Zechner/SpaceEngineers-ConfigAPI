@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using mz.Config.Abstractions;
 
 namespace mz.Config.Core

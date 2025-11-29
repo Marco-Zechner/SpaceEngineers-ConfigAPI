@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using mz.Config.Abstractions;
 using mz.Config.Domain;
 
@@ -343,10 +345,6 @@ namespace mz.Config.Core
                 _fileSystem.WriteFile(location, fileName, normalized);
 
                 return normalized;
-            }
-            catch (NotImplementedException)
-            {
-                return originalContent;
             }
             catch
             {

@@ -1,5 +1,6 @@
 using mz.Config.Core;
 using mz.Config.Domain;
+using NUnit.Framework;
 
 namespace NewTemplateMod.Tests.ConfigStorageTests
 {
@@ -29,7 +30,8 @@ namespace NewTemplateMod.Tests.ConfigStorageTests
 
             Assert.That(result, Is.True);
 
-            bool fileExists = FileSystem.TryReadFile(ConfigLocationType.Local, "myconfig.toml", out string content);
+            string content;
+            bool fileExists = FileSystem.TryReadFile(ConfigLocationType.Local, "myconfig.toml", out content);
 
             Assert.Multiple(() =>
             {
@@ -44,7 +46,7 @@ namespace NewTemplateMod.Tests.ConfigStorageTests
         [Test]
         public void Load_ReadsFile_UsesSerializer_AndReplacesInstance()
         {
-            TestConfig loadedConfig = new()
+            TestConfig loadedConfig = new TestConfig()
             {
                 SomeValue = 99
             };

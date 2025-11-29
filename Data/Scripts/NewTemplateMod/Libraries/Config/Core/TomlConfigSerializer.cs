@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using System.Text;
 using mz.Config.Abstractions;
 using mz.Config.Domain;
@@ -10,6 +12,7 @@ namespace mz.Config.Core
         {
             if (config == null)
                 throw new ArgumentNullException("config");
+
 
             ExampleConfig example = config as ExampleConfig;
             if (example == null)

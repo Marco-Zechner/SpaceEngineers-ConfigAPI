@@ -4,9 +4,6 @@ namespace mz.Config.Domain
     {
         public abstract string ConfigVersion { get; }
 
-        public virtual string ConfigNameOverride
-        {
-            get { return GetType().Name; }
-        }
+        public virtual string ConfigNameOverride => GetType().Name;
     }
 }

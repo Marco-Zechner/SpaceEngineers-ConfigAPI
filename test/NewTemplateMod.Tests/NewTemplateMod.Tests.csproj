@@ -1,14 +1,27 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net9</TargetFramework>
-    <LangVersion>latest</LangVersion>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
+    <TargetFramework>net48</TargetFramework>
+    <Platforms>x64</Platforms>
+    <LangVersion>6</LangVersion>
+
+    <!-- It's just a test project; don't treat it as a mod -->
     <IsPackable>false</IsPackable>
+    <IsPublishable>false</IsPublishable>
     <NoWarn>MDK01</NoWarn>
   </PropertyGroup>
 
+  <!-- Reference your mod project -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\Data\NewTemplateMod.csproj" />
+  </ItemGroup>
+
+  <!-- Get Space Engineers assemblies, but NOT the MDK analyzers -->
+  <!-- <ItemGroup> -->
+    <!-- <PackageReference Include="Mal.Mdk2.References" Version="*" /> -->
+  <!-- </ItemGroup> -->
+
+  <!-- Testing stack: NUnit 3 + VS runner -->
   <ItemGroup>
     <PackageReference Include="coverlet.collector" Version="6.0.2" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
@@ -16,15 +29,4 @@
     <PackageReference Include="NUnit.Analyzers" Version="4.4.0" />
     <PackageReference Include="NUnit3TestAdapter" Version="4.6.0" />
   </ItemGroup>
-
-  <ItemGroup>
-    <Using Include="NUnit.Framework" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <!-- <ProjectReference Include="..\..\Data\NewTemplateMod.csproj" /> -->
-    <Compile Include="..\..\Data\Scripts\**\*.cs" />
-    <PackageReference Include="SpaceEngineers-GameLibs" Version="*" />
-  </ItemGroup>
-
 </Project>

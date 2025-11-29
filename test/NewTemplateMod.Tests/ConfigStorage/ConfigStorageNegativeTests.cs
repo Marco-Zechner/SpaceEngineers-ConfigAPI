@@ -1,5 +1,7 @@
+using System;
 using mz.Config.Core;
 using mz.Config.Domain;
+using NUnit.Framework;
 
 namespace NewTemplateMod.Tests.ConfigStorageTests
 {

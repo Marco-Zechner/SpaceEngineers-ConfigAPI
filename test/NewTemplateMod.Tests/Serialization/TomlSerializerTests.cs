@@ -1,6 +1,7 @@
 using mz.Config.Core;
 using mz.Config.Domain;
 using mz.Config.Abstractions;
+using NUnit.Framework;
 
 namespace NewTemplateMod.Tests.Serialization
 {
