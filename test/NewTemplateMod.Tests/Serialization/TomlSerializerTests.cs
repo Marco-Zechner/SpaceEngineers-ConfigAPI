@@ -27,17 +27,17 @@ namespace NewTemplateMod.Tests.Serialization
             var toml = _serializer.Serialize(config);
 
             // Assert (loose on whitespace / order, strict on content)
-            Assert.That(toml, Contains.Substring("[ExampleConfig]"));
-            Assert.That(toml, Contains.Substring("StoredVersion"));
-            Assert.That(toml, Contains.Substring("\"0.1.0\""));
+            Assert.That(toml, Does.Contain("[ExampleConfig]"));
+            Assert.That(toml, Does.Contain("StoredVersion"));
+            Assert.That(toml, Does.Contain("\"0.1.0\""));
 
-            Assert.That(toml, Contains.Substring("RespondToHello"));
-            Assert.That(toml, Contains.Substring("false"));
-            Assert.That(toml, Contains.Substring("# false"));
-
-            Assert.That(toml, Contains.Substring("GreetingMessage"));
-            Assert.That(toml, Contains.Substring("\"hello\""));
-            Assert.That(toml, Contains.Substring("# \"hello\""));
+            Assert.That(toml, Does.Contain("RespondToHello"));
+            Assert.That(toml, Does.Contain("false"));
+            Assert.That(toml, Does.Contain("# false"));
+            
+            Assert.That(toml, Does.Contain("GreetingMessage"));
+            Assert.That(toml, Does.Contain("\"hello\""));
+            Assert.That(toml, Does.Contain("# \"hello\""));
         }
 
         [Test]
@@ -52,13 +52,13 @@ namespace NewTemplateMod.Tests.Serialization
             var toml = _serializer.Serialize(config);
 
             // Assert: values reflect current config
-            Assert.That(toml, Contains.Substring("RespondToHello"));
-            Assert.That(toml, Contains.Substring("true"));
-            Assert.That(toml, Contains.Substring("# false")); // default is still false in comment
+            Assert.That(toml, Does.Contain("RespondToHello"));
+            Assert.That(toml, Does.Contain("true"));
+            Assert.That(toml, Does.Contain("# false")); // default is still false in comment
 
-            Assert.That(toml, Contains.Substring("GreetingMessage"));
-            Assert.That(toml, Contains.Substring("\"hi\""));
-            Assert.That(toml, Contains.Substring("# \"hello\"")); // default is still "hello"
+            Assert.That(toml, Does.Contain("GreetingMessage"));
+            Assert.That(toml, Does.Contain("\"hi\""));
+            Assert.That(toml, Does.Contain("# \"hello\"")); // default is still "hello"
         }
 
         [Test]

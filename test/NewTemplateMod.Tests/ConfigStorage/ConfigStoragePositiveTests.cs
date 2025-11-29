@@ -29,11 +29,13 @@ namespace NewTemplateMod.Tests.ConfigStorageTests
 
             Assert.That(result, Is.True);
 
-            string content;
-            bool fileExists = FileSystem.TryReadFile(ConfigLocationType.Local, "myconfig.toml", out content);
+            bool fileExists = FileSystem.TryReadFile(ConfigLocationType.Local, "myconfig.toml", out string content);
 
-            Assert.That(fileExists, Is.True);
-            Assert.That(content, Is.EqualTo(Serializer.LastSerializedContent));
+            Assert.Multiple(() =>
+            {
+                Assert.That(fileExists, Is.True);
+                Assert.That(content, Is.EqualTo(Serializer.LastSerializedContent));
+            });
 
             string currentFileName = ConfigStorage.GetCurrentFileName(ConfigLocationType.Local, "TestConfig");
             Assert.That(currentFileName, Is.EqualTo("myconfig.toml"));
@@ -58,10 +60,13 @@ namespace NewTemplateMod.Tests.ConfigStorageTests
             Assert.That(cfg, Is.SameAs(loadedConfig));
 
             string currentFileName = ConfigStorage.GetCurrentFileName(ConfigLocationType.Local, "TestConfig");
-            Assert.That(currentFileName, Is.EqualTo("existing.toml"));
+            Assert.Multiple(() =>
+            {
+                Assert.That(currentFileName, Is.EqualTo("existing.toml"));
 
-            Assert.That(Serializer.LastDeserializeDefinition.TypeName, Is.EqualTo("TestConfig"));
-            Assert.That(Serializer.LastDeserializeContent, Is.EqualTo("dummy content"));
+                Assert.That(Serializer.LastDeserializeDefinition.TypeName, Is.EqualTo("TestConfig"));
+                Assert.That(Serializer.LastDeserializeContent, Is.EqualTo("dummy content"));
+            });
         }
 
         [Test]
@@ -73,8 +78,11 @@ namespace NewTemplateMod.Tests.ConfigStorageTests
             string text = ConfigStorage.GetConfigAsText(ConfigLocationType.Local, "TestConfig");
 
             Assert.That(text, Is.Not.Null);
-            Assert.That(text, Is.EqualTo(Serializer.LastSerializedContent));
-            Assert.That(Serializer.LastSerializedInstance, Is.SameAs(cfg));
+            Assert.Multiple(() =>
+            {
+                Assert.That(text, Is.EqualTo(Serializer.LastSerializedContent));
+                Assert.That(Serializer.LastSerializedInstance, Is.SameAs(cfg));
+            });
         }
 
         [Test]
@@ -85,8 +93,11 @@ namespace NewTemplateMod.Tests.ConfigStorageTests
             string found = ConfigStorage.GetFileAsText(ConfigLocationType.Local, "fileA.toml");
             string notFound = ConfigStorage.GetFileAsText(ConfigLocationType.Local, "missing.toml");
 
-            Assert.That(found, Is.EqualTo("content A"));
-            Assert.That(notFound, Is.Null);
+            Assert.Multiple(() =>
+            {
+                Assert.That(found, Is.EqualTo("content A"));
+                Assert.That(notFound, Is.Null);
+            });
         }
 
         [Test]
