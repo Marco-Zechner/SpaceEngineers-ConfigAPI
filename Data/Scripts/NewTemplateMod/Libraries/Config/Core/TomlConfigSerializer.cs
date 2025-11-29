@@ -11,7 +11,6 @@ namespace mz.Config.Core
             if (config == null)
                 throw new ArgumentNullException("config");
 
-            // For now we only support ExampleConfig (no reflection, simple and explicit).
             ExampleConfig example = config as ExampleConfig;
             if (example == null)
                 throw new InvalidOperationException(
@@ -34,8 +33,6 @@ namespace mz.Config.Core
                 "TomlConfigSerializer currently only supports ExampleConfig.");
         }
 
-        // --------- not used by current tests; keep as stubs for now ---------
-
         public ITomlModel ParseToModel(string tomlContent)
         {
             throw new NotImplementedException();
@@ -55,23 +52,20 @@ namespace mz.Config.Core
 
         private static string SerializeExampleConfig(ExampleConfig cfg)
         {
-            // Defaults (from ExampleConfig ctor)
             const bool defaultRespondToHello = false;
             const string defaultGreetingMessage = "hello";
 
-            StringBuilder sb = new();
+            StringBuilder sb = new StringBuilder();
 
             sb.AppendLine("[ExampleConfig]");
             sb.Append("StoredVersion = \"").Append(cfg.ConfigVersion).AppendLine("\"");
 
-            // RespondToHello = <value> # <default>
             sb.Append("RespondToHello = ");
             sb.Append(cfg.RespondToHello ? "true" : "false");
             sb.Append(" # ");
             sb.Append(defaultRespondToHello ? "true" : "false");
             sb.AppendLine();
 
-            // GreetingMessage = "<value>" # "<default>"
             sb.Append("GreetingMessage = ");
             sb.Append(ToTomlString(cfg.GreetingMessage));
             sb.Append(" # ");
@@ -83,7 +77,10 @@ namespace mz.Config.Core
 
         private static ConfigBase DeserializeExampleConfig(string content)
         {
-            // Start from defaults
+            // Current defaults
+            const bool defaultRespondToHello = false;
+            const string defaultGreetingMessage = "hello";
+
             ExampleConfig cfg = new ExampleConfig();
 
             if (string.IsNullOrEmpty(content))
@@ -104,8 +101,7 @@ namespace mz.Config.Core
 
                 if (line.StartsWith("[") && line.EndsWith("]"))
                 {
-                    // Section header, e.g. [ExampleConfig]
-                    // We can ignore the name for now; tests assume correct section.
+                    // Section header, ignore for now
                     continue;
                 }
 
@@ -116,27 +112,73 @@ namespace mz.Config.Core
                 string key = line.Substring(0, eqIndex).Trim();
                 string valuePart = line.Substring(eqIndex + 1).Trim();
 
-                // Strip default comment: "<value> # <default>"
                 string valueText = valuePart;
+                string defaultText = null;
+
                 int hashIndex = valuePart.IndexOf('#');
                 if (hashIndex >= 0)
                 {
                     valueText = valuePart.Substring(0, hashIndex).Trim();
+                    defaultText = valuePart.Substring(hashIndex + 1).Trim();
                 }
 
                 if (string.Equals(key, "RespondToHello", StringComparison.OrdinalIgnoreCase))
                 {
-                    bool parsedBool;
-                    if (bool.TryParse(valueText, out parsedBool))
-                        cfg.RespondToHello = parsedBool;
+                    bool parsedValue;
+                    bool hasValue = bool.TryParse(valueText, out parsedValue);
+
+                    if (hasValue && defaultText == null)
+                    {
+                        cfg.RespondToHello = parsedValue;
+                        continue;
+                    }
+                    
+
+                    bool parsedDefault;
+                    bool hasDefault = bool.TryParse(defaultText, out parsedDefault);
+
+                    if (hasValue)
+                    {
+                        if (hasDefault &&
+                            parsedValue == parsedDefault &&
+                            parsedDefault != defaultRespondToHello)
+                        {
+                            // Value equals old default, but the current default changed:
+                            // treat as "user never touched it" -> update to current default.
+                            cfg.RespondToHello = defaultRespondToHello;
+                        }
+                        else
+                        {
+                            cfg.RespondToHello = parsedValue;
+                        }
+                    }
                 }
                 else if (string.Equals(key, "GreetingMessage", StringComparison.OrdinalIgnoreCase))
                 {
-                    cfg.GreetingMessage = FromTomlString(valueText);
+                    string valueString = FromTomlString(valueText);
+
+                    string defaultString = null;
+                    if (!string.IsNullOrEmpty(defaultText))
+                    {
+                        defaultString = FromTomlString(defaultText);
+                    }
+
+                    if (!string.IsNullOrEmpty(defaultString) &&
+                        valueString == defaultString &&
+                        defaultString != defaultGreetingMessage)
+                    {
+                        // Value equals old default, but current default changed:
+                        // update to current default.
+                        cfg.GreetingMessage = defaultGreetingMessage;
+                    }
+                    else
+                    {
+                        cfg.GreetingMessage = valueString;
+                    }
                 }
                 else if (string.Equals(key, "StoredVersion", StringComparison.OrdinalIgnoreCase))
                 {
-                    // Ignore for now – version handling will come with migration tests later.
+                    // Version handling will come later with more migration logic.
                 }
             }
 
@@ -148,9 +190,6 @@ namespace mz.Config.Core
             if (value == null)
                 return "\"\"";
 
-            // Very naive quoting, sufficient for tests:
-            // - wrap in double quotes
-            // - escape existing double quotes
             string escaped = value.Replace("\"", "\\\"");
             return "\"" + escaped + "\"";
         }
@@ -166,7 +205,6 @@ namespace mz.Config.Core
                 s = s.Substring(1, s.Length - 2);
             }
 
-            // Unescape basic \" sequences
             s = s.Replace("\\\"", "\"");
             return s;
         }

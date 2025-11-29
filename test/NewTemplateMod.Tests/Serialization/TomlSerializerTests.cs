@@ -100,5 +100,25 @@ namespace NewTemplateMod.Tests.Serialization
             Assert.That(cfg.RespondToHello, Is.True);
             Assert.That(cfg.GreetingMessage, Is.EqualTo("custom"));
         }
+
+        [Test]
+        public void Deserialize_WhenValueEqualsOldDefaultComment_UsesCurrentDefault()
+        {
+            // Simulate an old file where the default for GreetingMessage used to be "old",
+            // and the user never changed it (value == default comment).
+            var toml =
+                "[ExampleConfig]\n" +
+                "StoredVersion = \"0.0.1\"\n" +
+                "RespondToHello = false # false\n" +
+                "GreetingMessage = \"old\" # \"old\"\n";
+
+            var result = _serializer.Deserialize(_definition, toml);
+            var cfg = result as ExampleConfig;
+
+            Assert.That(cfg, Is.Not.Null);
+            // Current default in ExampleConfig ctor is "hello"
+            Assert.That(cfg.GreetingMessage, Is.EqualTo("hello"));
+        }
+
     }
 }
