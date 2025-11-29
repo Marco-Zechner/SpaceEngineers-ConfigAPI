@@ -64,7 +64,7 @@ public static class ModSession
     /// <item> Dedicated Server: <b>true</b> </item>
     /// </list>
     /// </summary>
-    public static bool IsServerInMP => IsServer && MultiplayerActive;
+    public static bool IsServerInMp => IsServer && MultiplayerActive;
 
     /// <summary>
     /// Returns true if the current session is in single-player mode.
@@ -86,7 +86,7 @@ public static class ModSession
     /// <item> Dedicated Server: false </item>
     /// </list>
     /// </summary>
-    public static bool IsClientInMP => !IsServer && MultiplayerActive;
+    public static bool IsClientInMp => !IsServer && MultiplayerActive;
 
     /// <summary>
     /// Returns true if the current session is the host in a multiplayer game.
@@ -97,7 +97,7 @@ public static class ModSession
     /// <item> Dedicated Server: false </item>
     /// </list>
     /// </summary>
-    public static bool IsHostInMP => IsServer && MultiplayerActive && !MyAPIGateway.Utilities.IsDedicated;
+    public static bool IsHostInMp => IsServer && MultiplayerActive && !MyAPIGateway.Utilities.IsDedicated;
 
     /// <summary>
     /// Returns true if the current session is a dedicated server (i.e. no player character on this machine).

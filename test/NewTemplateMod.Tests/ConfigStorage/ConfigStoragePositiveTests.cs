@@ -46,7 +46,7 @@ namespace NewTemplateMod.Tests.ConfigStorageTests
         [Test]
         public void Load_ReadsFile_UsesSerializer_AndReplacesInstance()
         {
-            TestConfig loadedConfig = new TestConfig()
+            var loadedConfig = new TestConfig()
             {
                 SomeValue = 99
             };

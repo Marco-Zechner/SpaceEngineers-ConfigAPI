@@ -102,6 +102,7 @@ namespace mz.Config.Core
             return (T)slot.Instance;
         }
 
+        
         public static string GetCurrentFileName(ConfigLocationType location, string typeName)
         {
             EnsureInitialized();
