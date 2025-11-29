@@ -14,7 +14,8 @@ namespace NewTemplateMod.Tests.ConfigStorageTests
         public void SetUp()
         {
             _fileSystem = new FakeFileSystem();
-            _serializer = new TomlConfigSerializer();
+            var xml = new TestXmlSerializer();
+            _serializer = new TomlConfigSerializer(xml);
 
             ConfigStorage.Initialize(_fileSystem, _serializer);
             ConfigStorage.Register<ExampleConfig>(ConfigLocationType.Local);

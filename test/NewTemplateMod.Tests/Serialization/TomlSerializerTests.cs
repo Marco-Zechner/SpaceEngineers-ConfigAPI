@@ -14,7 +14,8 @@ namespace NewTemplateMod.Tests.Serialization
         [SetUp]
         public void SetUp()
         {
-            _serializer = new TomlConfigSerializer();
+            var xml = new TestXmlSerializer();
+            _serializer = new TomlConfigSerializer(xml);
             _definition = new ConfigDefinition<ExampleConfig>("ExampleConfig");
         }
 

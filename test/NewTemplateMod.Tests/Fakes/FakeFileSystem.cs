@@ -10,17 +10,13 @@ namespace NewTemplateMod.Tests
 
         public bool TryReadFile(ConfigLocationType location, string fileName, out string content)
         {
-            string key = MakeKey(location, fileName);
-            if (_files.TryGetValue(key, out content))
-                return true;
-
-            content = null;
-            return false;
+            var key = MakeKey(location, fileName);
+            return _files.TryGetValue(key, out content);
         }
 
         public void WriteFile(ConfigLocationType location, string fileName, string content)
         {
-            string key = MakeKey(location, fileName);
+            var key = MakeKey(location, fileName);
             _files[key] = content;
         }
 
@@ -31,7 +27,7 @@ namespace NewTemplateMod.Tests
 
         private static string MakeKey(ConfigLocationType location, string fileName)
         {
-            return ((int)location).ToString() + "|" + fileName;
+            return ((int)location) + "|" + fileName;
         }
     }
 }
