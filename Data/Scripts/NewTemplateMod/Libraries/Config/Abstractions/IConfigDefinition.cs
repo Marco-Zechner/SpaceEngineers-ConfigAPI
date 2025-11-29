@@ -10,5 +10,7 @@ namespace mz.Config.Abstractions
         Type ConfigType { get; }
 
         ConfigBase CreateDefaultInstance();
+
+        ConfigBase DeserializeFromXml(IConfigXmlSerializer xmlSerializer, string xml);
     }
 }
