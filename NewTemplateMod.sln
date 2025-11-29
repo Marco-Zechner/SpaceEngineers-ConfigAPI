@@ -5,6 +5,10 @@ VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NewTemplateMod", "Data\NewTemplateMod.csproj", "{8C388B10-D993-4CD4-BD4C-D379E3798AA1}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "test", "test", "{67A7E593-B290-4978-AF2D-5773C2EAE40F}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NewTemplateMod.Tests", "test\NewTemplateMod.Tests\NewTemplateMod.Tests.csproj", "{292EEC5C-245D-4B70-909A-EFEC7D608749}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -18,5 +22,12 @@ Global
 		{8C388B10-D993-4CD4-BD4C-D379E3798AA1}.Debug|Any CPU.Build.0 = Debug|x64
 		{8C388B10-D993-4CD4-BD4C-D379E3798AA1}.Release|Any CPU.ActiveCfg = Release|x64
 		{8C388B10-D993-4CD4-BD4C-D379E3798AA1}.Release|Any CPU.Build.0 = Release|x64
+		{292EEC5C-245D-4B70-909A-EFEC7D608749}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{292EEC5C-245D-4B70-909A-EFEC7D608749}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{292EEC5C-245D-4B70-909A-EFEC7D608749}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{292EEC5C-245D-4B70-909A-EFEC7D608749}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{292EEC5C-245D-4B70-909A-EFEC7D608749} = {67A7E593-B290-4978-AF2D-5773C2EAE40F}
 	EndGlobalSection
 EndGlobal
