@@ -9,23 +9,15 @@ namespace NewTemplateMod.Tests
     {
         private FakeFileSystem _fileSystem;
         private FakeSerializer _serializer;
-        private ConfigStorage _storage;
-        private FakeDefinition _testConfigDef;
 
         [SetUp]
         public void SetUp()
         {
             _fileSystem = new FakeFileSystem();
             _serializer = new FakeSerializer();
-            _storage = new ConfigStorage(_fileSystem, _serializer);
 
-            _testConfigDef = new FakeDefinition(
-                "TestConfig",
-                typeof(TestConfig),
-                new TestConfig() // default instance
-            );
-
-            _storage.RegisterConfig(_testConfigDef);
+            ConfigStorage.Initialize(_fileSystem, _serializer);
+            ConfigStorage.Register<TestConfig>(ConfigLocationType.Local);
         }
 
         #region Positive tests
@@ -33,55 +25,53 @@ namespace NewTemplateMod.Tests
         [Test]
         public void GetOrCreate_CreatesDefaultInstance_AndSetsDefaultFileName()
         {
-            TestConfig cfg = _storage.GetOrCreate<TestConfig>(ConfigLocationType.Local);
+            var cfg = ConfigStorage.GetOrCreate<TestConfig>(ConfigLocationType.Local);
 
             Assert.That(cfg, Is.Not.Null);
             Assert.That(cfg, Is.InstanceOf<TestConfig>());
             Assert.That(cfg.ConfigVersion, Is.EqualTo("0.1.0"));
 
-            string currentFileName = _storage.GetCurrentFileName(ConfigLocationType.Local, "TestConfig");
+            var currentFileName = ConfigStorage.GetCurrentFileName(ConfigLocationType.Local, "TestConfig");
             Assert.That(currentFileName, Is.EqualTo("TestConfigDefault.toml"));
         }
 
         [Test]
         public void Save_CreatesFile_WithSerializedContent_AndTracksFileName()
         {
-            TestConfig cfg = _storage.GetOrCreate<TestConfig>(ConfigLocationType.Local);
+            var cfg = ConfigStorage.GetOrCreate<TestConfig>(ConfigLocationType.Local);
             cfg.SomeValue = 42;
 
-            bool result = _storage.Save(ConfigLocationType.Local, "TestConfig", "myconfig.toml");
+            var result = ConfigStorage.Save(ConfigLocationType.Local, "TestConfig", "myconfig.toml");
 
             Assert.That(result, Is.True);
 
             string content;
-            bool fileExists = _fileSystem.TryReadFile(ConfigLocationType.Local, "myconfig.toml", out content);
+            var fileExists = _fileSystem.TryReadFile(ConfigLocationType.Local, "myconfig.toml", out content);
 
             Assert.That(fileExists, Is.True);
             Assert.That(content, Is.EqualTo(_serializer.LastSerializedContent));
 
-            string currentFileName = _storage.GetCurrentFileName(ConfigLocationType.Local, "TestConfig");
+            var currentFileName = ConfigStorage.GetCurrentFileName(ConfigLocationType.Local, "TestConfig");
             Assert.That(currentFileName, Is.EqualTo("myconfig.toml"));
         }
 
         [Test]
         public void Load_ReadsFile_UsesSerializer_AndReplacesInstance()
         {
-            // Serializer returns this instance
             var loadedConfig = new TestConfig();
             loadedConfig.SomeValue = 99;
             _serializer.DeserializeResult = loadedConfig;
 
-            // Insert a file
             _fileSystem.WriteFile(ConfigLocationType.Local, "existing.toml", "dummy content");
 
-            bool result = _storage.Load(ConfigLocationType.Local, "TestConfig", "existing.toml");
+            var result = ConfigStorage.Load(ConfigLocationType.Local, "TestConfig", "existing.toml");
 
             Assert.That(result, Is.True);
 
-            TestConfig cfg = _storage.GetOrCreate<TestConfig>(ConfigLocationType.Local);
+            var cfg = ConfigStorage.GetOrCreate<TestConfig>(ConfigLocationType.Local);
             Assert.That(cfg, Is.SameAs(loadedConfig));
 
-            string currentFileName = _storage.GetCurrentFileName(ConfigLocationType.Local, "TestConfig");
+            var currentFileName = ConfigStorage.GetCurrentFileName(ConfigLocationType.Local, "TestConfig");
             Assert.That(currentFileName, Is.EqualTo("existing.toml"));
 
             Assert.That(_serializer.LastDeserializeDefinition.TypeName, Is.EqualTo("TestConfig"));
@@ -91,10 +81,10 @@ namespace NewTemplateMod.Tests
         [Test]
         public void GetConfigAsText_SerializesCurrentInstance()
         {
-            TestConfig cfg = _storage.GetOrCreate<TestConfig>(ConfigLocationType.Local);
+            var cfg = ConfigStorage.GetOrCreate<TestConfig>(ConfigLocationType.Local);
             cfg.SomeValue = 7;
 
-            string text = _storage.GetConfigAsText(ConfigLocationType.Local, "TestConfig");
+            var text = ConfigStorage.GetConfigAsText(ConfigLocationType.Local, "TestConfig");
 
             Assert.That(text, Is.Not.Null);
             Assert.That(text, Is.EqualTo(_serializer.LastSerializedContent));
@@ -106,75 +96,52 @@ namespace NewTemplateMod.Tests
         {
             _fileSystem.WriteFile(ConfigLocationType.Local, "fileA.toml", "content A");
 
-            string found = _storage.GetFileAsText(ConfigLocationType.Local, "fileA.toml");
-            string notFound = _storage.GetFileAsText(ConfigLocationType.Local, "missing.toml");
+            var found = ConfigStorage.GetFileAsText(ConfigLocationType.Local, "fileA.toml");
+            var notFound = ConfigStorage.GetFileAsText(ConfigLocationType.Local, "missing.toml");
 
             Assert.That(found, Is.EqualTo("content A"));
             Assert.That(notFound, Is.Null);
         }
 
         [Test]
-        public void RegisterConfig_OverridesSameTypeName()
+        public void Register_SameTypeSameLocationTwice_DoesNotThrow()
         {
-            var secondDef = new FakeDefinition("TestConfig", typeof(TestConfig), new TestConfig());
-            _storage.RegisterConfig(secondDef);
-
-            // No exception expected; overwrite is allowed.
-
-            // Re-init the storage + register only secondDef, to check creation logic
-            _storage = new ConfigStorage(_fileSystem, _serializer);
-            _storage.RegisterConfig(secondDef);
-
-            TestConfig cfg = _storage.GetOrCreate<TestConfig>(ConfigLocationType.Local);
-            Assert.That(cfg, Is.Not.Null);
-            Assert.That(cfg, Is.InstanceOf<TestConfig>());
+            Assert.That(
+                () => ConfigStorage.Register<TestConfig>(ConfigLocationType.Local),
+                Throws.Nothing);
         }
 
         #endregion
 
         #region Negative tests
 
-       [Test]
-        public void RegisterConfig_NullDefinition_Throws()
+        [Test]
+        public void Initialize_NullFileSystem_Throws()
         {
             Assert.That(
-                () => _storage.RegisterConfig(null),
+                () => ConfigStorage.Initialize(null, _serializer),
                 Throws.TypeOf<ArgumentNullException>());
         }
 
         [Test]
-        public void RegisterConfig_EmptyTypeName_Throws()
+        public void Initialize_NullSerializer_Throws()
         {
-            var badDef = new FakeDefinition(string.Empty, typeof(TestConfig), new TestConfig());
-
             Assert.That(
-                () => _storage.RegisterConfig(badDef),
-                Throws.TypeOf<ArgumentException>());
-        }
-
-        [Test]
-        public void RegisterConfig_NullTypeName_Throws()
-        {
-            var badDef = new FakeDefinition(null, typeof(TestConfig), new TestConfig());
-
-            Assert.That(
-                () => _storage.RegisterConfig(badDef),
-                Throws.TypeOf<ArgumentException>());
+                () => ConfigStorage.Initialize(_fileSystem, null),
+                Throws.TypeOf<ArgumentNullException>());
         }
 
         [Test]
         public void GetOrCreate_NoDefinitionForType_ThrowsInvalidOperationException()
         {
-
-            // New storage with no registrations
-            var storage = new ConfigStorage(_fileSystem, _serializer);
+            ConfigStorage.Initialize(_fileSystem, _serializer);
+            // do NOT register OtherConfig
 
             Assert.That(
-                () => storage.GetOrCreate<OtherConfig>(ConfigLocationType.Local),
+                () => ConfigStorage.GetOrCreate<OtherConfig>(ConfigLocationType.Local),
                 Throws.TypeOf<InvalidOperationException>());
         }
 
-        // Helper config type used only for the "no definition registered" test.
         private class OtherConfig : ConfigBase
         {
             public override string ConfigVersion
@@ -184,26 +151,26 @@ namespace NewTemplateMod.Tests
         }
 
         [Test]
-        public void GetCurrentFileName_NullTypeName_Throws()
+        public void GetCurrentFileName_NullId_Throws()
         {
             Assert.That(
-                () => _storage.GetCurrentFileName(ConfigLocationType.Local, null),
+                () => ConfigStorage.GetCurrentFileName(ConfigLocationType.Local, null),
                 Throws.TypeOf<ArgumentNullException>());
 
             Assert.That(
-                () => _storage.GetCurrentFileName(ConfigLocationType.Local, string.Empty),
+                () => ConfigStorage.GetCurrentFileName(ConfigLocationType.Local, string.Empty),
                 Throws.TypeOf<ArgumentNullException>());
         }
 
         [Test]
-        public void SetCurrentFileName_NullTypeName_Throws()
+        public void SetCurrentFileName_NullId_Throws()
         {
             Assert.That(
-                () => _storage.SetCurrentFileName(ConfigLocationType.Local, null, "file.toml"),
+                () => ConfigStorage.SetCurrentFileName(ConfigLocationType.Local, null, "file.toml"),
                 Throws.TypeOf<ArgumentNullException>());
 
             Assert.That(
-                () => _storage.SetCurrentFileName(ConfigLocationType.Local, string.Empty, "file.toml"),
+                () => ConfigStorage.SetCurrentFileName(ConfigLocationType.Local, string.Empty, "file.toml"),
                 Throws.TypeOf<ArgumentNullException>());
         }
 
@@ -211,11 +178,11 @@ namespace NewTemplateMod.Tests
         public void SetCurrentFileName_NullFileName_Throws()
         {
             Assert.That(
-                () => _storage.SetCurrentFileName(ConfigLocationType.Local, "TestConfig", null),
+                () => ConfigStorage.SetCurrentFileName(ConfigLocationType.Local, "TestConfig", null),
                 Throws.TypeOf<ArgumentNullException>());
 
             Assert.That(
-                () => _storage.SetCurrentFileName(ConfigLocationType.Local, "TestConfig", string.Empty),
+                () => ConfigStorage.SetCurrentFileName(ConfigLocationType.Local, "TestConfig", string.Empty),
                 Throws.TypeOf<ArgumentNullException>());
         }
 
@@ -223,19 +190,19 @@ namespace NewTemplateMod.Tests
         public void Load_NullArguments_Throw()
         {
             Assert.That(
-                () => _storage.Load(ConfigLocationType.Local, null, "file.toml"),
+                () => ConfigStorage.Load(ConfigLocationType.Local, null, "file.toml"),
                 Throws.TypeOf<ArgumentNullException>());
 
             Assert.That(
-                () => _storage.Load(ConfigLocationType.Local, string.Empty, "file.toml"),
+                () => ConfigStorage.Load(ConfigLocationType.Local, string.Empty, "file.toml"),
                 Throws.TypeOf<ArgumentNullException>());
 
             Assert.That(
-                () => _storage.Load(ConfigLocationType.Local, "TestConfig", null),
+                () => ConfigStorage.Load(ConfigLocationType.Local, "TestConfig", null),
                 Throws.TypeOf<ArgumentNullException>());
 
             Assert.That(
-                () => _storage.Load(ConfigLocationType.Local, "TestConfig", string.Empty),
+                () => ConfigStorage.Load(ConfigLocationType.Local, "TestConfig", string.Empty),
                 Throws.TypeOf<ArgumentNullException>());
         }
 
@@ -243,90 +210,82 @@ namespace NewTemplateMod.Tests
         public void Save_NullArguments_Throw()
         {
             Assert.That(
-                () => _storage.Save(ConfigLocationType.Local, null, "file.toml"),
+                () => ConfigStorage.Save(ConfigLocationType.Local, null, "file.toml"),
                 Throws.TypeOf<ArgumentNullException>());
 
             Assert.That(
-                () => _storage.Save(ConfigLocationType.Local, string.Empty, "file.toml"),
+                () => ConfigStorage.Save(ConfigLocationType.Local, string.Empty, "file.toml"),
                 Throws.TypeOf<ArgumentNullException>());
 
             Assert.That(
-                () => _storage.Save(ConfigLocationType.Local, "TestConfig", null),
+                () => ConfigStorage.Save(ConfigLocationType.Local, "TestConfig", null),
                 Throws.TypeOf<ArgumentNullException>());
 
             Assert.That(
-                () => _storage.Save(ConfigLocationType.Local, "TestConfig", string.Empty),
+                () => ConfigStorage.Save(ConfigLocationType.Local, "TestConfig", string.Empty),
                 Throws.TypeOf<ArgumentNullException>());
         }
 
         [Test]
-        public void Load_UnknownTypeName_Throws()
+        public void Load_UnknownId_Throws()
         {
             Assert.That(
-                () => _storage.Load(ConfigLocationType.Local, "UnknownType", "file.toml"),
+                () => ConfigStorage.Load(ConfigLocationType.Local, "UnknownType", "file.toml"),
                 Throws.TypeOf<InvalidOperationException>());
         }
 
         [Test]
-        public void Save_UnknownTypeName_Throws()
+        public void Save_UnknownId_Throws()
         {
             Assert.That(
-                () => _storage.Save(ConfigLocationType.Local, "UnknownType", "file.toml"),
+                () => ConfigStorage.Save(ConfigLocationType.Local, "UnknownType", "file.toml"),
                 Throws.TypeOf<InvalidOperationException>());
         }
 
         [Test]
         public void Load_FileMissing_ReturnsFalse_AndDoesNotCreateInstance()
         {
-            var result = _storage.Load(ConfigLocationType.Local, "TestConfig", "does_not_exist.toml");
+            var result = ConfigStorage.Load(ConfigLocationType.Local, "TestConfig", "does_not_exist.toml");
 
             Assert.That(result, Is.False);
 
-            // No instance should exist yet until GetOrCreate is called
-            // We cannot access internals, but we can check that a later GetOrCreate
-            // still gives us a default instance (and that nothing crashed).
-            var cfg = _storage.GetOrCreate<TestConfig>(ConfigLocationType.Local);
+            var cfg = ConfigStorage.GetOrCreate<TestConfig>(ConfigLocationType.Local);
             Assert.That(cfg, Is.Not.Null);
 
-            // Current file name should be default, not "does_not_exist.toml"
-            var fileName = _storage.GetCurrentFileName(ConfigLocationType.Local, "TestConfig");
+            var fileName = ConfigStorage.GetCurrentFileName(ConfigLocationType.Local, "TestConfig");
             Assert.That(fileName, Is.EqualTo("TestConfigDefault.toml"));
         }
 
         [Test]
         public void Load_DeserializerReturnsNull_ReturnsFalse_AndDoesNotOverrideExistingInstance()
         {
-            // Arrange existing instance
-            var original = _storage.GetOrCreate<TestConfig>(ConfigLocationType.Local);
+            var original = ConfigStorage.GetOrCreate<TestConfig>(ConfigLocationType.Local);
             original.SomeValue = 5;
 
-            _serializer.DeserializeResult = null; // simulate deserialize failure
+            _serializer.DeserializeResult = null;
             _fileSystem.WriteFile(ConfigLocationType.Local, "bad.toml", "bad content");
 
-            // Act
-            var result = _storage.Load(ConfigLocationType.Local, "TestConfig", "bad.toml");
+            var result = ConfigStorage.Load(ConfigLocationType.Local, "TestConfig", "bad.toml");
 
-            // Assert
             Assert.That(result, Is.False);
 
-            var after = _storage.GetOrCreate<TestConfig>(ConfigLocationType.Local);
+            var after = ConfigStorage.GetOrCreate<TestConfig>(ConfigLocationType.Local);
             Assert.That(after, Is.SameAs(original));
             Assert.That(after.SomeValue, Is.EqualTo(5));
 
-            var currentFile = _storage.GetCurrentFileName(ConfigLocationType.Local, "TestConfig");
-            // Load failed, so it should not switch to "bad.toml"
+            var currentFile = ConfigStorage.GetCurrentFileName(ConfigLocationType.Local, "TestConfig");
             Assert.That(currentFile, Is.EqualTo("TestConfigDefault.toml"));
         }
 
         [Test]
-        public void GetConfigAsText_NullTypeName_Throws()
+        public void GetConfigAsText_NullId_Throws()
         {
             Assert.That(
-                () => _storage.GetConfigAsText(ConfigLocationType.Local, null),
+                () => ConfigStorage.GetConfigAsText(ConfigLocationType.Local, null),
                 Throws.TypeOf<ArgumentNullException>());
 
             Assert.That(
-                () => _storage.GetConfigAsText(ConfigLocationType.Local, string.Empty),
+                () => ConfigStorage.GetConfigAsText(ConfigLocationType.Local, string.Empty),
                 Throws.TypeOf<ArgumentNullException>());
         }
 
@@ -334,11 +293,11 @@ namespace NewTemplateMod.Tests
         public void GetFileAsText_NullFileName_Throws()
         {
             Assert.That(
-                () => _storage.GetFileAsText(ConfigLocationType.Local, null),
+                () => ConfigStorage.GetFileAsText(ConfigLocationType.Local, null),
                 Throws.TypeOf<ArgumentNullException>());
 
             Assert.That(
-                () => _storage.GetFileAsText(ConfigLocationType.Local, string.Empty),
+                () => ConfigStorage.GetFileAsText(ConfigLocationType.Local, string.Empty),
                 Throws.TypeOf<ArgumentNullException>());
         }
 
@@ -348,8 +307,7 @@ namespace NewTemplateMod.Tests
 
         private class FakeFileSystem : IConfigFileSystem
         {
-            private readonly Dictionary<string, string> _files =
-                new();
+            private readonly Dictionary<string, string> _files = [];
 
             public bool TryReadFile(ConfigLocationType location, string fileName, out string content)
             {
@@ -401,6 +359,7 @@ namespace NewTemplateMod.Tests
                 return DeserializeResult;
             }
 
+            // Will be used later for TOML; for now unused.
             public ITomlModel ParseToModel(string tomlContent)
             {
                 throw new NotImplementedException();
@@ -417,60 +376,19 @@ namespace NewTemplateMod.Tests
             }
         }
 
-        private class FakeDefinition : IConfigDefinition
-        {
-            private readonly string _typeName;
-            private readonly Type _configType;
-            private readonly ConfigBase _defaultInstance;
-
-            public FakeDefinition(string typeName, Type configType, ConfigBase defaultInstance)
-            {
-                _typeName = typeName;
-                _configType = configType;
-                _defaultInstance = defaultInstance;
-            }
-
-            public string TypeName { get { return _typeName; } }
-
-            public Type ConfigType { get { return _configType; } }
-
-            public string SectionName
-            {
-                get
-                {
-                    throw new NotImplementedException();
-                }
-            }
-
-            public ConfigLocationType[] SupportedLocations
-            {
-                get
-                {
-                    throw new NotImplementedException();
-                }
-            }
-
-            public ConfigBase CreateDefaultInstance()
-            {
-                var test = _defaultInstance as TestConfig;
-                if (test != null)
-                {
-                    return new TestConfig
-                    {
-                        SomeValue = test.SomeValue
-                    };
-                }
-                return _defaultInstance;
-            }
-        }
-
         private class TestConfig : ConfigBase
         {
             public int SomeValue { get; set; }
 
-            public override string ConfigVersion { get { return "0.1.0"; } }
+            public override string ConfigVersion
+            {
+                get { return "0.1.0"; }
+            }
 
-            public override string ConfigNameOverride { get { return "TestConfig"; } }
+            public override string ConfigNameOverride
+            {
+                get { return "TestConfig"; }
+            }
         }
     }
 }
