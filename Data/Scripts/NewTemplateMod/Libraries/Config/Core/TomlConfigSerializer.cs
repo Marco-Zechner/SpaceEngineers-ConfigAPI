@@ -33,19 +33,124 @@ namespace mz.Config.Core
                 "TomlConfigSerializer currently only supports ExampleConfig.");
         }
 
+        // ---------------- TOML model API ----------------
+
         public ITomlModel ParseToModel(string tomlContent)
         {
-            throw new NotImplementedException();
-        }
+            if (string.IsNullOrEmpty(tomlContent))
+                return null;
 
-        public string SerializeModel(ITomlModel model)
-        {
-            throw new NotImplementedException();
+            TomlModel model = new TomlModel();
+
+            string[] lines = tomlContent.Split(
+                new[] { "\r\n", "\n" },
+                StringSplitOptions.None);
+
+            for (int i = 0; i < lines.Length; i++)
+            {
+                string line = lines[i].Trim();
+                if (line.Length == 0)
+                    continue;
+
+                if (line.StartsWith("#"))
+                    continue;
+
+                if (line.StartsWith("[") && line.EndsWith("]"))
+                {
+                    string sectionName = line.Substring(1, line.Length - 2).Trim();
+                    model.TypeName = sectionName;
+                    continue;
+                }
+
+                int eqIndex = line.IndexOf('=');
+                if (eqIndex <= 0)
+                    continue;
+
+                string key = line.Substring(0, eqIndex).Trim();
+                string valuePart = line.Substring(eqIndex + 1).Trim();
+
+                string valueText = valuePart;
+                string defaultText = null;
+
+                int hashIndex = valuePart.IndexOf('#');
+                if (hashIndex >= 0)
+                {
+                    valueText = valuePart.Substring(0, hashIndex).Trim();
+                    defaultText = valuePart.Substring(hashIndex + 1).Trim();
+                }
+
+                if (string.Equals(key, "StoredVersion", StringComparison.OrdinalIgnoreCase))
+                {
+                    model.StoredVersion = TrimQuotes(valueText);
+                }
+                else
+                {
+                    TomlEntry entry = new TomlEntry();
+                    entry.Value = valueText;
+                    entry.DefaultValue = defaultText;
+                    model.Entries[key] = entry;
+                }
+            }
+
+            return model;
         }
 
         public ITomlModel BuildDefaultModel(IConfigDefinition definition)
         {
-            throw new NotImplementedException();
+            if (definition == null)
+                throw new ArgumentNullException("definition");
+
+            if (definition.ConfigType != typeof(ExampleConfig))
+                throw new InvalidOperationException(
+                    "BuildDefaultModel currently only supports ExampleConfig.");
+
+            ExampleConfig cfg = new ExampleConfig();
+
+            TomlModel model = new TomlModel();
+            model.TypeName = definition.TypeName;
+            model.StoredVersion = cfg.ConfigVersion;
+
+            TomlEntry resp = new TomlEntry();
+            resp.Value = cfg.RespondToHello ? "true" : "false";
+            resp.DefaultValue = resp.Value;
+            model.Entries["RespondToHello"] = resp;
+
+            TomlEntry greet = new TomlEntry();
+            greet.Value = ToTomlString(cfg.GreetingMessage);
+            greet.DefaultValue = greet.Value;
+            model.Entries["GreetingMessage"] = greet;
+
+            return model;
+        }
+
+        public string SerializeModel(ITomlModel model)
+        {
+            if (model == null)
+                throw new ArgumentNullException("model");
+
+            StringBuilder sb = new StringBuilder();
+
+            if (!string.IsNullOrEmpty(model.TypeName))
+            {
+                sb.Append('[').Append(model.TypeName).Append(']').AppendLine();
+            }
+
+            if (!string.IsNullOrEmpty(model.StoredVersion))
+            {
+                sb.Append("StoredVersion = \"").Append(model.StoredVersion).Append('"').AppendLine();
+            }
+
+            foreach (KeyValuePair<string, ITomlEntry> kv in model.Entries)
+            {
+                sb.Append(kv.Key).Append(" = ").Append(kv.Value.Value);
+                if (!string.IsNullOrEmpty(kv.Value.DefaultValue))
+                {
+                    sb.Append(" # ").Append(kv.Value.DefaultValue);
+                }
+                sb.AppendLine();
+            }
+
+            return sb.ToString();
         }
 
         // --------- ExampleConfig-specific implementation ---------
@@ -206,6 +311,18 @@ namespace mz.Config.Core
             }
 
             s = s.Replace("\\\"", "\"");
+            return s;
+        }
+
+        private static string TrimQuotes(string s)
+        {
+            if (string.IsNullOrEmpty(s))
+                return s;
+            s = s.Trim();
+            if (s.Length >= 2 && s[0] == '"' && s[s.Length - 1] == '"')
+            {
+                return s.Substring(1, s.Length - 2);
+            }
             return s;
         }
     }

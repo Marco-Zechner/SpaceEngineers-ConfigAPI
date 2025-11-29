@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Generic;
 using mz.Config.Abstractions;
 using mz.Config.Domain;
 
@@ -145,6 +143,8 @@ namespace mz.Config.Core
             if (!_fileSystem.TryReadFile(location, fileName, out content))
                 return false;
 
+            content = TryNormalizeConfigFile(location, fileName, def, content);
+
             ConfigBase config = _serializer.Deserialize(def, content);
             if (config == null)
                 return false;
@@ -272,6 +272,86 @@ namespace mz.Config.Core
             // If no file or deserialization failed, Instance stays null.
             byType[typeName] = slot;
             return slot;
+        }
+
+        private static string TryNormalizeConfigFile(
+            ConfigLocationType location,
+            string fileName,
+            IConfigDefinition def,
+            string originalContent)
+        {
+            // If anything goes wrong, just fall back to original content.
+            try
+            {
+                ITomlModel fileModel = _serializer.ParseToModel(originalContent);
+                ITomlModel defaultModel = _serializer.BuildDefaultModel(def);
+
+                if (fileModel == null || defaultModel == null)
+                    return originalContent;
+
+                if (!string.IsNullOrEmpty(fileModel.TypeName) &&
+                    !string.Equals(fileModel.TypeName, def.TypeName, StringComparison.OrdinalIgnoreCase))
+                {
+                    // Different section/type, do not touch.
+                    return originalContent;
+                }
+
+                bool hasExtraKeys = false;
+
+                // Detect extra keys
+                foreach (var kv in fileModel.Entries)
+                {
+                    if (!defaultModel.Entries.ContainsKey(kv.Key))
+                    {
+                        hasExtraKeys = true;
+                    }
+                }
+
+                // Merge known keys from file into default model
+                foreach (var kv in defaultModel.Entries)
+                {
+                    string key = kv.Key;
+                    ITomlEntry defaultEntry = kv.Value;
+
+                    ITomlEntry fileEntry;
+                    if (fileModel.Entries.TryGetValue(key, out fileEntry))
+                    {
+                        // If value != its own default in the file, user changed it -> carry over.
+                        if (!string.IsNullOrEmpty(fileEntry.DefaultValue) &&
+                            fileEntry.Value != fileEntry.DefaultValue)
+                        {
+                            defaultEntry.Value = fileEntry.Value;
+                        }
+                        // else: user left it at default; keep defaultEntry.Value (current default).
+                    }
+                    else
+                    {
+                        // Missing key: keep defaultEntry.Value (current default).
+                    }
+                }
+
+                string normalized = _serializer.SerializeModel(defaultModel);
+
+                // Backup only if there were extra keys.
+                if (hasExtraKeys)
+                {
+                    string backupName = fileName + ".bak";
+                    _fileSystem.WriteFile(location, backupName, originalContent);
+                }
+
+                // Always write normalized file (handles missing keys etc.).
+                _fileSystem.WriteFile(location, fileName, normalized);
+
+                return normalized;
+            }
+            catch (NotImplementedException)
+            {
+                return originalContent;
+            }
+            catch
+            {
+                return originalContent;
+            }
         }
     }
 }
