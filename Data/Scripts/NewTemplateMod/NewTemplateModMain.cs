@@ -1,114 +1,57 @@
-using System;
-using System.Linq;
+using System.Collections.Generic;
 using mz.Config;
-using Sandbox.ModAPI;
-using VRage.Game;
+using mz.Logging;
 using VRage.Game.Components;
 
 namespace mz.NewTemplateMod
 {
     [MySessionComponentDescriptor(MyUpdateOrder.AfterSimulation)]  
-    public class NewTemplateModMain : MySessionComponentBase
+    public partial class NewTemplateModMain : MySessionComponentBase
     {
-        private bool _initialized;
-
-        public static TestConfig TestConfig { get; private set; }
-        public static UselessConfig UselessConfig { get; private set; }
+        private static readonly List<ConfigBase> _configs = new List<ConfigBase>();
+        private SimpleConfig _simpleConfig;
+        private IntermediateConfig _intermediateConfig;
+        private CollectionConfig _collectionConfig;
+        private MigrationConfig _migrationConfig;
+        private AdvancedConfig _advancedConfig;
 
         public override void LoadData()
         {
+            _simpleConfig = ConfigStorage.Register<SimpleConfig>(ConfigStorageKind.Local);
+            _configs.Add(_simpleConfig);
+            _intermediateConfig = ConfigStorage.Register<IntermediateConfig>(ConfigStorageKind.Local);
+            _configs.Add(_intermediateConfig);
+            _collectionConfig = ConfigStorage.Register<CollectionConfig>(ConfigStorageKind.Local);
+            _configs.Add(_collectionConfig);
+            _migrationConfig = ConfigStorage.Register<MigrationConfig>(ConfigStorageKind.Local);
+            _configs.Add(_migrationConfig);
+            _advancedConfig = ConfigStorage.Register<AdvancedConfig>(ConfigStorageKind.Local);
+            _configs.Add(_advancedConfig);
+
             base.LoadData();
-            TestConfig = ConfigStorage.Register<TestConfig>(ConfigStorageKind.Local);
-            UselessConfig = ConfigStorage.Register<UselessConfig>(ConfigStorageKind.World);
-        }
-
-        public override void Init(MyObjectBuilder_SessionComponent sessionComponent)
-        {
-            base.Init(sessionComponent);
-
-            try
-            {
-                // Only do client-side stuff on clients
-                if (MyAPIGateway.Utilities?.IsDedicated == true)
-                    return;
-
-                MyAPIGateway.Utilities.MessageEnteredSender += ModMeta.CheckForCommands;
-                ModMeta.OnModCommand += HandleCommands;
-
-                _initialized = true;
-            }
-            catch (Exception)
-            {
-                ConfigStorage.TryLog("Failed to initialize NewTemplateModMain.", "NewTemplateMod");
-            }
-        }
-
-
-        protected override void UnloadData()
-        {
-            base.UnloadData();
-
-            try
-            {
-                if (_initialized && MyAPIGateway.Utilities != null)
-                {
-                    ModMeta.OnModCommand -= HandleCommands;
-                    MyAPIGateway.Utilities.MessageEnteredSender -= ModMeta.CheckForCommands;
-                }
-            }
-            catch (Exception)
-            {
-                ConfigStorage.TryLog("Failed to unload NewTemplateModMain.", "NewTemplateMod");
-            }
         }
 
         private void HandleCommands(ulong sender, string[] arguments)
         {
-            if (arguments.Length == 0)
-            {
-                ConfigStorage.TryLog("Available commands: help, greet, version, sethello, togglehello", "NewTemplateMod");
-                return;
-            }
-
             switch (arguments[0].ToLowerInvariant())
             {
-                case "help":
-                    ConfigStorage.TryLog("Available commands: help, greet, version, sethello, togglehello", "NewTemplateMod");
+                case "get":
+                    Chat.TryLine($"SimpleConfig.SomeValue = {_simpleConfig.SomeValue}", "NewTemplateMod");
+                    Chat.TryLine($"IntermediateConfig.CurrentMode = {_intermediateConfig.CurrentMode}", "New TemplateMod");
+                    Chat.TryLine($"CollectionConfig.Tags = {string.Join(", ", _collectionConfig.Tags.Value)}", "NewTemplateMod");
+                    Chat.TryLine($"MigrationConfig.DisplayName = {_migrationConfig.DisplayName}", "NewTemplateMod");
+                    Chat.TryLine($"AdvancedConfig.Settings.Display.Height = {_advancedConfig.Settings.Value.Display.Value.Height}", "NewTemplateMod");
                     break;
-                case "greet":
-                    if (TestConfig.RespondToHello)
-                    {
-                        ConfigStorage.TryLog(TestConfig.GreetingMessage, "NewTemplateMod");
-                    }
-                    else
-                    {
-                        ConfigStorage.TryLog("Greeting is disabled in the config.", "NewTemplateMod");
-                    }
-                    break;
-
-                case "version":
-                    ConfigStorage.TryLog($"Mod version: {ModMeta.Version}", "NewTemplateMod");
-                    break;
-
-                case "sethello":
-                    if (arguments.Length < 2)
-                    {
-                        ConfigStorage.TryLog("Usage: sethello <greetingString>", "NewTemplateMod");
-                        break;
-                    }
-
-                    var greeting = string.Join(" ", arguments.Skip(1));
-                    TestConfig.GreetingMessage.Value = greeting;
-                    ConfigStorage.TryLog($"Greeting message set to: {greeting}", "NewTemplateMod");
-                    break;
-
-                case "togglehello":
-                    TestConfig.RespondToHello.Value = !TestConfig.RespondToHello;
-                    ConfigStorage.TryLog($"RespondToHello set to: {TestConfig.RespondToHello}", "NewTemplateMod");
+                case "set":
+                    _simpleConfig.SomeValue = 999;
+                    _intermediateConfig.CurrentMode = IntermediateConfig.Mode.Expert;
+                    _collectionConfig.Tags.Value.Add("gamma");
+                    _migrationConfig.DisplayName = "Updated Name";
+                    _advancedConfig.Settings.Value.Display.Value.Height = 999;
                     break;
 
                 default:
-                    ConfigStorage.TryLog($"Unknown command: {arguments[0]}", "NewTemplateMod");
+                    Chat.TryLine($"Unknown command: {arguments[0]}", "NewTemplateMod");
                     break;
             }
         }

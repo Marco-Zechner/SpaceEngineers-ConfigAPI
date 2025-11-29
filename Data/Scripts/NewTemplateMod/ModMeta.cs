@@ -1,5 +1,6 @@
 using System;
 using mz.Config;
+using mz.Logging;
 using mz.SemanticVersioning;
 
 namespace mz.NewTemplateMod
@@ -23,15 +24,15 @@ namespace mz.NewTemplateMod
         public static Action<ulong, string[]> OnModCommand;
 
         public static void CheckForCommands(ulong sender, string command, ref bool sendToOthers) {
-            ConfigStorage.HandleConfigCommands($"{MOD_COMMAND}-cfg", sender, command, ref sendToOthers);
+            ConfigCommands.HandleConfigCommands(MOD_COMMAND, sender, command, ref sendToOthers);
             if (!sendToOthers)
                 return;
 
             string potentialCommand = command.Trim();
             if (potentialCommand.Equals($"/{DEV_NAME.ToLowerInvariant()} mods", StringComparison.OrdinalIgnoreCase)) {
                 sendToOthers = false;
-                ConfigStorage.TryLog($"{NAME} v{Version} -> /{MOD_COMMAND}", $"{DEV_NAME.ToLowerInvariant()}");
-                ConfigStorage.TryLog($"{NAME} v{Version} -> /{MOD_COMMAND}-cfg", $"{DEV_NAME.ToLowerInvariant()}");
+                Chat.TryLine($"{NAME} v{Version} -> /{MOD_COMMAND}", $"{DEV_NAME.ToLowerInvariant()}");
+                Chat.TryLine($"{NAME} v{Version} -> /{MOD_COMMAND}-cfg", $"{DEV_NAME.ToLowerInvariant()}");
                 return;
             }
 
@@ -42,7 +43,7 @@ namespace mz.NewTemplateMod
                 OnModCommand?.Invoke(sender, arguments);
                 return;
             }
-            ConfigStorage.TryLog($"No matching command found for: {potentialCommand}", "ModMeta");
+            Chat.TryLine($"No matching command found for: {potentialCommand}", "ModMeta");
         }
     }
 }

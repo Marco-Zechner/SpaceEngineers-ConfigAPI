@@ -1,6 +1,6 @@
-namespace mz.Config
+namespace mz.Config.Domain
 {
-    public enum ConfigStorageKind
+    public enum ConfigLocationType
     {
         /// <summary>
         /// Saved in 'SEAppData/Saves/[steamID]/[WorldName]/Storage/ModFolder'
