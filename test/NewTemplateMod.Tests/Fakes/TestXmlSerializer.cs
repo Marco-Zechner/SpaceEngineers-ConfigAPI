@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Xml.Serialization;
 using mz.Config.Abstractions;
+using mz.Config.Abstractions.SE;
 using mz.Config.Domain;
 
 namespace NewTemplateMod.Tests
@@ -11,7 +12,7 @@ namespace NewTemplateMod.Tests
         public string SerializeToXml(ConfigBase config)
         {
             if (config == null)
-                throw new ArgumentNullException("config");
+                throw new ArgumentNullException(nameof(config));
 
             var type = config.GetType();
             var serializer = new XmlSerializer(type);
@@ -27,9 +28,9 @@ namespace NewTemplateMod.Tests
             ConfigBase, new()
         {
             if (configType == null)
-                throw new ArgumentNullException("configType");
+                throw new ArgumentNullException(nameof(configType));
             if (xml == null)
-                throw new ArgumentNullException("xml");
+                throw new ArgumentNullException(nameof(xml));
             
             var serializer = new XmlSerializer(configType);
             using (var sr = new StringReader(xml))

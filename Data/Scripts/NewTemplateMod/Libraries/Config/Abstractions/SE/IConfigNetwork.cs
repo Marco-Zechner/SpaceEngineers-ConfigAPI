@@ -1,6 +1,6 @@
 using mz.Config.Domain;
 
-namespace mz.Config.Abstractions
+namespace mz.Config.Abstractions.SE
 {
         public interface IConfigNetwork
     {

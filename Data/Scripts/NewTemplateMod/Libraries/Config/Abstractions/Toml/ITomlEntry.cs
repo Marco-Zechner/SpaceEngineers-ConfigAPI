@@ -1,4 +1,4 @@
-namespace mz.Config.Abstractions
+namespace mz.Config.Abstractions.Toml
 {
     public interface ITomlEntry
     {

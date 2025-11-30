@@ -1,6 +1,6 @@
-using mz.Config.Abstractions;
+using mz.Config.Abstractions.Toml;
 
-namespace mz.Config.Core
+namespace mz.Config.Core.Toml
 {
     internal class TomlEntry : ITomlEntry
     {

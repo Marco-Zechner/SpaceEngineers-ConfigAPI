@@ -1,11 +1,11 @@
 using System;
-using mz.Config.Abstractions;
+using mz.Config.Abstractions.SE;
 using mz.Config.Domain;
 using Sandbox.ModAPI;
 
-namespace mz.Config.Core
+namespace mz.Config.SeImpl
 {
-    public class SeXmlConfigSerializer : IConfigXmlSerializer
+    public class ConfigXmlSerializer : IConfigXmlSerializer
     {
         public string SerializeToXml(ConfigBase config)
         {

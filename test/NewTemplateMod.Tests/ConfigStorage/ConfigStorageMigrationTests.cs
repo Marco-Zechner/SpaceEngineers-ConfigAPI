@@ -1,4 +1,6 @@
 using mz.Config.Core;
+using mz.Config.Core.Storage;
+using mz.Config.Core.Toml;
 using mz.Config.Domain;
 using NUnit.Framework;
 

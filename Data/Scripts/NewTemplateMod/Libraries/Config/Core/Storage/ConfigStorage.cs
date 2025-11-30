@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Generic;
 using mz.Config.Abstractions;
+using mz.Config.Abstractions.SE;
+using mz.Config.Abstractions.Toml;
 using mz.Config.Domain;
 
-namespace mz.Config.Core
+namespace mz.Config.Core.Storage
 {
     public static class ConfigStorage
     {
@@ -22,8 +24,8 @@ namespace mz.Config.Core
 
         public static void Initialize(IConfigFileSystem fileSystem, IConfigSerializer serializer)
         {
-            if (fileSystem == null) throw new ArgumentNullException("fileSystem");
-            if (serializer == null) throw new ArgumentNullException("serializer");
+            if (fileSystem == null) throw new ArgumentNullException(nameof(fileSystem));
+            if (serializer == null) throw new ArgumentNullException(nameof(serializer));
 
             _fileSystem = fileSystem;
             _serializer = serializer;
@@ -108,7 +110,7 @@ namespace mz.Config.Core
             EnsureInitialized();
 
             if (string.IsNullOrEmpty(typeName))
-                throw new ArgumentNullException("typeName");
+                throw new ArgumentNullException(nameof(typeName));
 
             var def = GetDefinitionByTypeName(typeName);
             var slot = GetOrCreateSlot(location, typeName, def, null);
@@ -121,9 +123,9 @@ namespace mz.Config.Core
             EnsureInitialized();
 
             if (string.IsNullOrEmpty(typeName))
-                throw new ArgumentNullException("typeName");
+                throw new ArgumentNullException(nameof(typeName));
             if (string.IsNullOrEmpty(fileName))
-                throw new ArgumentNullException("fileName");
+                throw new ArgumentNullException(nameof(fileName));
 
             var def = GetDefinitionByTypeName(typeName);
             var slot = GetOrCreateSlot(location, typeName, def, null);
@@ -135,9 +137,9 @@ namespace mz.Config.Core
             EnsureInitialized();
 
             if (string.IsNullOrEmpty(typeName))
-                throw new ArgumentNullException("typeName");
+                throw new ArgumentNullException(nameof(typeName));
             if (string.IsNullOrEmpty(fileName))
-                throw new ArgumentNullException("fileName");
+                throw new ArgumentNullException(nameof(fileName));
 
             var def = GetDefinitionByTypeName(typeName);
             var slot = GetOrCreateSlot(location, typeName, def, null);
@@ -162,9 +164,9 @@ namespace mz.Config.Core
             EnsureInitialized();
 
             if (string.IsNullOrEmpty(typeName))
-                throw new ArgumentNullException("typeName");
+                throw new ArgumentNullException(nameof(typeName));
             if (string.IsNullOrEmpty(fileName))
-                throw new ArgumentNullException("fileName");
+                throw new ArgumentNullException(nameof(fileName));
 
             var def = GetDefinitionByTypeName(typeName);
             var slot = GetOrCreateSlot(location, typeName, def, null);
@@ -186,7 +188,7 @@ namespace mz.Config.Core
             EnsureInitialized();
 
             if (string.IsNullOrEmpty(typeName))
-                throw new ArgumentNullException("typeName");
+                throw new ArgumentNullException(nameof(typeName));
 
             var def = GetDefinitionByTypeName(typeName);
             var slot = GetOrCreateSlot(location, typeName, def, null);
@@ -204,7 +206,7 @@ namespace mz.Config.Core
             EnsureInitialized();
 
             if (string.IsNullOrEmpty(fileName))
-                throw new ArgumentNullException("fileName");
+                throw new ArgumentNullException(nameof(fileName));
 
             string content;
             if (_fileSystem.TryReadFile(location, fileName, out content))

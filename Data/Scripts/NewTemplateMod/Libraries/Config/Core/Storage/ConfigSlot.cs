@@ -1,6 +1,6 @@
 using mz.Config.Domain;
 
-namespace mz.Config.Core
+namespace mz.Config.Core.Storage
 {
     internal class ConfigSlot
     {

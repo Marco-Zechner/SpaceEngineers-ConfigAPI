@@ -1,6 +1,8 @@
 using mz.Config.Core;
 using mz.Config.Domain;
 using mz.Config.Abstractions;
+using mz.Config.Core.Storage;
+using mz.Config.Core.Toml;
 using NUnit.Framework;
 
 namespace NewTemplateMod.Tests.Serialization

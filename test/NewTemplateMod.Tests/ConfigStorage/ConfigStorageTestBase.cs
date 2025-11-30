@@ -1,4 +1,5 @@
 using mz.Config.Core;
+using mz.Config.Core.Storage;
 using mz.Config.Domain;
 using NUnit.Framework;
 

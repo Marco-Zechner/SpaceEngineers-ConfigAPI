@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using mz.Config.Abstractions;
+using mz.Config.Abstractions.SE;
 using mz.Config.Domain;
 
 namespace NewTemplateMod.Tests

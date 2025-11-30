@@ -1,5 +1,6 @@
 using System;
 using mz.Config.Abstractions;
+using mz.Config.Abstractions.Toml;
 using mz.Config.Domain;
 
 namespace NewTemplateMod.Tests

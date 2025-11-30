@@ -1,8 +1,9 @@
 using System;
 using mz.Config.Abstractions;
+using mz.Config.Abstractions.SE;
 using mz.Config.Domain;
 
-namespace mz.Config.Core
+namespace mz.Config.Core.Storage
 {
     public sealed class ConfigDefinition<T> : IConfigDefinition
         where T : ConfigBase, new()
