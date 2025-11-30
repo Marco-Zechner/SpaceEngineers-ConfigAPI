@@ -13,20 +13,47 @@ namespace mz.Config.Core
             if (string.IsNullOrEmpty(xml))
                 return result;
 
+            // Find root tag
+            int lt = xml.IndexOf('<');
+            if (lt < 0)
+                return result;
+
+            int gt = xml.IndexOf('>', lt + 1);
+            if (gt < 0)
+                return result;
+
+            string rootTagContent = xml.Substring(lt + 1, gt - lt - 1).Trim();
+            if (rootTagContent.Length == 0)
+                return result;
+
+            int spaceIndex = rootTagContent.IndexOf(' ');
+            string rootName = (spaceIndex >= 0)
+                ? rootTagContent.Substring(0, spaceIndex)
+                : rootTagContent;
+
+            string endRootTag = "</" + rootName + ">";
+            int endRootIndex = xml.LastIndexOf(endRootTag, StringComparison.Ordinal);
+            if (endRootIndex < 0)
+                return result;
+
+            int innerStart = gt + 1;
+            string inner = xml.Substring(innerStart, endRootIndex - innerStart);
+
+            // Now parse only child elements inside the root
             int pos = 0;
-            int len = xml.Length;
+            int len = inner.Length;
 
             while (true)
             {
-                int startTagOpen = xml.IndexOf('<', pos);
+                int startTagOpen = inner.IndexOf('<', pos);
                 if (startTagOpen < 0 || startTagOpen >= len)
                     break;
 
-                int startTagClose = xml.IndexOf('>', startTagOpen + 1);
+                int startTagClose = inner.IndexOf('>', startTagOpen + 1);
                 if (startTagClose < 0)
                     break;
 
-                string startTagContent = xml.Substring(startTagOpen + 1, startTagClose - startTagOpen - 1).Trim();
+                string startTagContent = inner.Substring(startTagOpen + 1, startTagClose - startTagOpen - 1).Trim();
 
                 if (startTagContent.Length == 0 ||
                     startTagContent[0] == '?' ||
@@ -37,21 +64,21 @@ namespace mz.Config.Core
                     continue;
                 }
 
-                int spaceIndex = startTagContent.IndexOf(' ');
+                spaceIndex = startTagContent.IndexOf(' ');
                 string tagName = (spaceIndex >= 0)
                     ? startTagContent.Substring(0, spaceIndex)
                     : startTagContent;
 
                 string endTag = "</" + tagName + ">";
-                int endTagIndex = xml.IndexOf(endTag, startTagClose + 1, StringComparison.Ordinal);
+                int endTagIndex = inner.IndexOf(endTag, startTagClose + 1, StringComparison.Ordinal);
                 if (endTagIndex < 0)
                 {
                     pos = startTagClose + 1;
                     continue;
                 }
 
-                int innerStart = startTagClose + 1;
-                string innerText = xml.Substring(innerStart, endTagIndex - innerStart);
+                int innerValueStart = startTagClose + 1;
+                string innerText = inner.Substring(innerValueStart, endTagIndex - innerValueStart);
 
                 string value = Unescape(innerText.Trim());
                 result[tagName] = value;
