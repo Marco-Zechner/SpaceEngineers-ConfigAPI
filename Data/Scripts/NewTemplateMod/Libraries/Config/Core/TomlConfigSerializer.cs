@@ -26,26 +26,26 @@ public class TomlConfigSerializer : IConfigSerializer
             throw new ArgumentNullException("config");
 
         // Special handling for ExampleConfig to keep existing behaviour/tests
-        ExampleConfig example = config as ExampleConfig;
+        var example = config as ExampleConfig;
         if (example != null)
             return SerializeExampleConfig(example);
 
         // Generic path: XML -> fields -> TOML with simple bool/string heuristics
-        string typeName = config.GetType().Name;
-        string xml = _xml.SerializeToXml(config);
-        Dictionary<string, string> fields = SimpleXml.ParseSimpleElements(xml);
+        var typeName = config.GetType().Name;
+        var xml = _xml.SerializeToXml(config);
+        var fields = SimpleXml.ParseSimpleElements(xml);
 
-        StringBuilder sb = new StringBuilder();
+        var sb = new StringBuilder();
 
         sb.Append('[').Append(typeName).Append(']').AppendLine();
         sb.Append("StoredVersion = \"").Append(config.ConfigVersion).Append('"').AppendLine();
 
-        foreach (KeyValuePair<string, string> kv in fields)
+        foreach (var kv in fields)
         {
-            string key = kv.Key;
-            string rawValue = kv.Value;
+            var key = kv.Key;
+            var rawValue = kv.Value;
 
-            string tomlValue = ToTomlValue(rawValue);
+            var tomlValue = ToTomlValue(rawValue);
 
             sb.Append(key).Append(" = ").Append(tomlValue);
             sb.Append(" # ").Append(tomlValue); // comment == current value
@@ -65,23 +65,23 @@ public class TomlConfigSerializer : IConfigSerializer
             return DeserializeExampleConfig(content);
 
         // Generic path
-        ITomlModel model = ParseToModel(content);
+        var model = ParseToModel(content);
         if (model == null)
             return definition.CreateDefaultInstance();
 
-        Dictionary<string, string> values = new Dictionary<string, string>();
+        var values = new Dictionary<string, string>();
 
-        foreach (KeyValuePair<string, ITomlEntry> kv in model.Entries)
+        foreach (var kv in model.Entries)
         {
-            string key = kv.Key;
-            string tomlValue = kv.Value.Value;
+            var key = kv.Key;
+            var tomlValue = kv.Value.Value;
 
-            string raw = FromTomlValue(tomlValue);
+            var raw = FromTomlValue(tomlValue);
             values[key] = raw;
         }
 
-        string rootName = definition.TypeName;
-        string xml = SimpleXml.BuildSimpleXml(rootName, values);
+        var rootName = definition.TypeName;
+        var xml = SimpleXml.BuildSimpleXml(rootName, values);
 
         return definition.DeserializeFromXml(_xml, xml);
     }
@@ -95,16 +95,16 @@ public class TomlConfigSerializer : IConfigSerializer
         if (string.IsNullOrEmpty(tomlContent))
             return null;
 
-        TomlModel model = new TomlModel();
+        var model = new TomlModel();
 
-        string[] lines = tomlContent.Split(
+        var lines = tomlContent.Split(
             new[] { "\r\n", "\n" },
             StringSplitOptions.None);
 
-        for (int i = 0; i < lines.Length; i++)
+        for (var i = 0; i < lines.Length; i++)
         {
-            string raw = lines[i];
-            string line = raw.Trim();
+            var raw = lines[i];
+            var line = raw.Trim();
             if (line.Length == 0)
                 continue;
 
@@ -113,22 +113,22 @@ public class TomlConfigSerializer : IConfigSerializer
 
             if (line.StartsWith("[") && line.EndsWith("]"))
             {
-                string sectionName = line.Substring(1, line.Length - 2).Trim();
+                var sectionName = line.Substring(1, line.Length - 2).Trim();
                 model.TypeName = sectionName;
                 continue;
             }
 
-            int eqIndex = line.IndexOf('=');
+            var eqIndex = line.IndexOf('=');
             if (eqIndex <= 0)
                 continue;
 
-            string key = line.Substring(0, eqIndex).Trim();
-            string valuePart = line.Substring(eqIndex + 1).Trim();
+            var key = line.Substring(0, eqIndex).Trim();
+            var valuePart = line.Substring(eqIndex + 1).Trim();
 
-            string valueText = valuePart;
+            var valueText = valuePart;
             string defaultText = null;
 
-            int hashIndex = valuePart.IndexOf('#');
+            var hashIndex = valuePart.IndexOf('#');
             if (hashIndex >= 0)
             {
                 valueText = valuePart.Substring(0, hashIndex).Trim();
@@ -141,7 +141,7 @@ public class TomlConfigSerializer : IConfigSerializer
                 continue;
             }
 
-            TomlEntry entry = new TomlEntry();
+            var entry = new TomlEntry();
             entry.Value = valueText;
             entry.DefaultValue = defaultText;
             model.Entries[key] = entry;
@@ -155,7 +155,7 @@ public class TomlConfigSerializer : IConfigSerializer
         if (model == null)
             throw new ArgumentNullException("model");
 
-        StringBuilder sb = new StringBuilder();
+        var sb = new StringBuilder();
 
         if (!string.IsNullOrEmpty(model.TypeName))
         {
@@ -167,7 +167,7 @@ public class TomlConfigSerializer : IConfigSerializer
             sb.Append("StoredVersion = \"").Append(model.StoredVersion).Append('"').AppendLine();
         }
 
-        foreach (KeyValuePair<string, ITomlEntry> kv in model.Entries)
+        foreach (var kv in model.Entries)
         {
             sb.Append(kv.Key).Append(" = ").Append(kv.Value.Value);
             if (!string.IsNullOrEmpty(kv.Value.DefaultValue))
@@ -190,22 +190,22 @@ public class TomlConfigSerializer : IConfigSerializer
             return BuildDefaultModelExample(definition);
 
         // Generic path: default instance -> XML -> fields
-        ConfigBase defaultInstance = definition.CreateDefaultInstance();
-        string xml = _xml.SerializeToXml(defaultInstance);
-        Dictionary<string, string> fields = SimpleXml.ParseSimpleElements(xml);
+        var defaultInstance = definition.CreateDefaultInstance();
+        var xml = _xml.SerializeToXml(defaultInstance);
+        var fields = SimpleXml.ParseSimpleElements(xml);
 
-        TomlModel model = new TomlModel();
+        var model = new TomlModel();
         model.TypeName = definition.TypeName;
         model.StoredVersion = defaultInstance.ConfigVersion;
 
-        foreach (KeyValuePair<string, string> kv in fields)
+        foreach (var kv in fields)
         {
-            string key = kv.Key;
-            string rawValue = kv.Value;
+            var key = kv.Key;
+            var rawValue = kv.Value;
 
-            string tomlValue = ToTomlValue(rawValue);
+            var tomlValue = ToTomlValue(rawValue);
 
-            TomlEntry entry = new TomlEntry();
+            var entry = new TomlEntry();
             entry.Value = tomlValue;
             entry.DefaultValue = tomlValue;
             model.Entries[key] = entry;
@@ -223,7 +223,7 @@ public class TomlConfigSerializer : IConfigSerializer
         const bool defaultRespondToHello = false;
         const string defaultGreetingMessage = "hello";
 
-        StringBuilder sb = new StringBuilder();
+        var sb = new StringBuilder();
 
         sb.AppendLine("[ExampleConfig]");
         sb.Append("StoredVersion = \"").Append(cfg.ConfigVersion).AppendLine("\"");
@@ -248,19 +248,19 @@ public class TomlConfigSerializer : IConfigSerializer
         const bool defaultRespondToHello = false;
         const string defaultGreetingMessage = "hello";
 
-        ExampleConfig cfg = new ExampleConfig();
+        var cfg = new ExampleConfig();
 
         if (string.IsNullOrEmpty(content))
             return cfg;
 
-        string[] lines = content.Split(
+        var lines = content.Split(
             new[] { "\r\n", "\n" },
             StringSplitOptions.None);
 
-        for (int i = 0; i < lines.Length; i++)
+        for (var i = 0; i < lines.Length; i++)
         {
-            string raw = lines[i];
-            string line = raw.Trim();
+            var raw = lines[i];
+            var line = raw.Trim();
             if (line.Length == 0)
                 continue;
 
@@ -272,17 +272,17 @@ public class TomlConfigSerializer : IConfigSerializer
                 continue;
             }
 
-            int eqIndex = line.IndexOf('=');
+            var eqIndex = line.IndexOf('=');
             if (eqIndex <= 0)
                 continue;
 
-            string key = line.Substring(0, eqIndex).Trim();
-            string valuePart = line.Substring(eqIndex + 1).Trim();
+            var key = line.Substring(0, eqIndex).Trim();
+            var valuePart = line.Substring(eqIndex + 1).Trim();
 
-            string valueText = valuePart;
+            var valueText = valuePart;
             string defaultText = null;
 
-            int hashIndex = valuePart.IndexOf('#');
+            var hashIndex = valuePart.IndexOf('#');
             if (hashIndex >= 0)
             {
                 valueText = valuePart.Substring(0, hashIndex).Trim();
@@ -292,10 +292,10 @@ public class TomlConfigSerializer : IConfigSerializer
             if (string.Equals(key, "RespondToHello", StringComparison.OrdinalIgnoreCase))
             {
                 bool parsedValue;
-                bool hasValue = bool.TryParse(valueText, out parsedValue);
+                var hasValue = bool.TryParse(valueText, out parsedValue);
 
-                bool parsedDefault = false;
-                bool hasDefault = defaultText != null && bool.TryParse(defaultText, out parsedDefault);
+                var parsedDefault = false;
+                var hasDefault = defaultText != null && bool.TryParse(defaultText, out parsedDefault);
 
                 if (hasValue)
                 {
@@ -313,7 +313,7 @@ public class TomlConfigSerializer : IConfigSerializer
             }
             else if (string.Equals(key, "GreetingMessage", StringComparison.OrdinalIgnoreCase))
             {
-                string valueString = FromTomlString(valueText);
+                var valueString = FromTomlString(valueText);
 
                 string defaultString = null;
                 if (!string.IsNullOrEmpty(defaultText))
@@ -343,22 +343,22 @@ public class TomlConfigSerializer : IConfigSerializer
 
     private static ITomlModel BuildDefaultModelExample(IConfigDefinition definition)
     {
-        ExampleConfig cfg = new ExampleConfig();
+        var cfg = new ExampleConfig();
 
         const bool defaultRespondToHello = false;
         const string defaultGreetingMessage = "hello";
 
-        TomlModel model = new TomlModel();
+        var model = new TomlModel();
         model.TypeName = definition.TypeName;
         model.StoredVersion = cfg.ConfigVersion;
 
-        TomlEntry resp = new TomlEntry();
+        var resp = new TomlEntry();
         resp.Value = defaultRespondToHello ? "true" : "false";
         resp.DefaultValue = resp.Value;
         model.Entries["RespondToHello"] = resp;
 
-        TomlEntry greet = new TomlEntry();
-        string defToml = ToTomlString(defaultGreetingMessage, defaultGreetingMessage);
+        var greet = new TomlEntry();
+        var defToml = ToTomlString(defaultGreetingMessage, defaultGreetingMessage);
         greet.Value = defToml;
         greet.DefaultValue = defToml;
         model.Entries["GreetingMessage"] = greet;
@@ -373,15 +373,9 @@ public class TomlConfigSerializer : IConfigSerializer
     private static string ToTomlValue(string raw)
     {
         if (raw == null)
-            return "\"\"";
+            raw = string.Empty;
 
-        string t = raw.Trim();
-
-        bool b;
-        if (bool.TryParse(t, out b))
-            return b ? "true" : "false";
-
-        string escaped = t.Replace("\"", "\\\"");
+        var escaped = raw.Replace("\"", "\\\"");
         return "\"" + escaped + "\"";
     }
 
@@ -390,7 +384,7 @@ public class TomlConfigSerializer : IConfigSerializer
         if (currentValue == null)
             currentValue = string.Empty;
 
-        string escaped = currentValue.Replace("\"", "\\\"");
+        var escaped = currentValue.Replace("\"", "\\\"");
         return "\"" + escaped + "\"";
     }
 
@@ -399,7 +393,7 @@ public class TomlConfigSerializer : IConfigSerializer
         if (string.IsNullOrEmpty(value))
             return string.Empty;
 
-        string s = value.Trim();
+        var s = value.Trim();
         if (s.Length >= 2 && s[0] == '"' && s[s.Length - 1] == '"')
         {
             s = s.Substring(1, s.Length - 2);
@@ -414,7 +408,7 @@ public class TomlConfigSerializer : IConfigSerializer
         if (string.IsNullOrEmpty(value))
             return string.Empty;
 
-        string v = value.Trim();
+        var v = value.Trim();
 
         if (v.Length >= 2 && v[0] == '"' && v[v.Length - 1] == '"')
         {

@@ -10,28 +10,28 @@ namespace NewTemplateMod.Tests.ConfigStorageTests
         [Test]
         public void GetOrCreate_CreatesDefaultInstance_AndSetsDefaultFileName()
         {
-            TestConfig cfg = ConfigStorage.GetOrCreate<TestConfig>(ConfigLocationType.Local);
+            var cfg = ConfigStorage.GetOrCreate<TestConfig>(ConfigLocationType.Local);
 
             Assert.That(cfg, Is.Not.Null);
             Assert.That(cfg, Is.InstanceOf<TestConfig>());
             Assert.That(cfg.ConfigVersion, Is.EqualTo("0.1.0"));
 
-            string currentFileName = ConfigStorage.GetCurrentFileName(ConfigLocationType.Local, "TestConfig");
+            var currentFileName = ConfigStorage.GetCurrentFileName(ConfigLocationType.Local, "TestConfig");
             Assert.That(currentFileName, Is.EqualTo("TestConfigDefault.toml"));
         }
 
         [Test]
         public void Save_CreatesFile_WithSerializedContent_AndTracksFileName()
         {
-            TestConfig cfg = ConfigStorage.GetOrCreate<TestConfig>(ConfigLocationType.Local);
+            var cfg = ConfigStorage.GetOrCreate<TestConfig>(ConfigLocationType.Local);
             cfg.SomeValue = 42;
 
-            bool result = ConfigStorage.Save(ConfigLocationType.Local, "TestConfig", "myconfig.toml");
+            var result = ConfigStorage.Save(ConfigLocationType.Local, "TestConfig", "myconfig.toml");
 
             Assert.That(result, Is.True);
 
             string content;
-            bool fileExists = FileSystem.TryReadFile(ConfigLocationType.Local, "myconfig.toml", out content);
+            var fileExists = FileSystem.TryReadFile(ConfigLocationType.Local, "myconfig.toml", out content);
 
             Assert.Multiple(() =>
             {
@@ -39,7 +39,7 @@ namespace NewTemplateMod.Tests.ConfigStorageTests
                 Assert.That(content, Is.EqualTo(Serializer.LastSerializedContent));
             });
 
-            string currentFileName = ConfigStorage.GetCurrentFileName(ConfigLocationType.Local, "TestConfig");
+            var currentFileName = ConfigStorage.GetCurrentFileName(ConfigLocationType.Local, "TestConfig");
             Assert.That(currentFileName, Is.EqualTo("myconfig.toml"));
         }
 
@@ -54,14 +54,14 @@ namespace NewTemplateMod.Tests.ConfigStorageTests
 
             FileSystem.WriteFile(ConfigLocationType.Local, "existing.toml", "dummy content");
 
-            bool result = ConfigStorage.Load(ConfigLocationType.Local, "TestConfig", "existing.toml");
+            var result = ConfigStorage.Load(ConfigLocationType.Local, "TestConfig", "existing.toml");
 
             Assert.That(result, Is.True);
 
-            TestConfig cfg = ConfigStorage.GetOrCreate<TestConfig>(ConfigLocationType.Local);
+            var cfg = ConfigStorage.GetOrCreate<TestConfig>(ConfigLocationType.Local);
             Assert.That(cfg, Is.SameAs(loadedConfig));
 
-            string currentFileName = ConfigStorage.GetCurrentFileName(ConfigLocationType.Local, "TestConfig");
+            var currentFileName = ConfigStorage.GetCurrentFileName(ConfigLocationType.Local, "TestConfig");
             Assert.Multiple(() =>
             {
                 Assert.That(currentFileName, Is.EqualTo("existing.toml"));
@@ -74,10 +74,10 @@ namespace NewTemplateMod.Tests.ConfigStorageTests
         [Test]
         public void GetConfigAsText_SerializesCurrentInstance()
         {
-            TestConfig cfg = ConfigStorage.GetOrCreate<TestConfig>(ConfigLocationType.Local);
+            var cfg = ConfigStorage.GetOrCreate<TestConfig>(ConfigLocationType.Local);
             cfg.SomeValue = 7;
 
-            string text = ConfigStorage.GetConfigAsText(ConfigLocationType.Local, "TestConfig");
+            var text = ConfigStorage.GetConfigAsText(ConfigLocationType.Local, "TestConfig");
 
             Assert.That(text, Is.Not.Null);
             Assert.Multiple(() =>
@@ -92,8 +92,8 @@ namespace NewTemplateMod.Tests.ConfigStorageTests
         {
             FileSystem.WriteFile(ConfigLocationType.Local, "fileA.toml", "content A");
 
-            string found = ConfigStorage.GetFileAsText(ConfigLocationType.Local, "fileA.toml");
-            string notFound = ConfigStorage.GetFileAsText(ConfigLocationType.Local, "missing.toml");
+            var found = ConfigStorage.GetFileAsText(ConfigLocationType.Local, "fileA.toml");
+            var notFound = ConfigStorage.GetFileAsText(ConfigLocationType.Local, "missing.toml");
 
             Assert.Multiple(() =>
             {
@@ -105,13 +105,13 @@ namespace NewTemplateMod.Tests.ConfigStorageTests
         [Test]
         public void Register_SameTypeSameLocationTwice_DoesNotThrow_AndDoesNotChangeCurrentFileName()
         {
-            string originalFileName = ConfigStorage.GetCurrentFileName(ConfigLocationType.Local, "TestConfig");
+            var originalFileName = ConfigStorage.GetCurrentFileName(ConfigLocationType.Local, "TestConfig");
 
             Assert.That(
                 () => ConfigStorage.Register<TestConfig>(ConfigLocationType.Local),
                 Throws.Nothing);
 
-            string after = ConfigStorage.GetCurrentFileName(ConfigLocationType.Local, "TestConfig");
+            var after = ConfigStorage.GetCurrentFileName(ConfigLocationType.Local, "TestConfig");
             Assert.That(after, Is.EqualTo(originalFileName));
         }
     }

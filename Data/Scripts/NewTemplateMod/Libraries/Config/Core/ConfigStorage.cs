@@ -62,7 +62,7 @@ namespace mz.Config.Core
         {
             EnsureInitialized();
 
-            string typeName = typeof(T).Name;
+            var typeName = typeof(T).Name;
 
             IConfigDefinition def;
             if (!_definitions.TryGetValue(typeName, out def))
@@ -77,7 +77,7 @@ namespace mz.Config.Core
                     "Config type name '" + typeName + "' is already registered with a different type.");
             }
 
-            ConfigSlot slot = GetOrCreateSlot(location, typeName, def, initialFileName);
+            var slot = GetOrCreateSlot(location, typeName, def, initialFileName);
 
             // If slot.Instance is null, we either failed to load or there was no file;
             // keep it lazy: we will create default on first GetOrCreate/Save/Load success.
@@ -90,9 +90,9 @@ namespace mz.Config.Core
         {
             EnsureInitialized();
 
-            string typeName = typeof(T).Name;
-            IConfigDefinition def = GetDefinitionByTypeName(typeName);
-            ConfigSlot slot = GetOrCreateSlot(location, typeName, def, null);
+            var typeName = typeof(T).Name;
+            var def = GetDefinitionByTypeName(typeName);
+            var slot = GetOrCreateSlot(location, typeName, def, null);
 
             if (slot.Instance == null)
             {
@@ -110,8 +110,8 @@ namespace mz.Config.Core
             if (string.IsNullOrEmpty(typeName))
                 throw new ArgumentNullException("typeName");
 
-            IConfigDefinition def = GetDefinitionByTypeName(typeName);
-            ConfigSlot slot = GetOrCreateSlot(location, typeName, def, null);
+            var def = GetDefinitionByTypeName(typeName);
+            var slot = GetOrCreateSlot(location, typeName, def, null);
 
             return slot.CurrentFileName;
         }
@@ -125,8 +125,8 @@ namespace mz.Config.Core
             if (string.IsNullOrEmpty(fileName))
                 throw new ArgumentNullException("fileName");
 
-            IConfigDefinition def = GetDefinitionByTypeName(typeName);
-            ConfigSlot slot = GetOrCreateSlot(location, typeName, def, null);
+            var def = GetDefinitionByTypeName(typeName);
+            var slot = GetOrCreateSlot(location, typeName, def, null);
             slot.CurrentFileName = fileName;
         }
 
@@ -139,8 +139,8 @@ namespace mz.Config.Core
             if (string.IsNullOrEmpty(fileName))
                 throw new ArgumentNullException("fileName");
 
-            IConfigDefinition def = GetDefinitionByTypeName(typeName);
-            ConfigSlot slot = GetOrCreateSlot(location, typeName, def, null);
+            var def = GetDefinitionByTypeName(typeName);
+            var slot = GetOrCreateSlot(location, typeName, def, null);
 
             string content;
             if (!_fileSystem.TryReadFile(location, fileName, out content))
@@ -148,7 +148,7 @@ namespace mz.Config.Core
 
             content = TryNormalizeConfigFile(location, fileName, def, content);
 
-            ConfigBase config = _serializer.Deserialize(def, content);
+            var config = _serializer.Deserialize(def, content);
             if (config == null)
                 return false;
 
@@ -166,15 +166,15 @@ namespace mz.Config.Core
             if (string.IsNullOrEmpty(fileName))
                 throw new ArgumentNullException("fileName");
 
-            IConfigDefinition def = GetDefinitionByTypeName(typeName);
-            ConfigSlot slot = GetOrCreateSlot(location, typeName, def, null);
+            var def = GetDefinitionByTypeName(typeName);
+            var slot = GetOrCreateSlot(location, typeName, def, null);
 
             if (slot.Instance == null)
             {
                 slot.Instance = def.CreateDefaultInstance();
             }
 
-            string content = _serializer.Serialize(slot.Instance);
+            var content = _serializer.Serialize(slot.Instance);
             _fileSystem.WriteFile(location, fileName, content);
             slot.CurrentFileName = fileName;
 
@@ -188,8 +188,8 @@ namespace mz.Config.Core
             if (string.IsNullOrEmpty(typeName))
                 throw new ArgumentNullException("typeName");
 
-            IConfigDefinition def = GetDefinitionByTypeName(typeName);
-            ConfigSlot slot = GetOrCreateSlot(location, typeName, def, null);
+            var def = GetDefinitionByTypeName(typeName);
+            var slot = GetOrCreateSlot(location, typeName, def, null);
 
             if (slot.Instance == null)
             {
@@ -265,7 +265,7 @@ namespace mz.Config.Core
             string content;
             if (_fileSystem.TryReadFile(location, fileName, out content))
             {
-                ConfigBase config = _serializer.Deserialize(def, content);
+                var config = _serializer.Deserialize(def, content);
                 if (config != null)
                 {
                     slot.Instance = config;
@@ -286,8 +286,8 @@ namespace mz.Config.Core
             // If anything goes wrong, just fall back to original content.
             try
             {
-                ITomlModel fileModel = _serializer.ParseToModel(originalContent);
-                ITomlModel defaultModel = _serializer.BuildDefaultModel(def);
+                var fileModel = _serializer.ParseToModel(originalContent);
+                var defaultModel = _serializer.BuildDefaultModel(def);
 
                 if (fileModel == null || defaultModel == null)
                     return originalContent;
@@ -299,7 +299,7 @@ namespace mz.Config.Core
                     return originalContent;
                 }
 
-                bool hasExtraKeys = false;
+                var hasExtraKeys = false;
 
                 // Detect extra keys
                 foreach (var kv in fileModel.Entries)
@@ -313,8 +313,8 @@ namespace mz.Config.Core
                 // Merge known keys from file into default model
                 foreach (var kv in defaultModel.Entries)
                 {
-                    string key = kv.Key;
-                    ITomlEntry defaultEntry = kv.Value;
+                    var key = kv.Key;
+                    var defaultEntry = kv.Value;
 
                     ITomlEntry fileEntry;
                     if (fileModel.Entries.TryGetValue(key, out fileEntry))
@@ -333,12 +333,12 @@ namespace mz.Config.Core
                     }
                 }
 
-                string normalized = _serializer.SerializeModel(defaultModel);
+                var normalized = _serializer.SerializeModel(defaultModel);
 
                 // Backup only if there were extra keys.
                 if (hasExtraKeys)
                 {
-                    string backupName = fileName + ".bak";
+                    var backupName = fileName + ".bak";
                     _fileSystem.WriteFile(location, backupName, originalContent);
                 }
 

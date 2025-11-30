@@ -8,82 +8,115 @@ namespace mz.Config.Core
     {
         public static Dictionary<string, string> ParseSimpleElements(string xml)
         {
-            Dictionary<string, string> result = new Dictionary<string, string>();
+            var result = new Dictionary<string, string>();
 
             if (string.IsNullOrEmpty(xml))
                 return result;
 
-            // Find root tag
-            int lt = xml.IndexOf('<');
-            if (lt < 0)
+            var len = xml.Length;
+            var pos = 0;
+
+            string rootName = null;
+            var rootStartClose = -1;
+            var endRootIndex = -1;
+
+            // Find the real root element, skipping declarations/comments/etc.
+            while (pos < len && rootName == null)
+            {
+                var lt = xml.IndexOf('<', pos);
+                if (lt < 0)
+                    return result;
+
+                var gt = xml.IndexOf('>', lt + 1);
+                if (gt < 0)
+                    return result;
+
+                var tagContent = xml.Substring(lt + 1, gt - lt - 1).Trim();
+                if (tagContent.Length == 0)
+                {
+                    pos = gt + 1;
+                    continue;
+                }
+
+                var first = tagContent[0];
+                // Skip xml declarations, comments, closing tags etc.
+                if (first == '?' || first == '!' || first == '/')
+                {
+                    pos = gt + 1;
+                    continue;
+                }
+
+                var spaceIndex = tagContent.IndexOf(' ');
+                rootName = (spaceIndex >= 0)
+                    ? tagContent.Substring(0, spaceIndex)
+                    : tagContent;
+
+                rootStartClose = gt;
+
+                var endRootTag = "</" + rootName + ">";
+                endRootIndex = xml.LastIndexOf(endRootTag, StringComparison.Ordinal);
+                if (endRootIndex < 0)
+                {
+                    // malformed, give up
+                    return result;
+                }
+            }
+
+            if (rootName == null || rootStartClose < 0 || endRootIndex <= rootStartClose)
                 return result;
 
-            int gt = xml.IndexOf('>', lt + 1);
-            if (gt < 0)
-                return result;
+            // Inner content between <root ...> and </root>
+            var inner = xml.Substring(rootStartClose + 1, endRootIndex - (rootStartClose + 1));
 
-            string rootTagContent = xml.Substring(lt + 1, gt - lt - 1).Trim();
-            if (rootTagContent.Length == 0)
-                return result;
-
-            int spaceIndex = rootTagContent.IndexOf(' ');
-            string rootName = (spaceIndex >= 0)
-                ? rootTagContent.Substring(0, spaceIndex)
-                : rootTagContent;
-
-            string endRootTag = "</" + rootName + ">";
-            int endRootIndex = xml.LastIndexOf(endRootTag, StringComparison.Ordinal);
-            if (endRootIndex < 0)
-                return result;
-
-            int innerStart = gt + 1;
-            string inner = xml.Substring(innerStart, endRootIndex - innerStart);
-
-            // Now parse only child elements inside the root
-            int pos = 0;
-            int len = inner.Length;
+            // Parse child elements from inner
+            var innerLen = inner.Length;
+            var innerPos = 0;
 
             while (true)
             {
-                int startTagOpen = inner.IndexOf('<', pos);
-                if (startTagOpen < 0 || startTagOpen >= len)
+                var startTagOpen = inner.IndexOf('<', innerPos);
+                if (startTagOpen < 0 || startTagOpen >= innerLen)
                     break;
 
-                int startTagClose = inner.IndexOf('>', startTagOpen + 1);
+                var startTagClose = inner.IndexOf('>', startTagOpen + 1);
                 if (startTagClose < 0)
                     break;
 
-                string startTagContent = inner.Substring(startTagOpen + 1, startTagClose - startTagOpen - 1).Trim();
+                var startTagContent = inner.Substring(startTagOpen + 1, startTagClose - startTagOpen - 1).Trim();
 
-                if (startTagContent.Length == 0 ||
-                    startTagContent[0] == '?' ||
-                    startTagContent[0] == '!' ||
-                    startTagContent[0] == '/')
+                if (startTagContent.Length == 0)
                 {
-                    pos = startTagClose + 1;
+                    innerPos = startTagClose + 1;
                     continue;
                 }
 
-                spaceIndex = startTagContent.IndexOf(' ');
-                string tagName = (spaceIndex >= 0)
+                var first = startTagContent[0];
+                if (first == '?' || first == '!' || first == '/')
+                {
+                    innerPos = startTagClose + 1;
+                    continue;
+                }
+
+                var spaceIndex = startTagContent.IndexOf(' ');
+                var tagName = (spaceIndex >= 0)
                     ? startTagContent.Substring(0, spaceIndex)
                     : startTagContent;
 
-                string endTag = "</" + tagName + ">";
-                int endTagIndex = inner.IndexOf(endTag, startTagClose + 1, StringComparison.Ordinal);
+                var endTag = "</" + tagName + ">";
+                var endTagIndex = inner.IndexOf(endTag, startTagClose + 1, StringComparison.Ordinal);
                 if (endTagIndex < 0)
                 {
-                    pos = startTagClose + 1;
+                    innerPos = startTagClose + 1;
                     continue;
                 }
 
-                int innerValueStart = startTagClose + 1;
-                string innerText = inner.Substring(innerValueStart, endTagIndex - innerValueStart);
+                var innerValueStart = startTagClose + 1;
+                var innerText = inner.Substring(innerValueStart, endTagIndex - innerValueStart);
 
-                string value = Unescape(innerText.Trim());
+                var value = Unescape(innerText.Trim());
                 result[tagName] = value;
 
-                pos = endTagIndex + endTag.Length;
+                innerPos = endTagIndex + endTag.Length;
             }
 
             return result;
@@ -91,10 +124,10 @@ namespace mz.Config.Core
 
         public static string BuildSimpleXml(string rootName, IDictionary<string, string> values)
         {
-            StringBuilder sb = new StringBuilder();
+            var sb = new StringBuilder();
             sb.Append('<').Append(rootName).Append('>');
 
-            foreach (KeyValuePair<string, string> kv in values)
+            foreach (var kv in values)
             {
                 sb.Append('<').Append(kv.Key).Append('>');
                 sb.Append(Escape(kv.Value));

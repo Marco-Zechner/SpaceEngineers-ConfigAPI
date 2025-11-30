@@ -130,30 +130,30 @@ namespace NewTemplateMod.Tests.ConfigStorageTests
         [Test]
         public void Load_FileMissing_ReturnsFalse_AndDoesNotChangeCurrentFileName()
         {
-            string originalFileName = ConfigStorage.GetCurrentFileName(ConfigLocationType.Local, "TestConfig");
+            var originalFileName = ConfigStorage.GetCurrentFileName(ConfigLocationType.Local, "TestConfig");
 
-            bool result = ConfigStorage.Load(ConfigLocationType.Local, "TestConfig", "does_not_exist.toml");
+            var result = ConfigStorage.Load(ConfigLocationType.Local, "TestConfig", "does_not_exist.toml");
 
             Assert.That(result, Is.False);
 
-            string fileName = ConfigStorage.GetCurrentFileName(ConfigLocationType.Local, "TestConfig");
+            var fileName = ConfigStorage.GetCurrentFileName(ConfigLocationType.Local, "TestConfig");
             Assert.That(fileName, Is.EqualTo(originalFileName));
         }
 
         [Test]
         public void Load_DeserializerReturnsNull_ReturnsFalse_AndDoesNotOverrideExistingInstance()
         {
-            TestConfig original = ConfigStorage.GetOrCreate<TestConfig>(ConfigLocationType.Local);
+            var original = ConfigStorage.GetOrCreate<TestConfig>(ConfigLocationType.Local);
             original.SomeValue = 5;
 
             Serializer.DeserializeResult = null;
             FileSystem.WriteFile(ConfigLocationType.Local, "bad.toml", "bad content");
 
-            bool result = ConfigStorage.Load(ConfigLocationType.Local, "TestConfig", "bad.toml");
+            var result = ConfigStorage.Load(ConfigLocationType.Local, "TestConfig", "bad.toml");
 
             Assert.That(result, Is.False);
 
-            TestConfig after = ConfigStorage.GetOrCreate<TestConfig>(ConfigLocationType.Local);
+            var after = ConfigStorage.GetOrCreate<TestConfig>(ConfigLocationType.Local);
             Assert.That(after, Is.SameAs(original));
             Assert.That(after.SomeValue, Is.EqualTo(5));
         }

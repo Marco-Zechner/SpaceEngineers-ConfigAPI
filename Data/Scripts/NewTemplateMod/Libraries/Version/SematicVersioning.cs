@@ -77,9 +77,9 @@ namespace mz.SemanticVersioning
 
         public int CompareTo(SemanticVersion other)
         {
-            int m = Major.CompareTo(other.Major);
+            var m = Major.CompareTo(other.Major);
             if (m != 0) return m;
-            int n = Minor.CompareTo(other.Minor);
+            var n = Minor.CompareTo(other.Minor);
             if (n != 0) return n;
             return Patch.CompareTo(other.Patch);
         }

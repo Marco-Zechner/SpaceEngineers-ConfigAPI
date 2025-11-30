@@ -30,7 +30,7 @@ namespace NewTemplateMod.Tests
                 throw new ArgumentNullException("configType");
             if (xml == null)
                 throw new ArgumentNullException("xml");
-
+            
             var serializer = new XmlSerializer(configType);
             using (var sr = new StringReader(xml))
             {

@@ -28,7 +28,7 @@ namespace mz.NewTemplateMod
             if (!sendToOthers)
                 return;
 
-            string potentialCommand = command.Trim();
+            var potentialCommand = command.Trim();
             if (potentialCommand.Equals($"/{DEV_NAME.ToLowerInvariant()} mods", StringComparison.OrdinalIgnoreCase)) {
                 sendToOthers = false;
                 Chat.TryLine($"{NAME} v{Version} -> /{MOD_COMMAND}", $"{DEV_NAME.ToLowerInvariant()}");
@@ -39,7 +39,7 @@ namespace mz.NewTemplateMod
             if (potentialCommand.StartsWith($"/{MOD_COMMAND.ToLowerInvariant()} ", StringComparison.OrdinalIgnoreCase) || 
                 potentialCommand.Equals($"/{MOD_COMMAND.ToLowerInvariant()}", StringComparison.OrdinalIgnoreCase)) {
                 sendToOthers = false;
-                string[] arguments = potentialCommand.Substring($"/{MOD_COMMAND.ToLowerInvariant()}".Length).Trim().Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                var arguments = potentialCommand.Substring($"/{MOD_COMMAND.ToLowerInvariant()}".Length).Trim().Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
                 OnModCommand?.Invoke(sender, arguments);
                 return;
             }
