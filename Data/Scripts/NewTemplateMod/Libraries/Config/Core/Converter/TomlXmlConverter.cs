@@ -4,21 +4,29 @@ using System.Text;
 using mz.Config.Abstractions;
 using mz.Config.Abstractions.Converter;
 using mz.Config.Abstractions.SE;
+using mz.Config.Core.Storage;
 
 namespace mz.Config.Core.Converter
 {
     public sealed class TomlXmlConverter : IXmlConverter
     {
-        private readonly IConfigXmlSerializer _xmlSerializer;
-
-        public TomlXmlConverter(IConfigXmlSerializer xmlSerializer)
-        {
-            if (xmlSerializer == null) throw new ArgumentNullException(nameof(xmlSerializer));
-            _xmlSerializer = xmlSerializer;
-        }
-
         public string GetExtension => ".toml";
 
+        private readonly IConfigXmlSerializer _backupXmlSerializer;
+
+        /// <summary>
+        /// Creates a new TomlXmlConverter with a backup XML serializer.
+        /// This can be used if you know that ConfigStorage won't be initialized yet.
+        /// (ConfigStorage.XmlSerializer will always be preferred if available.)
+        /// </summary>
+        /// <param name="backupXmlSerializer"></param>
+        public TomlXmlConverter(IConfigXmlSerializer backupXmlSerializer)
+        {
+            _backupXmlSerializer = backupXmlSerializer;
+        }
+        
+        public TomlXmlConverter() {}
+        
         public string ToExternal(IConfigDefinition definition, string xmlContent)
         {
             if (definition == null) throw new ArgumentNullException(nameof(definition));
@@ -27,7 +35,7 @@ namespace mz.Config.Core.Converter
             var currentValues = SimpleXml.ParseSimpleElements(xmlContent);
 
             var defaultInstance = definition.CreateDefaultInstance();
-            var defaultXml = _xmlSerializer.SerializeToXml(defaultInstance);
+            var defaultXml = (InternalConfigStorage.XmlSerializer ?? _backupXmlSerializer).SerializeToXml(defaultInstance);
             var defaultValues = SimpleXml.ParseSimpleElements(defaultXml);
 
             var sb = new StringBuilder();
@@ -72,7 +80,7 @@ namespace mz.Config.Core.Converter
             if (string.IsNullOrEmpty(externalContent))
             {
                 var defaultInstance = definition.CreateDefaultInstance();
-                return _xmlSerializer.SerializeToXml(defaultInstance);
+                return (InternalConfigStorage.XmlSerializer ?? _backupXmlSerializer).SerializeToXml(defaultInstance);
             }
 
             var lines = externalContent.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);

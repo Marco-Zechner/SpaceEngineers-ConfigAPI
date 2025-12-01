@@ -19,10 +19,10 @@ namespace NewTemplateMod.Tests.ConfigStorageTests
             FileSystem = new FakeFileSystem();
             XmlSerializer = new TestXmlSerializer();
             LayoutMigrator = new ConfigLayoutMigrator();
-            Converter = new TomlXmlConverter(XmlSerializer);
+            Converter = new TomlXmlConverter();
 
-            ConfigStorage.Initialize(FileSystem, XmlSerializer, LayoutMigrator, Converter);
-            ConfigStorage.Register<TestConfig>(ConfigLocationType.Local);
+            InternalConfigStorage.Initialize(FileSystem, XmlSerializer, LayoutMigrator, Converter);
+            InternalConfigStorage.Register<TestConfig>(ConfigLocationType.Local);
         }
     }
 }

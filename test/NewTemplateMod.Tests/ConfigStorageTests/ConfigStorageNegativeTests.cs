@@ -12,7 +12,7 @@ namespace NewTemplateMod.Tests.ConfigStorageTests
         public void Initialize_NullFileSystem_Throws()
         {
             Assert.That(
-                () => ConfigStorage.Initialize(null, XmlSerializer, LayoutMigrator, Converter),
+                () => InternalConfigStorage.Initialize(null, XmlSerializer, LayoutMigrator, Converter),
                 Throws.TypeOf<ArgumentNullException>());
         }
 
@@ -20,7 +20,7 @@ namespace NewTemplateMod.Tests.ConfigStorageTests
         public void Initialize_NullXmlSerializer_Throws()
         {
             Assert.That(
-                () => ConfigStorage.Initialize(FileSystem, null, LayoutMigrator, Converter),
+                () => InternalConfigStorage.Initialize(FileSystem, null, LayoutMigrator, Converter),
                 Throws.TypeOf<ArgumentNullException>());
         }
 
@@ -28,7 +28,7 @@ namespace NewTemplateMod.Tests.ConfigStorageTests
         public void Initialize_NullLayoutMigrator_Throws()
         {
             Assert.That(
-                () => ConfigStorage.Initialize(FileSystem, XmlSerializer, null, Converter),
+                () => InternalConfigStorage.Initialize(FileSystem, XmlSerializer, null, Converter),
                 Throws.TypeOf<ArgumentNullException>());
         }
 
@@ -36,7 +36,7 @@ namespace NewTemplateMod.Tests.ConfigStorageTests
         public void Initialize_NullConverter_Throws()
         {
             Assert.That(
-                () => ConfigStorage.Initialize(FileSystem, XmlSerializer, LayoutMigrator, null),
+                () => InternalConfigStorage.Initialize(FileSystem, XmlSerializer, LayoutMigrator, null),
                 Throws.TypeOf<ArgumentNullException>());
         }
 
@@ -44,30 +44,27 @@ namespace NewTemplateMod.Tests.ConfigStorageTests
         public void GetOrCreate_NoDefinitionForType_ThrowsInvalidOperationException()
         {
             // Re-init without registering OtherConfig
-            ConfigStorage.Initialize(FileSystem, XmlSerializer, LayoutMigrator, Converter);
+            InternalConfigStorage.Initialize(FileSystem, XmlSerializer, LayoutMigrator, Converter);
 
             Assert.That(
-                () => ConfigStorage.GetOrCreate<OtherConfig>(ConfigLocationType.Local),
+                () => InternalConfigStorage.GetOrCreate<OtherConfig>(ConfigLocationType.Local),
                 Throws.TypeOf<InvalidOperationException>());
         }
 
         private class OtherConfig : ConfigBase
         {
-            public override string ConfigVersion
-            {
-                get { return "1.0.0"; }
-            }
+            public override string ConfigVersion => "1.0.0";
         }
 
         [Test]
         public void GetCurrentFileName_NullTypeName_Throws()
         {
             Assert.That(
-                () => ConfigStorage.GetCurrentFileName(ConfigLocationType.Local, null),
+                () => InternalConfigStorage.GetCurrentFileName(ConfigLocationType.Local, null),
                 Throws.TypeOf<ArgumentNullException>());
 
             Assert.That(
-                () => ConfigStorage.GetCurrentFileName(ConfigLocationType.Local, string.Empty),
+                () => InternalConfigStorage.GetCurrentFileName(ConfigLocationType.Local, string.Empty),
                 Throws.TypeOf<ArgumentNullException>());
         }
 
@@ -75,11 +72,11 @@ namespace NewTemplateMod.Tests.ConfigStorageTests
         public void SetCurrentFileName_NullTypeName_Throws()
         {
             Assert.That(
-                () => ConfigStorage.SetCurrentFileName(ConfigLocationType.Local, null, "file.toml"),
+                () => InternalConfigStorage.SetCurrentFileName(ConfigLocationType.Local, null, "file.toml"),
                 Throws.TypeOf<ArgumentNullException>());
 
             Assert.That(
-                () => ConfigStorage.SetCurrentFileName(ConfigLocationType.Local, string.Empty, "file.toml"),
+                () => InternalConfigStorage.SetCurrentFileName(ConfigLocationType.Local, string.Empty, "file.toml"),
                 Throws.TypeOf<ArgumentNullException>());
         }
 
@@ -87,11 +84,11 @@ namespace NewTemplateMod.Tests.ConfigStorageTests
         public void SetCurrentFileName_NullFileName_Throws()
         {
             Assert.That(
-                () => ConfigStorage.SetCurrentFileName(ConfigLocationType.Local, "TestConfig", null),
+                () => InternalConfigStorage.SetCurrentFileName(ConfigLocationType.Local, "TestConfig", null),
                 Throws.TypeOf<ArgumentNullException>());
 
             Assert.That(
-                () => ConfigStorage.SetCurrentFileName(ConfigLocationType.Local, "TestConfig", string.Empty),
+                () => InternalConfigStorage.SetCurrentFileName(ConfigLocationType.Local, "TestConfig", string.Empty),
                 Throws.TypeOf<ArgumentNullException>());
         }
 
@@ -99,19 +96,19 @@ namespace NewTemplateMod.Tests.ConfigStorageTests
         public void Load_NullArguments_Throw()
         {
             Assert.That(
-                () => ConfigStorage.Load(ConfigLocationType.Local, null, "file.toml"),
+                () => InternalConfigStorage.Load(ConfigLocationType.Local, null, "file.toml"),
                 Throws.TypeOf<ArgumentNullException>());
 
             Assert.That(
-                () => ConfigStorage.Load(ConfigLocationType.Local, string.Empty, "file.toml"),
+                () => InternalConfigStorage.Load(ConfigLocationType.Local, string.Empty, "file.toml"),
                 Throws.TypeOf<ArgumentNullException>());
 
             Assert.That(
-                () => ConfigStorage.Load(ConfigLocationType.Local, "TestConfig", null),
+                () => InternalConfigStorage.Load(ConfigLocationType.Local, "TestConfig", null),
                 Throws.TypeOf<ArgumentNullException>());
 
             Assert.That(
-                () => ConfigStorage.Load(ConfigLocationType.Local, "TestConfig", string.Empty),
+                () => InternalConfigStorage.Load(ConfigLocationType.Local, "TestConfig", string.Empty),
                 Throws.TypeOf<ArgumentNullException>());
         }
 
@@ -119,19 +116,19 @@ namespace NewTemplateMod.Tests.ConfigStorageTests
         public void Save_NullArguments_Throw()
         {
             Assert.That(
-                () => ConfigStorage.Save(ConfigLocationType.Local, null, "file.toml"),
+                () => InternalConfigStorage.Save(ConfigLocationType.Local, null, "file.toml"),
                 Throws.TypeOf<ArgumentNullException>());
 
             Assert.That(
-                () => ConfigStorage.Save(ConfigLocationType.Local, string.Empty, "file.toml"),
+                () => InternalConfigStorage.Save(ConfigLocationType.Local, string.Empty, "file.toml"),
                 Throws.TypeOf<ArgumentNullException>());
 
             Assert.That(
-                () => ConfigStorage.Save(ConfigLocationType.Local, "TestConfig", null),
+                () => InternalConfigStorage.Save(ConfigLocationType.Local, "TestConfig", null),
                 Throws.TypeOf<ArgumentNullException>());
 
             Assert.That(
-                () => ConfigStorage.Save(ConfigLocationType.Local, "TestConfig", string.Empty),
+                () => InternalConfigStorage.Save(ConfigLocationType.Local, "TestConfig", string.Empty),
                 Throws.TypeOf<ArgumentNullException>());
         }
 
@@ -139,7 +136,7 @@ namespace NewTemplateMod.Tests.ConfigStorageTests
         public void Load_UnknownTypeName_Throws()
         {
             Assert.That(
-                () => ConfigStorage.Load(ConfigLocationType.Local, "UnknownType", "file.toml"),
+                () => InternalConfigStorage.Load(ConfigLocationType.Local, "UnknownType", "file.toml"),
                 Throws.TypeOf<InvalidOperationException>());
         }
 
@@ -147,20 +144,20 @@ namespace NewTemplateMod.Tests.ConfigStorageTests
         public void Save_UnknownTypeName_Throws()
         {
             Assert.That(
-                () => ConfigStorage.Save(ConfigLocationType.Local, "UnknownType", "file.toml"),
+                () => InternalConfigStorage.Save(ConfigLocationType.Local, "UnknownType", "file.toml"),
                 Throws.TypeOf<InvalidOperationException>());
         }
 
         [Test]
         public void Load_FileMissing_ReturnsFalse_AndDoesNotChangeCurrentFileName()
         {
-            var originalFileName = ConfigStorage.GetCurrentFileName(ConfigLocationType.Local, "TestConfig");
+            var originalFileName = InternalConfigStorage.GetCurrentFileName(ConfigLocationType.Local, "TestConfig");
 
-            var result = ConfigStorage.Load(ConfigLocationType.Local, "TestConfig", "does_not_exist.toml");
+            var result = InternalConfigStorage.Load(ConfigLocationType.Local, "TestConfig", "does_not_exist.toml");
 
             Assert.That(result, Is.False);
 
-            var fileName = ConfigStorage.GetCurrentFileName(ConfigLocationType.Local, "TestConfig");
+            var fileName = InternalConfigStorage.GetCurrentFileName(ConfigLocationType.Local, "TestConfig");
             Assert.That(fileName, Is.EqualTo(originalFileName));
         }
 
@@ -168,11 +165,11 @@ namespace NewTemplateMod.Tests.ConfigStorageTests
         public void GetConfigAsText_NullTypeName_Throws()
         {
             Assert.That(
-                () => ConfigStorage.GetConfigAsText(ConfigLocationType.Local, null),
+                () => InternalConfigStorage.GetConfigAsText(ConfigLocationType.Local, null),
                 Throws.TypeOf<ArgumentNullException>());
 
             Assert.That(
-                () => ConfigStorage.GetConfigAsText(ConfigLocationType.Local, string.Empty),
+                () => InternalConfigStorage.GetConfigAsText(ConfigLocationType.Local, string.Empty),
                 Throws.TypeOf<ArgumentNullException>());
         }
 
@@ -180,11 +177,11 @@ namespace NewTemplateMod.Tests.ConfigStorageTests
         public void GetFileAsText_NullFileName_Throws()
         {
             Assert.That(
-                () => ConfigStorage.GetFileAsText(ConfigLocationType.Local, null),
+                () => InternalConfigStorage.GetFileAsText(ConfigLocationType.Local, null),
                 Throws.TypeOf<ArgumentNullException>());
 
             Assert.That(
-                () => ConfigStorage.GetFileAsText(ConfigLocationType.Local, string.Empty),
+                () => InternalConfigStorage.GetFileAsText(ConfigLocationType.Local, string.Empty),
                 Throws.TypeOf<ArgumentNullException>());
         }
     }

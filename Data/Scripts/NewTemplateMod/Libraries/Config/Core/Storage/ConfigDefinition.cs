@@ -30,17 +30,11 @@ namespace mz.Config.Core.Storage
             SectionName = sectionName;
         }
 
-        public string TypeName
-        {
-            get { return typeof(T).Name; }
-        }
+        public string TypeName => typeof(T).Name;
 
         public string SectionName { get; private set; }
 
-        public Type ConfigType
-        {
-            get { return typeof(T); }
-        }
+        public Type ConfigType => typeof(T);
 
         public ConfigBase CreateDefaultInstance()
         {

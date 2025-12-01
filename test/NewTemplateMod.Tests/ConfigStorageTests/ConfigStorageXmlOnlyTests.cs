@@ -1,4 +1,5 @@
 ﻿using mz.Config.Core.Converter;
+using mz.Config.Core.Layout;
 using mz.Config.Core.Storage;
 using mz.Config.Domain;
 using NUnit.Framework;
@@ -17,20 +18,20 @@ namespace NewTemplateMod.Tests.ConfigStorageTests
             _fileSystem = new FakeFileSystem();
             _serializer = new TestXmlSerializer();
 
-            var layout = new mz.Config.Core.Layout.ConfigLayoutMigrator();
+            var layout = new ConfigLayoutMigrator();
             var converter = new IdentityXmlConverter();
 
-            ConfigStorage.Initialize(_fileSystem, _serializer, layout, converter);
-            ConfigStorage.Register<TestConfig>(ConfigLocationType.Local);
+            InternalConfigStorage.Initialize(_fileSystem, _serializer, layout, converter);
+            InternalConfigStorage.Register<TestConfig>(ConfigLocationType.Local);
         }
 
         [Test]
         public void DefaultFileName_UsesXmlExtension_WhenIdentityConverter()
         {
-            var cfg = ConfigStorage.GetOrCreate<TestConfig>(ConfigLocationType.Local);
+            var cfg = InternalConfigStorage.GetOrCreate<TestConfig>(ConfigLocationType.Local);
             Assert.That(cfg, Is.Not.Null);
 
-            var currentFileName = ConfigStorage.GetCurrentFileName(ConfigLocationType.Local, "TestConfig");
+            var currentFileName = InternalConfigStorage.GetCurrentFileName(ConfigLocationType.Local, "TestConfig");
             Assert.That(currentFileName, Is.EqualTo("TestConfigDefault.xml"));
         }
     }

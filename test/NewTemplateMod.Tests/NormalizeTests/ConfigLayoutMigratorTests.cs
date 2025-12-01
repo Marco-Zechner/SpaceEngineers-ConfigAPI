@@ -49,14 +49,20 @@ namespace NewTemplateMod.Tests.NormalizeTests
 
             // values stay the same
             Assert.That(result.NormalizedXml, Does.Contain("<RespondToHello>false</RespondToHello>"));
-            Assert.That(result.NormalizedXml, Does.Contain("<GreetingMessage>hello</GreetingMessage>"));
+            Assert.Multiple(() =>
+            {
+                Assert.That(result.NormalizedXml, Does.Contain("<GreetingMessage>hello</GreetingMessage>"));
 
-            // defaults stay the same
-            Assert.That(result.NormalizedDefaultsXml, Does.Contain("<RespondToHello>false</RespondToHello>"));
-            Assert.That(result.NormalizedDefaultsXml, Does.Contain("<GreetingMessage>hello</GreetingMessage>"));
+                // defaults stay the same
+                Assert.That(result.NormalizedDefaultsXml, Does.Contain("<RespondToHello>false</RespondToHello>"));
+            });
+            Assert.Multiple(() =>
+            {
+                Assert.That(result.NormalizedDefaultsXml, Does.Contain("<GreetingMessage>hello</GreetingMessage>"));
 
-            // nothing destructive -> no backup
-            Assert.That(result.RequiresBackup, Is.False);
+                // nothing destructive -> no backup
+                Assert.That(result.RequiresBackup, Is.False);
+            });
         }
 
         [Test]
@@ -83,14 +89,17 @@ namespace NewTemplateMod.Tests.NormalizeTests
             // user value for RespondToHello is kept
             Assert.That(result.NormalizedXml, Does.Contain("<RespondToHello>true</RespondToHello>"));
 
-            // missing GreetingMessage is added with current default "hello"
-            Assert.That(result.NormalizedXml, Does.Contain("<GreetingMessage>hello</GreetingMessage>"));
+            Assert.Multiple(() =>
+            {
+                // missing GreetingMessage is added with current default "hello"
+                Assert.That(result.NormalizedXml, Does.Contain("<GreetingMessage>hello</GreetingMessage>"));
 
-            // defaults reflect current layout (include GreetingMessage)
-            Assert.That(result.NormalizedDefaultsXml, Does.Contain("<GreetingMessage>hello</GreetingMessage>"));
+                // defaults reflect current layout (include GreetingMessage)
+                Assert.That(result.NormalizedDefaultsXml, Does.Contain("<GreetingMessage>hello</GreetingMessage>"));
 
-            // adding keys is not destructive for user data -> no backup
-            Assert.That(result.RequiresBackup, Is.False);
+                // adding keys is not destructive for user data -> no backup
+                Assert.That(result.RequiresBackup, Is.False);
+            });
         }
 
         [Test]
@@ -116,15 +125,21 @@ namespace NewTemplateMod.Tests.NormalizeTests
             Assert.That(result.NormalizedXml, Does.Contain("<RespondToHello>false</RespondToHello>"));
             Assert.That(result.NormalizedXml, Does.Contain("<GreetingMessage>hello</GreetingMessage>"));
 
-            // unknown key is removed
-            Assert.That(result.NormalizedXml, Does.Not.Contain("ExtraSetting"));
+            Assert.Multiple(() =>
+            {
+                // unknown key is removed
+                Assert.That(result.NormalizedXml, Does.Not.Contain("ExtraSetting"));
 
-            // defaults are current layout
-            Assert.That(result.NormalizedDefaultsXml, Does.Contain("<RespondToHello>false</RespondToHello>"));
-            Assert.That(result.NormalizedDefaultsXml, Does.Contain("<GreetingMessage>hello</GreetingMessage>"));
+                // defaults are current layout
+                Assert.That(result.NormalizedDefaultsXml, Does.Contain("<RespondToHello>false</RespondToHello>"));
+            });
+            Assert.Multiple(() =>
+            {
+                Assert.That(result.NormalizedDefaultsXml, Does.Contain("<GreetingMessage>hello</GreetingMessage>"));
 
-            // destructive (dropped data) -> backup required
-            Assert.That(result.RequiresBackup, Is.True);
+                // destructive (dropped data) -> backup required
+                Assert.That(result.RequiresBackup, Is.True);
+            });
         }
 
         // -------------------- default migration behaviour --------------------
@@ -157,13 +172,16 @@ namespace NewTemplateMod.Tests.NormalizeTests
 
             // Value should be upgraded to new default "hello"
             Assert.That(result.NormalizedXml, Does.Not.Contain("<GreetingMessage>old</GreetingMessage>"));
-            Assert.That(result.NormalizedXml, Does.Contain("<GreetingMessage>hello</GreetingMessage>"));
+            Assert.Multiple(() =>
+            {
+                Assert.That(result.NormalizedXml, Does.Contain("<GreetingMessage>hello</GreetingMessage>"));
 
-            // Defaults must also be "hello"
-            Assert.That(result.NormalizedDefaultsXml, Does.Contain("<GreetingMessage>hello</GreetingMessage>"));
+                // Defaults must also be "hello"
+                Assert.That(result.NormalizedDefaultsXml, Does.Contain("<GreetingMessage>hello</GreetingMessage>"));
 
-            // No unknown keys removed -> no backup
-            Assert.That(result.RequiresBackup, Is.False);
+                // No unknown keys removed -> no backup
+                Assert.That(result.RequiresBackup, Is.False);
+            });
         }
 
         [Test]
@@ -194,12 +212,15 @@ namespace NewTemplateMod.Tests.NormalizeTests
 
             // User override should be kept, not replaced by "hello"
             Assert.That(result.NormalizedXml, Does.Contain("<GreetingMessage>custom</GreetingMessage>"));
-            Assert.That(result.NormalizedXml, Does.Not.Contain("<GreetingMessage>hello</GreetingMessage>"));
+            Assert.Multiple(() =>
+            {
+                Assert.That(result.NormalizedXml, Does.Not.Contain("<GreetingMessage>hello</GreetingMessage>"));
 
-            // Defaults describe code defaults, not user values
-            Assert.That(result.NormalizedDefaultsXml, Does.Contain("<GreetingMessage>hello</GreetingMessage>"));
+                // Defaults describe code defaults, not user values
+                Assert.That(result.NormalizedDefaultsXml, Does.Contain("<GreetingMessage>hello</GreetingMessage>"));
 
-            Assert.That(result.RequiresBackup, Is.False);
+                Assert.That(result.RequiresBackup, Is.False);
+            });
         }
 
         [Test]
@@ -227,12 +248,15 @@ namespace NewTemplateMod.Tests.NormalizeTests
             // Without previous defaults, we cannot know "old" was a default,
             // so we MUST treat it as a user choice and keep it.
             Assert.That(result.NormalizedXml, Does.Contain("<GreetingMessage>old</GreetingMessage>"));
-            Assert.That(result.NormalizedXml, Does.Not.Contain("<GreetingMessage>hello</GreetingMessage>"));
+            Assert.Multiple(() =>
+            {
+                Assert.That(result.NormalizedXml, Does.Not.Contain("<GreetingMessage>hello</GreetingMessage>"));
 
-            // Defaults file still records "hello" as the current default
-            Assert.That(result.NormalizedDefaultsXml, Does.Contain("<GreetingMessage>hello</GreetingMessage>"));
+                // Defaults file still records "hello" as the current default
+                Assert.That(result.NormalizedDefaultsXml, Does.Contain("<GreetingMessage>hello</GreetingMessage>"));
 
-            Assert.That(result.RequiresBackup, Is.False);
+                Assert.That(result.RequiresBackup, Is.False);
+            });
         }
     }
 }

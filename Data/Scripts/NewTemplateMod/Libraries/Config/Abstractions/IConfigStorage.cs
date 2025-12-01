@@ -10,20 +10,17 @@ namespace mz.Config.Abstractions
     public interface IConfigStorage
     {
         /// <summary>
-        /// Register a config definition for a type. Registration is per type;
-        /// locations and file names are handled by separate calls.
+        /// Register a config type for a given location.
+        /// This must be called before any other operations for the type.
+        /// You can optionally provide an initial file name, otherwise the typename will be used.
+        /// Will return the in-memory instance (on create a new one if non exists for this type & location).
         /// </summary>
-        void RegisterConfig(IConfigDefinition definition);
-
-        /// <summary>
-        /// Enumerate all known config definitions.
-        /// </summary>
-        IConfigDefinition[] GetRegisteredDefinitions();
+        T RegisterConfig<T>(ConfigLocationType location, string initialFileName = null) where T : ConfigBase, new();
 
         /// <summary>
         /// Get or create the in-memory instance for a given type and location.
         /// </summary>
-        T GetOrCreate<T>(ConfigLocationType location) where T : ConfigBase;
+        T GetOrCreate<T>(ConfigLocationType location) where T : ConfigBase, new();
 
         /// <summary>
         /// Get the current file name for a given type and location.

@@ -18,10 +18,10 @@ namespace NewTemplateMod.Tests.ConfigStorageTests
             _fileSystem = new FakeFileSystem();
             _xmlSerializer = new TestXmlSerializer();
             var layout = new ConfigLayoutMigrator();
-            var converter = new TomlXmlConverter(_xmlSerializer);
+            var converter = new TomlXmlConverter();
 
-            ConfigStorage.Initialize(_fileSystem, _xmlSerializer, layout, converter);
-            ConfigStorage.Register<ExampleConfig>(ConfigLocationType.Local);
+            InternalConfigStorage.Initialize(_fileSystem, _xmlSerializer, layout, converter);
+            InternalConfigStorage.Register<ExampleConfig>(ConfigLocationType.Local);
         }
 
         [Test]
@@ -36,7 +36,7 @@ namespace NewTemplateMod.Tests.ConfigStorageTests
 
             _fileSystem.WriteFile(ConfigLocationType.Local, "cfg.toml", oldToml);
 
-            var result = ConfigStorage.Load(ConfigLocationType.Local, "ExampleConfig", "cfg.toml");
+            var result = InternalConfigStorage.Load(ConfigLocationType.Local, "ExampleConfig", "cfg.toml");
 
             Assert.That(result, Is.True);
 
@@ -64,7 +64,7 @@ namespace NewTemplateMod.Tests.ConfigStorageTests
                 Assert.That(normalizedContent, Does.Contain("GreetingMessage"));
             });
 
-            var cfg = ConfigStorage.GetOrCreate<ExampleConfig>(ConfigLocationType.Local);
+            var cfg = InternalConfigStorage.GetOrCreate<ExampleConfig>(ConfigLocationType.Local);
             Assert.Multiple(() =>
             {
                 Assert.That(cfg.RespondToHello, Is.False);
@@ -82,7 +82,7 @@ namespace NewTemplateMod.Tests.ConfigStorageTests
 
             _fileSystem.WriteFile(ConfigLocationType.Local, "missing.toml", oldToml);
 
-            var result = ConfigStorage.Load(ConfigLocationType.Local, "ExampleConfig", "missing.toml");
+            var result = InternalConfigStorage.Load(ConfigLocationType.Local, "ExampleConfig", "missing.toml");
 
             Assert.That(result, Is.True);
 
@@ -104,7 +104,7 @@ namespace NewTemplateMod.Tests.ConfigStorageTests
                 Assert.That(normalizedContent, Does.Contain("\"hello\""));
             });
 
-            var cfg = ConfigStorage.GetOrCreate<ExampleConfig>(ConfigLocationType.Local);
+            var cfg = InternalConfigStorage.GetOrCreate<ExampleConfig>(ConfigLocationType.Local);
             Assert.Multiple(() =>
             {
                 Assert.That(cfg.RespondToHello, Is.True);
@@ -125,7 +125,7 @@ namespace NewTemplateMod.Tests.ConfigStorageTests
             _fileSystem.WriteFile(ConfigLocationType.Local, "example.toml", toml);
 
             // Act
-            var result = ConfigStorage.Load(ConfigLocationType.Local, "ExampleConfig", "example.toml");
+            var result = InternalConfigStorage.Load(ConfigLocationType.Local, "ExampleConfig", "example.toml");
 
             // Assert: load succeeded
             Assert.That(result, Is.True);
@@ -140,7 +140,7 @@ namespace NewTemplateMod.Tests.ConfigStorageTests
             Assert.That(defaultsContent, Does.Contain("StoredVersion"));
 
             // In-memory config matches user values
-            var cfg = ConfigStorage.GetOrCreate<ExampleConfig>(ConfigLocationType.Local);
+            var cfg = InternalConfigStorage.GetOrCreate<ExampleConfig>(ConfigLocationType.Local);
             Assert.That(cfg.RespondToHello, Is.True);
             Assert.That(cfg.GreetingMessage, Is.EqualTo("hi"));
         }
@@ -150,7 +150,7 @@ namespace NewTemplateMod.Tests.ConfigStorageTests
         {
             _fileSystem.WriteFile(ConfigLocationType.Local, "empty.toml", string.Empty);
 
-            var result = ConfigStorage.Load(ConfigLocationType.Local, "ExampleConfig", "empty.toml");
+            var result = InternalConfigStorage.Load(ConfigLocationType.Local, "ExampleConfig", "empty.toml");
 
             Assert.That(result, Is.True);
 
@@ -160,7 +160,7 @@ namespace NewTemplateMod.Tests.ConfigStorageTests
                 ConfigLocationType.Local, "empty.bak.toml", out backup);
             Assert.That(hasBackup, Is.False);
 
-            var cfg = ConfigStorage.GetOrCreate<ExampleConfig>(ConfigLocationType.Local);
+            var cfg = InternalConfigStorage.GetOrCreate<ExampleConfig>(ConfigLocationType.Local);
             Assert.That(cfg.RespondToHello, Is.False);
             Assert.That(cfg.GreetingMessage, Is.EqualTo("hello"));
         }
