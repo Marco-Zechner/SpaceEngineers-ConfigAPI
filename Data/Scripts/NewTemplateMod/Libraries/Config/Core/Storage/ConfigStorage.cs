@@ -148,9 +148,12 @@ namespace mz.Config.Core.Storage
             if (string.IsNullOrEmpty(fileName))
                 throw new ArgumentNullException(nameof(fileName));
 
+            if (fileName.EndsWith(_xmlConverter.GetExtension))
+                fileName = fileName.Remove(fileName.Length - _xmlConverter.GetExtension.Length);
+            
             var def = GetDefinitionByTypeName(typeName);
             var slot = GetOrCreateSlot(location, typeName, def, null);
-            slot.CurrentFileName = fileName;
+            slot.CurrentFileName = fileName + _xmlConverter.GetExtension;
         }
 
         public static bool Load(ConfigLocationType location, string typeName, string fileName)
@@ -162,18 +165,21 @@ namespace mz.Config.Core.Storage
             if (string.IsNullOrEmpty(fileName))
                 throw new ArgumentNullException(nameof(fileName));
 
+            if (fileName.EndsWith(_xmlConverter.GetExtension))
+                fileName = fileName.Remove(fileName.Length - _xmlConverter.GetExtension.Length);
+                
             var def = GetDefinitionByTypeName(typeName);
             var slot = GetOrCreateSlot(location, typeName, def, null);
 
             // 1) Read current external config
             string externalCurrent;
-            if (!_fileSystem.TryReadFile(location, fileName, out externalCurrent))
+            if (!_fileSystem.TryReadFile(location, fileName + _xmlConverter.GetExtension, out externalCurrent))
                 return false;
 
             // 2) Read old defaults external (sidecar) if present
             var defaultsFileName = fileName + ".defaults";
             string externalOldDefaults;
-            var hasOldDefaults = _fileSystem.TryReadFile(location, defaultsFileName, out externalOldDefaults);
+            var hasOldDefaults = _fileSystem.TryReadFile(location, defaultsFileName + _xmlConverter.GetExtension, out externalOldDefaults);
 
             // 3) Build current defaults XML from code
             var currentDefaultInstance = def.CreateDefaultInstance();
@@ -196,15 +202,15 @@ namespace mz.Config.Core.Storage
             if (layoutResult.RequiresBackup)
             {
                 var backupName = fileName + ".bak";
-                _fileSystem.WriteFile(location, backupName, externalCurrent);
+                _fileSystem.WriteFile(location, backupName + _xmlConverter.GetExtension, externalCurrent);
             }
 
             // 7) Convert normalized XML back to external and overwrite both files
             var normalizedExternalCurrent = _xmlConverter.ToExternal(def, layoutResult.NormalizedXml);
-            _fileSystem.WriteFile(location, fileName, normalizedExternalCurrent);
+            _fileSystem.WriteFile(location, fileName + _xmlConverter.GetExtension, normalizedExternalCurrent);
 
             var normalizedExternalDefaults = _xmlConverter.ToExternal(def, layoutResult.NormalizedDefaultsXml);
-            _fileSystem.WriteFile(location, defaultsFileName, normalizedExternalDefaults);
+            _fileSystem.WriteFile(location, defaultsFileName + _xmlConverter.GetExtension, normalizedExternalDefaults);
 
             // 8) Deserialize config from normalized current XML
             var config = def.DeserializeFromXml(_xmlSerializer, layoutResult.NormalizedXml);
@@ -212,7 +218,7 @@ namespace mz.Config.Core.Storage
                 return false;
 
             slot.Instance = config;
-            slot.CurrentFileName = fileName;
+            slot.CurrentFileName = fileName + _xmlConverter.GetExtension;
             return true;
         }
 
@@ -225,6 +231,9 @@ namespace mz.Config.Core.Storage
             if (string.IsNullOrEmpty(fileName))
                 throw new ArgumentNullException(nameof(fileName));
 
+            if (fileName.EndsWith(_xmlConverter.GetExtension))
+                fileName = fileName.Remove(fileName.Length - _xmlConverter.GetExtension.Length);
+            
             var def = GetDefinitionByTypeName(typeName);
             var slot = GetOrCreateSlot(location, typeName, def, null);
 
@@ -244,10 +253,10 @@ namespace mz.Config.Core.Storage
             var externalCurrent = _xmlConverter.ToExternal(def, xmlCurrent);
             var externalDefaults = _xmlConverter.ToExternal(def, xmlDefaults);
 
-            _fileSystem.WriteFile(location, fileName, externalCurrent);
-            _fileSystem.WriteFile(location, fileName + ".defaults", externalDefaults);
+            _fileSystem.WriteFile(location, fileName + _xmlConverter.GetExtension, externalCurrent);
+            _fileSystem.WriteFile(location, fileName + ".defaults" + _xmlConverter.GetExtension, externalDefaults);
 
-            slot.CurrentFileName = fileName;
+            slot.CurrentFileName = fileName + _xmlConverter.GetExtension;
 
             return true;
         }
@@ -280,8 +289,11 @@ namespace mz.Config.Core.Storage
             if (string.IsNullOrEmpty(fileName))
                 throw new ArgumentNullException(nameof(fileName));
 
+            if (fileName.EndsWith(_xmlConverter.GetExtension))
+                fileName = fileName.Remove(fileName.Length - _xmlConverter.GetExtension.Length);
+            
             string content;
-            if (_fileSystem.TryReadFile(location, fileName, out content))
+            if (_fileSystem.TryReadFile(location, fileName + _xmlConverter.GetExtension, out content))
                 return content;
 
             return null;
@@ -326,16 +338,16 @@ namespace mz.Config.Core.Storage
             if (!string.IsNullOrEmpty(initialFileNameOverride))
             {
                 fileName = initialFileNameOverride;
+                if (fileName.EndsWith(_xmlConverter.GetExtension))
+                    fileName = fileName.Remove(fileName.Length - _xmlConverter.GetExtension.Length);
             }
             else
             {
-                // NOTE: keep this in sync with IConfigFileSystem
-                fileName = _fileSystem.GetDefaultConfigFileName(def);
+                fileName = typeName + "Default";
             }
 
-            slot.CurrentFileName = fileName;
+            slot.CurrentFileName = fileName + _xmlConverter.GetExtension;
 
-            // No auto-load; Instance remains null until Load or GetOrCreate is called.
             byType[typeName] = slot;
             return slot;
         }

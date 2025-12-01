@@ -19,13 +19,5 @@ namespace mz.Config.Abstractions.SE
         /// any existing contents.
         /// </summary>
         void WriteFile(ConfigLocationType location, string fileName, string content);
-
-        /// <summary>
-        /// Returns the default config file name for the given definition.
-        /// This is used as the initial "current file" when a type is registered
-        /// and no explicit file name is provided.
-        /// Example: "ExampleConfig.toml".
-        /// </summary>
-        string GetDefaultConfigFileName(IConfigDefinition definition);
     }
 }

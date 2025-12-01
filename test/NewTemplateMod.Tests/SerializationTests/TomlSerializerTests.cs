@@ -4,7 +4,7 @@ using mz.Config.Core.Storage;
 using mz.Config.Domain;
 using NUnit.Framework;
 
-namespace NewTemplateMod.Tests.Serialization
+namespace NewTemplateMod.Tests.SerializationTests
 {
     [TestFixture]
     public class TomlXmlConverterTests

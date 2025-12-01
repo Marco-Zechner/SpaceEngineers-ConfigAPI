@@ -7,16 +7,6 @@ using mz.Config.Abstractions.SE;
 
 namespace mz.Config.Core.Converter
 {
-    /// <summary>
-    /// XML &lt;-&gt; TOML converter.
-    /// ToExternal:
-    ///   - parses the given XML for the config instance
-    ///   - uses a fresh default instance for the key set and defaults
-    ///   - emits TOML with a [TypeName] section and StoredVersion
-    /// ToInternal:
-    ///   - parses a very simple "key = value [# comment]" TOML
-    ///   - builds a minimal XML document that can be deserialized by XmlSerializer
-    /// </summary>
     public sealed class TomlXmlConverter : IXmlConverter
     {
         private readonly IConfigXmlSerializer _xmlSerializer;
@@ -27,34 +17,31 @@ namespace mz.Config.Core.Converter
             _xmlSerializer = xmlSerializer;
         }
 
+        public string GetExtension => ".toml";
+
         public string ToExternal(IConfigDefinition definition, string xmlContent)
         {
             if (definition == null) throw new ArgumentNullException(nameof(definition));
             if (xmlContent == null) xmlContent = string.Empty;
 
-            // Current values from xmlContent
             var currentValues = SimpleXml.ParseSimpleElements(xmlContent);
 
-            // Defaults from a freshly created instance (defines the layout)
             var defaultInstance = definition.CreateDefaultInstance();
             var defaultXml = _xmlSerializer.SerializeToXml(defaultInstance);
             var defaultValues = SimpleXml.ParseSimpleElements(defaultXml);
 
             var sb = new StringBuilder();
 
-            // Section header: use type name
             sb.Append('[')
               .Append(definition.TypeName)
               .Append(']')
               .AppendLine();
 
-            // Stored version from default instance (code version)
             var storedVersion = defaultInstance.ConfigVersion ?? string.Empty;
             sb.Append("StoredVersion = ")
               .Append(ToTomlString(storedVersion))
               .AppendLine();
 
-            // For each key in the current code layout (defaults dict)
             foreach (var kv in defaultValues)
             {
                 var key = kv.Key;
@@ -62,22 +49,17 @@ namespace mz.Config.Core.Converter
 
                 string currentRaw;
                 if (!currentValues.TryGetValue(key, out currentRaw))
-                {
                     currentRaw = defaultRaw;
-                }
 
                 var valueToml = ToTomlString(currentRaw);
                 var defaultToml = ToTomlString(defaultRaw);
 
                 sb.Append(key)
                   .Append(" = ")
-                  .Append(valueToml);
-
-                // Comment shows the default (useful for humans and potential future migration)
-                sb.Append(" # ")
-                  .Append(defaultToml);
-
-                sb.AppendLine();
+                  .Append(valueToml)
+                  .Append(" # ")
+                  .Append(defaultToml)
+                  .AppendLine();
             }
 
             return sb.ToString();
@@ -89,7 +71,6 @@ namespace mz.Config.Core.Converter
 
             if (string.IsNullOrEmpty(externalContent))
             {
-                // No content -> return XML for default instance
                 var defaultInstance = definition.CreateDefaultInstance();
                 return _xmlSerializer.SerializeToXml(defaultInstance);
             }
@@ -109,12 +90,8 @@ namespace mz.Config.Core.Converter
                 if (line[0] == '#')
                     continue;
 
-                // Section header
                 if (line.StartsWith("[") && line.EndsWith("]"))
-                {
-                    // Section name is ignored; we rely on definition.TypeName instead.
                     continue;
-                }
 
                 var eqIndex = line.IndexOf('=');
                 if (eqIndex <= 0)
@@ -123,40 +100,29 @@ namespace mz.Config.Core.Converter
                 var key = line.Substring(0, eqIndex).Trim();
                 var valuePart = line.Substring(eqIndex + 1).Trim();
 
-                // Split off comment if present
                 var valueText = valuePart;
                 var hashIndex = valuePart.IndexOf('#');
                 if (hashIndex >= 0)
                 {
                     valueText = valuePart.Substring(0, hashIndex).Trim();
-                    // comment part is ignored
                 }
 
                 if (string.Equals(key, "StoredVersion", StringComparison.OrdinalIgnoreCase))
-                {
-                    // We ignore StoredVersion here, version is taken from code.
                     continue;
-                }
 
                 var rawValue = FromTomlString(valueText);
                 values[key] = rawValue;
             }
 
-            // Build simple XML for the root element == TypeName
             var xml = SimpleXml.BuildSimpleXml(definition.TypeName, values);
             return xml;
         }
-
-        // ----------------------------------------------------
-        // Helpers
-        // ----------------------------------------------------
 
         private static string ToTomlString(string raw)
         {
             if (raw == null)
                 raw = string.Empty;
 
-            // For simplicity: treat everything as TOML string
             var escaped = raw.Replace("\\", "\\\\").Replace("\"", "\\\"");
             return "\"" + escaped + "\"";
         }
@@ -168,7 +134,6 @@ namespace mz.Config.Core.Converter
 
             var s = value.Trim();
 
-            // Quoted string: unescape
             if (s.Length >= 2 && s[0] == '"' && s[s.Length - 1] == '"')
             {
                 s = s.Substring(1, s.Length - 2);
@@ -176,7 +141,6 @@ namespace mz.Config.Core.Converter
                 return s;
             }
 
-            // Non-quoted: just return as-is (for numbers, bools, etc.)
             return s;
         }
     }

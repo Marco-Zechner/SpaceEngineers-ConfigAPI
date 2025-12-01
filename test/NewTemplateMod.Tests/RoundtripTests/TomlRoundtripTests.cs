@@ -4,7 +4,7 @@ using mz.Config.Core.Converter;
 using mz.Config.Core.Storage;
 using NUnit.Framework;
 
-namespace NewTemplateMod.Tests
+namespace NewTemplateMod.Tests.RoundtripTests
 {
     [TestFixture]
     public class TomlRoundtripTests

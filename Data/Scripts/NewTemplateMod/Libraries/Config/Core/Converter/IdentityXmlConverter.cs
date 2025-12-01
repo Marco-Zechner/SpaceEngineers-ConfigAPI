@@ -9,6 +9,8 @@ namespace mz.Config.Core.Converter
     /// </summary>
     public sealed class IdentityXmlConverter : IXmlConverter
     {
+        public string GetExtension => ".xml";
+
         public string ToExternal(IConfigDefinition definition, string xmlContent)
         {
             return xmlContent ?? string.Empty;

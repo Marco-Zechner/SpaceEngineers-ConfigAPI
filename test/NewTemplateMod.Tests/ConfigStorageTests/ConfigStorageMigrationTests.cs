@@ -43,7 +43,7 @@ namespace NewTemplateMod.Tests.ConfigStorageTests
             // Backup must exist and contain original content
             string backupContent;
             var backupExists = _fileSystem.TryReadFile(
-                ConfigLocationType.Local, "cfg.toml.bak", out backupContent);
+                ConfigLocationType.Local, "cfg.bak.toml", out backupContent);
 
             Assert.Multiple(() =>
             {
@@ -110,6 +110,59 @@ namespace NewTemplateMod.Tests.ConfigStorageTests
                 Assert.That(cfg.RespondToHello, Is.True);
                 Assert.That(cfg.GreetingMessage, Is.EqualTo("hello"));
             });
+        }
+        
+        [Test]
+        public void Load_WhenDefaultsFileMissing_CreatesItAndLoadsConfig()
+        {
+            // Arrange: write only main config file, no .defaults file
+            var toml =
+                "[ExampleConfig]\n" +
+                "StoredVersion = \"0.1.0\"\n" +
+                "RespondToHello = true # false\n" +
+                "GreetingMessage = \"hi\" # \"hello\"\n";
+
+            _fileSystem.WriteFile(ConfigLocationType.Local, "example.toml", toml);
+
+            // Act
+            var result = ConfigStorage.Load(ConfigLocationType.Local, "ExampleConfig", "example.toml");
+
+            // Assert: load succeeded
+            Assert.That(result, Is.True);
+
+            // Defaults file got created
+            string defaultsContent;
+            var defaultsExists = _fileSystem.TryReadFile(
+                ConfigLocationType.Local, "example.defaults.toml", out defaultsContent);
+
+            Assert.That(defaultsExists, Is.True);
+            Assert.That(defaultsContent, Does.Contain("[ExampleConfig]"));
+            Assert.That(defaultsContent, Does.Contain("StoredVersion"));
+
+            // In-memory config matches user values
+            var cfg = ConfigStorage.GetOrCreate<ExampleConfig>(ConfigLocationType.Local);
+            Assert.That(cfg.RespondToHello, Is.True);
+            Assert.That(cfg.GreetingMessage, Is.EqualTo("hi"));
+        }
+        
+        [Test]
+        public void Load_WithEmptyFile_UsesCurrentDefaults_NoBackup()
+        {
+            _fileSystem.WriteFile(ConfigLocationType.Local, "empty.toml", string.Empty);
+
+            var result = ConfigStorage.Load(ConfigLocationType.Local, "ExampleConfig", "empty.toml");
+
+            Assert.That(result, Is.True);
+
+            // No backup, nothing destructive happened
+            string backup;
+            var hasBackup = _fileSystem.TryReadFile(
+                ConfigLocationType.Local, "empty.bak.toml", out backup);
+            Assert.That(hasBackup, Is.False);
+
+            var cfg = ConfigStorage.GetOrCreate<ExampleConfig>(ConfigLocationType.Local);
+            Assert.That(cfg.RespondToHello, Is.False);
+            Assert.That(cfg.GreetingMessage, Is.EqualTo("hello"));
         }
     }
 }

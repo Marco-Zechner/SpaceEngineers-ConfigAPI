@@ -12,6 +12,12 @@
     public interface IXmlConverter
     {
         /// <summary>
+        /// File extension used for this converter, including the leading dot.
+        /// Examples: ".xml", ".toml".
+        /// </summary>
+        string GetExtension { get; }
+
+        /// <summary>
         /// Convert an internal XML document (for a single config instance)
         /// to the external format that is written to disk.
         /// </summary>

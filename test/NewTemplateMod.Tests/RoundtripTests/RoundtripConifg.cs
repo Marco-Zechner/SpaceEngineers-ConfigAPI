@@ -1,6 +1,6 @@
 using mz.Config.Domain;
 
-namespace NewTemplateMod.Tests
+namespace NewTemplateMod.Tests.RoundtripTests
 {
     public class RoundtripConfig : ConfigBase
     {
