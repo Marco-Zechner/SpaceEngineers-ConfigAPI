@@ -1,85 +1,74 @@
-using mz.Config.Core;
-using mz.Config.Domain;
 using mz.Config.Abstractions;
+using mz.Config.Core.Converter;
 using mz.Config.Core.Storage;
-using mz.Config.Core.Toml;
+using mz.Config.Domain;
 using NUnit.Framework;
 
 namespace NewTemplateMod.Tests.Serialization
 {
     [TestFixture]
-    public class TomlConfigSerializerTests
+    public class TomlXmlConverterTests
     {
-        private TomlConfigSerializer _serializer;
+        private TestXmlSerializer _xml;
+        private TomlXmlConverter _converter;
         private IConfigDefinition _definition;
 
         [SetUp]
         public void SetUp()
         {
-            var xml = new TestXmlSerializer();
-            _serializer = new TomlConfigSerializer(xml);
-            _definition = new ConfigDefinition<ExampleConfig>("ExampleConfig");
+            _xml = new TestXmlSerializer();
+            _converter = new TomlXmlConverter(_xml);
+            _definition = new ConfigDefinition<ExampleConfig>();
         }
 
         [Test]
         public void Serialize_DefaultExampleConfig_ContainsExpectedLines()
         {
-            // Arrange
             var config = new ExampleConfig();
 
-            // Act
-            var toml = _serializer.Serialize(config);
+            var xmlContent = _xml.SerializeToXml(config);
+            var toml = _converter.ToExternal(_definition, xmlContent);
 
-            // Assert (loose on whitespace / order, strict on content)
             Assert.That(toml, Does.Contain("[ExampleConfig]"));
             Assert.That(toml, Does.Contain("StoredVersion"));
             Assert.That(toml, Does.Contain("\"0.1.0\""));
 
             Assert.That(toml, Does.Contain("RespondToHello"));
             Assert.That(toml, Does.Contain("false"));
-            Assert.That(toml, Does.Contain("# false"));
-            
+
             Assert.That(toml, Does.Contain("GreetingMessage"));
             Assert.That(toml, Does.Contain("\"hello\""));
-            Assert.That(toml, Does.Contain("# \"hello\""));
         }
 
         [Test]
-        public void Serialize_ModifiedExampleConfig_ContainsUpdatedValues_AndSameDefaults()
+        public void Serialize_ModifiedExampleConfig_ContainsUpdatedValues()
         {
-            // Arrange
             var config = new ExampleConfig();
             config.RespondToHello = true;
             config.GreetingMessage = "hi";
 
-            // Act
-            var toml = _serializer.Serialize(config);
+            var xmlContent = _xml.SerializeToXml(config);
+            var toml = _converter.ToExternal(_definition, xmlContent);
 
-            // Assert: values reflect current config
             Assert.That(toml, Does.Contain("RespondToHello"));
             Assert.That(toml, Does.Contain("true"));
-            Assert.That(toml, Does.Contain("# false")); // default is still false in comment
 
             Assert.That(toml, Does.Contain("GreetingMessage"));
             Assert.That(toml, Does.Contain("\"hi\""));
-            Assert.That(toml, Does.Contain("# \"hello\"")); // default is still "hello"
         }
 
         [Test]
         public void Deserialize_RoundTrip_ProducesEquivalentConfig()
         {
-            // Arrange
             var original = new ExampleConfig();
             original.RespondToHello = true;
             original.GreetingMessage = "hi";
 
-            var toml = _serializer.Serialize(original);
+            var xml1 = _xml.SerializeToXml(original);
+            var toml = _converter.ToExternal(_definition, xml1);
+            var xml2 = _converter.ToInternal(_definition, toml);
+            var cfg = _xml.DeserializeFromXml<ExampleConfig>(xml2);
 
-            // Act
-            var result = _serializer.Deserialize(_definition, toml);
-            var cfg = result as ExampleConfig;
-
-            // Assert
             Assert.That(cfg, Is.Not.Null);
             Assert.That(cfg.RespondToHello, Is.True);
             Assert.That(cfg.GreetingMessage, Is.EqualTo("hi"));
@@ -88,41 +77,18 @@ namespace NewTemplateMod.Tests.Serialization
         [Test]
         public void Deserialize_HandWrittenToml_UsesProvidedValues()
         {
-            // Arrange: simulate a file
-            var toml = 
+            var toml =
                 "[ExampleConfig]\n" +
                 "StoredVersion = \"0.1.0\"\n" +
-                "RespondToHello = true # false\n" +
-                "GreetingMessage = \"custom\" # \"hello\"\n";
+                "RespondToHello = true\n" +
+                "GreetingMessage = \"custom\"\n";
 
-            // Act
-            var result = _serializer.Deserialize(_definition, toml);
-            var cfg = result as ExampleConfig;
+            var xmlInput = _converter.ToInternal(_definition, toml);
+            var cfg = _xml.DeserializeFromXml<ExampleConfig>(xmlInput);
 
-            // Assert
             Assert.That(cfg, Is.Not.Null);
             Assert.That(cfg.RespondToHello, Is.True);
             Assert.That(cfg.GreetingMessage, Is.EqualTo("custom"));
         }
-
-        [Test]
-        public void Deserialize_WhenValueEqualsOldDefaultComment_UsesCurrentDefault()
-        {
-            // Simulate an old file where the default for GreetingMessage used to be "old",
-            // and the user never changed it (value == default comment).
-            var toml =
-                "[ExampleConfig]\n" +
-                "StoredVersion = \"0.0.1\"\n" +
-                "RespondToHello = false # false\n" +
-                "GreetingMessage = \"old\" # \"old\"\n";
-
-            var result = _serializer.Deserialize(_definition, toml);
-            var cfg = result as ExampleConfig;
-
-            Assert.That(cfg, Is.Not.Null);
-            // Current default in ExampleConfig ctor is "hello"
-            Assert.That(cfg.GreetingMessage, Is.EqualTo("hello"));
-        }
-
     }
 }

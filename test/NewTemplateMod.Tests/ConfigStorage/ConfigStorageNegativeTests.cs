@@ -1,5 +1,4 @@
 using System;
-using mz.Config.Core;
 using mz.Config.Core.Storage;
 using mz.Config.Domain;
 using NUnit.Framework;
@@ -13,27 +12,51 @@ namespace NewTemplateMod.Tests.ConfigStorageTests
         public void Initialize_NullFileSystem_Throws()
         {
             Assert.That(
-                () => ConfigStorage.Initialize(null, Serializer),
+                () => ConfigStorage.Initialize(null, XmlSerializer, LayoutMigrator, Converter),
                 Throws.TypeOf<ArgumentNullException>());
         }
 
         [Test]
-        public void Initialize_NullSerializer_Throws()
+        public void Initialize_NullXmlSerializer_Throws()
         {
             Assert.That(
-                () => ConfigStorage.Initialize(FileSystem, null),
+                () => ConfigStorage.Initialize(FileSystem, null, LayoutMigrator, Converter),
+                Throws.TypeOf<ArgumentNullException>());
+        }
+
+        [Test]
+        public void Initialize_NullLayoutMigrator_Throws()
+        {
+            Assert.That(
+                () => ConfigStorage.Initialize(FileSystem, XmlSerializer, null, Converter),
+                Throws.TypeOf<ArgumentNullException>());
+        }
+
+        [Test]
+        public void Initialize_NullConverter_Throws()
+        {
+            Assert.That(
+                () => ConfigStorage.Initialize(FileSystem, XmlSerializer, LayoutMigrator, null),
                 Throws.TypeOf<ArgumentNullException>());
         }
 
         [Test]
         public void GetOrCreate_NoDefinitionForType_ThrowsInvalidOperationException()
         {
-            ConfigStorage.Initialize(FileSystem, Serializer);
-            // do NOT register OtherConfig
+            // Re-init without registering OtherConfig
+            ConfigStorage.Initialize(FileSystem, XmlSerializer, LayoutMigrator, Converter);
 
             Assert.That(
                 () => ConfigStorage.GetOrCreate<OtherConfig>(ConfigLocationType.Local),
                 Throws.TypeOf<InvalidOperationException>());
+        }
+
+        private class OtherConfig : ConfigBase
+        {
+            public override string ConfigVersion
+            {
+                get { return "1.0.0"; }
+            }
         }
 
         [Test]
@@ -139,24 +162,6 @@ namespace NewTemplateMod.Tests.ConfigStorageTests
 
             var fileName = ConfigStorage.GetCurrentFileName(ConfigLocationType.Local, "TestConfig");
             Assert.That(fileName, Is.EqualTo(originalFileName));
-        }
-
-        [Test]
-        public void Load_DeserializerReturnsNull_ReturnsFalse_AndDoesNotOverrideExistingInstance()
-        {
-            var original = ConfigStorage.GetOrCreate<TestConfig>(ConfigLocationType.Local);
-            original.SomeValue = 5;
-
-            Serializer.DeserializeResult = null;
-            FileSystem.WriteFile(ConfigLocationType.Local, "bad.toml", "bad content");
-
-            var result = ConfigStorage.Load(ConfigLocationType.Local, "TestConfig", "bad.toml");
-
-            Assert.That(result, Is.False);
-
-            var after = ConfigStorage.GetOrCreate<TestConfig>(ConfigLocationType.Local);
-            Assert.That(after, Is.SameAs(original));
-            Assert.That(after.SomeValue, Is.EqualTo(5));
         }
 
         [Test]

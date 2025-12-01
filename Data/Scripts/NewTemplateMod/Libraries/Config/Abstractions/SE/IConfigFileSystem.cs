@@ -2,10 +2,30 @@ using mz.Config.Domain;
 
 namespace mz.Config.Abstractions.SE
 {
-       public interface IConfigFileSystem
+    /// <summary>
+    /// Abstracts file access for configs. Implementation decides where and how
+    /// files are stored in Space Engineers' folders.
+    /// </summary>
+    public interface IConfigFileSystem
     {
+        /// <summary>
+        /// Try to read a text file for a given location and file name.
+        /// Returns true on success and outputs the content.
+        /// </summary>
         bool TryReadFile(ConfigLocationType location, string fileName, out string content);
+
+        /// <summary>
+        /// Write a text file for a given location and file name, overwriting
+        /// any existing contents.
+        /// </summary>
         void WriteFile(ConfigLocationType location, string fileName, string content);
-        string GetDefaultFileName(IConfigDefinition definition);
+
+        /// <summary>
+        /// Returns the default config file name for the given definition.
+        /// This is used as the initial "current file" when a type is registered
+        /// and no explicit file name is provided.
+        /// Example: "ExampleConfig.toml".
+        /// </summary>
+        string GetDefaultConfigFileName(IConfigDefinition definition);
     }
 }

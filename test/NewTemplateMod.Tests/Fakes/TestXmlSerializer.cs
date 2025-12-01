@@ -1,7 +1,6 @@
 using System;
 using System.IO;
 using System.Xml.Serialization;
-using mz.Config.Abstractions;
 using mz.Config.Abstractions.SE;
 using mz.Config.Domain;
 
@@ -24,15 +23,12 @@ namespace NewTemplateMod.Tests
             }
         }
 
-        public T DeserializeFromXml<T>(Type configType, string xml) where T :
-            ConfigBase, new()
+        public T DeserializeFromXml<T>(string xml) where T : ConfigBase, new()
         {
-            if (configType == null)
-                throw new ArgumentNullException(nameof(configType));
             if (xml == null)
                 throw new ArgumentNullException(nameof(xml));
-            
-            var serializer = new XmlSerializer(configType);
+
+            var serializer = new XmlSerializer(typeof(T));
             using (var sr = new StringReader(xml))
             {
                 var obj = serializer.Deserialize(sr);

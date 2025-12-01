@@ -1,6 +1,6 @@
-using mz.Config.Core;
+using mz.Config.Core.Layout;
 using mz.Config.Core.Storage;
-using mz.Config.Core.Toml;
+using mz.Config.Core.Converter;
 using mz.Config.Domain;
 using NUnit.Framework;
 
@@ -10,29 +10,29 @@ namespace NewTemplateMod.Tests.ConfigStorageTests
     public class ConfigStorageMigrationTests
     {
         private FakeFileSystem _fileSystem;
-        private TomlConfigSerializer _serializer;
+        private TestXmlSerializer _xmlSerializer;
 
         [SetUp]
         public void SetUp()
         {
             _fileSystem = new FakeFileSystem();
-            var xml = new TestXmlSerializer();
-            _serializer = new TomlConfigSerializer(xml);
+            _xmlSerializer = new TestXmlSerializer();
+            var layout = new ConfigLayoutMigrator();
+            var converter = new TomlXmlConverter(_xmlSerializer);
 
-            ConfigStorage.Initialize(_fileSystem, _serializer);
+            ConfigStorage.Initialize(_fileSystem, _xmlSerializer, layout, converter);
             ConfigStorage.Register<ExampleConfig>(ConfigLocationType.Local);
         }
 
         [Test]
         public void Load_WithExtraKey_BackupsOriginal_AndRemovesUnknownKeys()
         {
-            // File has an extra setting that does not exist in ExampleConfig.
             var oldToml =
                 "[ExampleConfig]\n" +
                 "StoredVersion = \"0.1.0\"\n" +
-                "RespondToHello = false # false\n" +
-                "GreetingMessage = \"hello\" # \"hello\"\n" +
-                "ExtraSetting = 5 # 5\n";
+                "RespondToHello = false\n" +
+                "GreetingMessage = \"hello\"\n" +
+                "ExtraSetting = 5\n";
 
             _fileSystem.WriteFile(ConfigLocationType.Local, "cfg.toml", oldToml);
 
@@ -64,7 +64,6 @@ namespace NewTemplateMod.Tests.ConfigStorageTests
                 Assert.That(normalizedContent, Does.Contain("GreetingMessage"));
             });
 
-            // Loaded config should still have correct values
             var cfg = ConfigStorage.GetOrCreate<ExampleConfig>(ConfigLocationType.Local);
             Assert.Multiple(() =>
             {
@@ -76,11 +75,10 @@ namespace NewTemplateMod.Tests.ConfigStorageTests
         [Test]
         public void Load_WithMissingKey_AddsItWithoutBackup()
         {
-            // File is missing GreetingMessage entirely.
             var oldToml =
                 "[ExampleConfig]\n" +
                 "StoredVersion = \"0.1.0\"\n" +
-                "RespondToHello = true # false\n";
+                "RespondToHello = true\n";
 
             _fileSystem.WriteFile(ConfigLocationType.Local, "missing.toml", oldToml);
 
@@ -95,7 +93,6 @@ namespace NewTemplateMod.Tests.ConfigStorageTests
 
             Assert.That(backupExists, Is.False);
 
-            // Normalized file must contain GreetingMessage with default "hello".
             string normalizedContent;
             var normalizedExists = _fileSystem.TryReadFile(
                 ConfigLocationType.Local, "missing.toml", out normalizedContent);
@@ -107,7 +104,6 @@ namespace NewTemplateMod.Tests.ConfigStorageTests
                 Assert.That(normalizedContent, Does.Contain("\"hello\""));
             });
 
-            // Loaded config should use user value for RespondToHello and default for GreetingMessage
             var cfg = ConfigStorage.GetOrCreate<ExampleConfig>(ConfigLocationType.Local);
             Assert.Multiple(() =>
             {

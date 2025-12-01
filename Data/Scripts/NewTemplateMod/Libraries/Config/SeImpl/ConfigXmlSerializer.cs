@@ -12,7 +12,7 @@ namespace mz.Config.SeImpl
             return MyAPIGateway.Utilities.SerializeToXML(config);
         }
 
-        public T DeserializeFromXml<T>(Type configType, string xml) where T :
+        public T DeserializeFromXml<T>(string xml) where T :
             ConfigBase, new()
         {
             return MyAPIGateway.Utilities.SerializeFromXML<T>(xml);

@@ -21,8 +21,9 @@ namespace NewTemplateMod.Tests
             _files[key] = content;
         }
 
-        public string GetDefaultFileName(IConfigDefinition definition)
+        public string GetDefaultConfigFileName(IConfigDefinition definition)
         {
+            // Default main config file name
             return definition.TypeName + "Default.toml";
         }
 

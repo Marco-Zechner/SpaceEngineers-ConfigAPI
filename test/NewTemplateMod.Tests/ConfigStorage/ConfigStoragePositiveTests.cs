@@ -1,4 +1,3 @@
-using mz.Config.Core;
 using mz.Config.Core.Storage;
 using mz.Config.Domain;
 using NUnit.Framework;
@@ -37,7 +36,10 @@ namespace NewTemplateMod.Tests.ConfigStorageTests
             Assert.Multiple(() =>
             {
                 Assert.That(fileExists, Is.True);
-                Assert.That(content, Is.EqualTo(Serializer.LastSerializedContent));
+                Assert.That(content, Is.Not.Null);
+                Assert.That(content, Does.Contain("[TestConfig]"));
+                Assert.That(content, Does.Contain("SomeValue"));
+                Assert.That(content, Does.Contain("42"));
             });
 
             var currentFileName = ConfigStorage.GetCurrentFileName(ConfigLocationType.Local, "TestConfig");
@@ -45,31 +47,29 @@ namespace NewTemplateMod.Tests.ConfigStorageTests
         }
 
         [Test]
-        public void Load_ReadsFile_UsesSerializer_AndReplacesInstance()
+        public void Load_ReadsFile_AndReplacesInstance()
         {
-            var loadedConfig = new TestConfig()
-            {
-                SomeValue = 99
-            };
-            Serializer.DeserializeResult = loadedConfig;
+            // Prepare a TOML file for TestConfig with SomeValue = 99
+            var toml =
+                "[TestConfig]\n" +
+                "StoredVersion = \"0.1.0\"\n" +
+                "SomeValue = 99\n";
 
-            FileSystem.WriteFile(ConfigLocationType.Local, "existing.toml", "dummy content");
+            FileSystem.WriteFile(ConfigLocationType.Local, "existing.toml", toml);
 
             var result = ConfigStorage.Load(ConfigLocationType.Local, "TestConfig", "existing.toml");
 
             Assert.That(result, Is.True);
 
             var cfg = ConfigStorage.GetOrCreate<TestConfig>(ConfigLocationType.Local);
-            Assert.That(cfg, Is.SameAs(loadedConfig));
-
-            var currentFileName = ConfigStorage.GetCurrentFileName(ConfigLocationType.Local, "TestConfig");
             Assert.Multiple(() =>
             {
-                Assert.That(currentFileName, Is.EqualTo("existing.toml"));
-
-                Assert.That(Serializer.LastDeserializeDefinition.TypeName, Is.EqualTo("TestConfig"));
-                Assert.That(Serializer.LastDeserializeContent, Is.EqualTo("dummy content"));
+                Assert.That(cfg, Is.Not.Null);
+                Assert.That(cfg.SomeValue, Is.EqualTo(99));
             });
+
+            var currentFileName = ConfigStorage.GetCurrentFileName(ConfigLocationType.Local, "TestConfig");
+            Assert.That(currentFileName, Is.EqualTo("existing.toml"));
         }
 
         [Test]
@@ -83,8 +83,9 @@ namespace NewTemplateMod.Tests.ConfigStorageTests
             Assert.That(text, Is.Not.Null);
             Assert.Multiple(() =>
             {
-                Assert.That(text, Is.EqualTo(Serializer.LastSerializedContent));
-                Assert.That(Serializer.LastSerializedInstance, Is.SameAs(cfg));
+                Assert.That(text, Does.Contain("[TestConfig]"));
+                Assert.That(text, Does.Contain("SomeValue"));
+                Assert.That(text, Does.Contain("7"));
             });
         }
 

@@ -1,16 +1,27 @@
 using System;
 using System.Collections.Generic;
 using mz.Config.Abstractions;
+using mz.Config.Abstractions.Converter;
+using mz.Config.Abstractions.Layout;
 using mz.Config.Abstractions.SE;
-using mz.Config.Abstractions.Toml;
+using mz.Config.Core.Converter;
+using mz.Config.Core.Layout;
 using mz.Config.Domain;
 
 namespace mz.Config.Core.Storage
 {
+    /// <summary>
+    /// Static facade for config management:
+    /// - registration by type + location
+    /// - load / save through XML + converter + layout migrator
+    /// - keeps one in-memory instance per (type, location)
+    /// </summary>
     public static class ConfigStorage
     {
         private static IConfigFileSystem _fileSystem;
-        private static IConfigSerializer _serializer;
+        private static IConfigXmlSerializer _xmlSerializer;
+        private static IConfigLayoutMigrator _layoutMigrator;
+        private static IXmlConverter _xmlConverter;
 
         // TypeName -> definition (for metadata + default instance)
         private static readonly Dictionary<string, IConfigDefinition> _definitions =
@@ -22,18 +33,40 @@ namespace mz.Config.Core.Storage
 
         private static bool _initialized;
 
-        public static void Initialize(IConfigFileSystem fileSystem, IConfigSerializer serializer)
+        /// <summary>
+        /// Full initialization: caller must provide all dependencies.
+        /// For XML-only mode, pass an IdentityXmlConverter instance.
+        /// </summary>
+        public static void Initialize(
+            IConfigFileSystem fileSystem,
+            IConfigXmlSerializer xmlSerializer,
+            IConfigLayoutMigrator layoutMigrator,
+            IXmlConverter xmlConverter)
         {
             if (fileSystem == null) throw new ArgumentNullException(nameof(fileSystem));
-            if (serializer == null) throw new ArgumentNullException(nameof(serializer));
+            if (xmlSerializer == null) throw new ArgumentNullException(nameof(xmlSerializer));
+            if (layoutMigrator == null) throw new ArgumentNullException(nameof(layoutMigrator));
+            if (xmlConverter == null) throw new ArgumentNullException(nameof(xmlConverter));
 
             _fileSystem = fileSystem;
-            _serializer = serializer;
+            _xmlSerializer = xmlSerializer;
+            _layoutMigrator = layoutMigrator;
+            _xmlConverter = xmlConverter;
 
             _definitions.Clear();
             _slots.Clear();
 
             _initialized = true;
+        }
+
+        /// <summary>
+        /// Convenience initialization for XML-only configs. Uses IdentityXmlConverter.
+        /// </summary>
+        public static void InitializeXmlOnly(IConfigFileSystem fileSystem, IConfigXmlSerializer xmlSerializer)
+        {
+            var layoutMigrator = new ConfigLayoutMigrator();
+            var converter = new IdentityXmlConverter();
+            Initialize(fileSystem, xmlSerializer, layoutMigrator, converter);
         }
 
         private static void EnsureInitialized()
@@ -44,21 +77,12 @@ namespace mz.Config.Core.Storage
 
         // ----------------- registration -----------------
 
-        /// <summary>
-        /// Register a config type for a given location. File name defaults to
-        /// the file system's default file name (usually TypeNameDefault.toml).
-        /// </summary>
         public static void Register<T>(ConfigLocationType location)
             where T : ConfigBase, new()
         {
             Register<T>(location, null);
         }
 
-        /// <summary>
-        /// Register a config type for a given location and initial file name.
-        /// CurrentFileName is set to user-provided name or default; if the file
-        /// exists, ConfigStorage will try to load it once at registration time.
-        /// </summary>
         public static void Register<T>(ConfigLocationType location, string initialFileName)
             where T : ConfigBase, new()
         {
@@ -69,8 +93,7 @@ namespace mz.Config.Core.Storage
             IConfigDefinition def;
             if (!_definitions.TryGetValue(typeName, out def))
             {
-                // Section name for TOML is also type name for now.
-                def = new ConfigDefinition<T>(typeName);
+                def = new ConfigDefinition<T>();
                 _definitions[typeName] = def;
             }
             else if (def.ConfigType != typeof(T))
@@ -79,10 +102,9 @@ namespace mz.Config.Core.Storage
                     "Config type name '" + typeName + "' is already registered with a different type.");
             }
 
-            var slot = GetOrCreateSlot(location, typeName, def, initialFileName);
-
-            // If slot.Instance is null, we either failed to load or there was no file;
-            // keep it lazy: we will create default on first GetOrCreate/Save/Load success.
+            // Just create the slot & remember the filename.
+            // We no longer auto-load here; Load is explicit / lazy.
+            GetOrCreateSlot(location, typeName, def, initialFileName);
         }
 
         // ----------------- public API -----------------
@@ -104,7 +126,6 @@ namespace mz.Config.Core.Storage
             return (T)slot.Instance;
         }
 
-        
         public static string GetCurrentFileName(ConfigLocationType location, string typeName)
         {
             EnsureInitialized();
@@ -144,13 +165,49 @@ namespace mz.Config.Core.Storage
             var def = GetDefinitionByTypeName(typeName);
             var slot = GetOrCreateSlot(location, typeName, def, null);
 
-            string content;
-            if (!_fileSystem.TryReadFile(location, fileName, out content))
+            // 1) Read current external config
+            string externalCurrent;
+            if (!_fileSystem.TryReadFile(location, fileName, out externalCurrent))
                 return false;
 
-            content = TryNormalizeConfigFile(location, fileName, def, content);
+            // 2) Read old defaults external (sidecar) if present
+            var defaultsFileName = fileName + ".defaults";
+            string externalOldDefaults;
+            var hasOldDefaults = _fileSystem.TryReadFile(location, defaultsFileName, out externalOldDefaults);
 
-            var config = _serializer.Deserialize(def, content);
+            // 3) Build current defaults XML from code
+            var currentDefaultInstance = def.CreateDefaultInstance();
+            var xmlCurrentDefaults = _xmlSerializer.SerializeToXml(currentDefaultInstance);
+
+            // 4) Convert external -> internal XML
+            var xmlCurrentFromFile = _xmlConverter.ToInternal(def, externalCurrent);
+            var xmlOldDefaultsFromFile = hasOldDefaults
+                ? _xmlConverter.ToInternal(def, externalOldDefaults)
+                : string.Empty;
+
+            // 5) Normalize layout
+            var layoutResult = _layoutMigrator.Normalize(
+                def,
+                xmlCurrentFromFile,
+                xmlOldDefaultsFromFile,
+                xmlCurrentDefaults);
+
+            // 6) Backup if necessary
+            if (layoutResult.RequiresBackup)
+            {
+                var backupName = fileName + ".bak";
+                _fileSystem.WriteFile(location, backupName, externalCurrent);
+            }
+
+            // 7) Convert normalized XML back to external and overwrite both files
+            var normalizedExternalCurrent = _xmlConverter.ToExternal(def, layoutResult.NormalizedXml);
+            _fileSystem.WriteFile(location, fileName, normalizedExternalCurrent);
+
+            var normalizedExternalDefaults = _xmlConverter.ToExternal(def, layoutResult.NormalizedDefaultsXml);
+            _fileSystem.WriteFile(location, defaultsFileName, normalizedExternalDefaults);
+
+            // 8) Deserialize config from normalized current XML
+            var config = def.DeserializeFromXml(_xmlSerializer, layoutResult.NormalizedXml);
             if (config == null)
                 return false;
 
@@ -176,8 +233,20 @@ namespace mz.Config.Core.Storage
                 slot.Instance = def.CreateDefaultInstance();
             }
 
-            var content = _serializer.Serialize(slot.Instance);
-            _fileSystem.WriteFile(location, fileName, content);
+            // Object -> XML (current)
+            var xmlCurrent = _xmlSerializer.SerializeToXml(slot.Instance);
+
+            // Current defaults XML from code
+            var currentDefaultInstance = def.CreateDefaultInstance();
+            var xmlDefaults = _xmlSerializer.SerializeToXml(currentDefaultInstance);
+
+            // Convert both XML blobs to external format
+            var externalCurrent = _xmlConverter.ToExternal(def, xmlCurrent);
+            var externalDefaults = _xmlConverter.ToExternal(def, xmlDefaults);
+
+            _fileSystem.WriteFile(location, fileName, externalCurrent);
+            _fileSystem.WriteFile(location, fileName + ".defaults", externalDefaults);
+
             slot.CurrentFileName = fileName;
 
             return true;
@@ -198,7 +267,10 @@ namespace mz.Config.Core.Storage
                 slot.Instance = def.CreateDefaultInstance();
             }
 
-            return _serializer.Serialize(slot.Instance);
+            // Serialize current instance to XML, then convert to external format
+            var xml = _xmlSerializer.SerializeToXml(slot.Instance);
+            var external = _xmlConverter.ToExternal(def, xml);
+            return external;
         }
 
         public static string GetFileAsText(ConfigLocationType location, string fileName)
@@ -244,7 +316,6 @@ namespace mz.Config.Core.Storage
             ConfigSlot slot;
             if (byType.TryGetValue(typeName, out slot))
             {
-                // Already exists; Register<T> is idempotent. Do not override current filename here.
                 return slot;
             }
 
@@ -258,101 +329,15 @@ namespace mz.Config.Core.Storage
             }
             else
             {
-                fileName = _fileSystem.GetDefaultFileName(def);
+                // NOTE: keep this in sync with IConfigFileSystem
+                fileName = _fileSystem.GetDefaultConfigFileName(def);
             }
 
             slot.CurrentFileName = fileName;
 
-            // Attempt to load existing file once
-            string content;
-            if (_fileSystem.TryReadFile(location, fileName, out content))
-            {
-                var config = _serializer.Deserialize(def, content);
-                if (config != null)
-                {
-                    slot.Instance = config;
-                }
-            }
-
-            // If no file or deserialization failed, Instance stays null.
+            // No auto-load; Instance remains null until Load or GetOrCreate is called.
             byType[typeName] = slot;
             return slot;
-        }
-
-        private static string TryNormalizeConfigFile(
-            ConfigLocationType location,
-            string fileName,
-            IConfigDefinition def,
-            string originalContent)
-        {
-            // If anything goes wrong, just fall back to original content.
-            try
-            {
-                var fileModel = _serializer.ParseToModel(originalContent);
-                var defaultModel = _serializer.BuildDefaultModel(def);
-
-                if (fileModel == null || defaultModel == null)
-                    return originalContent;
-
-                if (!string.IsNullOrEmpty(fileModel.TypeName) &&
-                    !string.Equals(fileModel.TypeName, def.TypeName, StringComparison.OrdinalIgnoreCase))
-                {
-                    // Different section/type, do not touch.
-                    return originalContent;
-                }
-
-                var hasExtraKeys = false;
-
-                // Detect extra keys
-                foreach (var kv in fileModel.Entries)
-                {
-                    if (!defaultModel.Entries.ContainsKey(kv.Key))
-                    {
-                        hasExtraKeys = true;
-                    }
-                }
-
-                // Merge known keys from file into default model
-                foreach (var kv in defaultModel.Entries)
-                {
-                    var key = kv.Key;
-                    var defaultEntry = kv.Value;
-
-                    ITomlEntry fileEntry;
-                    if (fileModel.Entries.TryGetValue(key, out fileEntry))
-                    {
-                        // If value != its own default in the file, user changed it -> carry over.
-                        if (!string.IsNullOrEmpty(fileEntry.DefaultValue) &&
-                            fileEntry.Value != fileEntry.DefaultValue)
-                        {
-                            defaultEntry.Value = fileEntry.Value;
-                        }
-                        // else: user left it at default; keep defaultEntry.Value (current default).
-                    }
-                    else
-                    {
-                        // Missing key: keep defaultEntry.Value (current default).
-                    }
-                }
-
-                var normalized = _serializer.SerializeModel(defaultModel);
-
-                // Backup only if there were extra keys.
-                if (hasExtraKeys)
-                {
-                    var backupName = fileName + ".bak";
-                    _fileSystem.WriteFile(location, backupName, originalContent);
-                }
-
-                // Always write normalized file (handles missing keys etc.).
-                _fileSystem.WriteFile(location, fileName, normalized);
-
-                return normalized;
-            }
-            catch
-            {
-                return originalContent;
-            }
         }
     }
 }
