@@ -53,9 +53,9 @@ namespace mz.Config.Core
             
             InternalConfigStorage.Register<T>(location, fileName);
             var typeName = typeof(T).Name;
-            Debug.Log("Loading config of type " + typeName + " from location " + location, "ConfigStorage.Load");
+            Debug?.Log("Loading config of type " + typeName + " from location " + location, "ConfigStorage.Load");
             var currentFile = InternalConfigStorage.GetCurrentFileName(location, typeName);
-            Debug.Log("Using file name: " + (fileName ?? currentFile), "ConfigStorage.Load");
+            Debug?.Log("Using file name: " + (fileName ?? currentFile), "ConfigStorage.Load");
             InternalConfigStorage.Load(location, typeName, fileName ?? currentFile);
             return InternalConfigStorage.GetOrCreate<T>(location);
         }
@@ -74,9 +74,9 @@ namespace mz.Config.Core
             
             InternalConfigStorage.Register<T>(location, fileName);
             var typeName = typeof(T).Name;
-            Debug.Log("Saving config of type " + typeName + " to location " + location, "ConfigStorage.Save");
+            Debug?.Log("Saving config of type " + typeName + " to location " + location, "ConfigStorage.Save");
             var currentFile = InternalConfigStorage.GetCurrentFileName(location, typeName);
-            Debug.Log("Using file name: " + (fileName ?? currentFile), "ConfigStorage.Save");
+            Debug?.Log("Using file name: " + (fileName ?? currentFile), "ConfigStorage.Save");
             InternalConfigStorage.Save(location, typeName, fileName ?? currentFile);
         }
 

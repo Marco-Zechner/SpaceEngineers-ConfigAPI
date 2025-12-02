@@ -17,6 +17,12 @@ namespace mz.Config.Domain
         }
 
         public virtual string ConfigNameOverride => GetType().Name;
-        public virtual Dictionary<string, string> VariableDescriptions => new Dictionary<string, string>();
+        
+        // Name -> description, per *property* name
+        public virtual IReadOnlyDictionary<string, string> VariableDescriptions
+            => _emptyDescriptions;
+
+        private static readonly IReadOnlyDictionary<string, string> _emptyDescriptions
+            = new Dictionary<string, string>();
     }
 }

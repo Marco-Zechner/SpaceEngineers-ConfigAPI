@@ -150,16 +150,15 @@ namespace NewTemplateMod.Tests.ConfigStorageTests
         }
 
         [Test]
-        public void Load_FileMissing_ReturnsFalse_AndDoesNotChangeCurrentFileName()
+        public void Load_FileMissing_ReturnsTrue_AndCreateNewFile()
         {
-            var originalFileName = InternalConfigStorage.GetCurrentFileName(ConfigLocationType.Local, "TestConfig");
+            var newFileName = "does_not_exist.toml";
+            var result = InternalConfigStorage.Load(ConfigLocationType.Local, "TestConfig", newFileName);
 
-            var result = InternalConfigStorage.Load(ConfigLocationType.Local, "TestConfig", "does_not_exist.toml");
-
-            Assert.That(result, Is.False);
+            Assert.That(result, Is.True);
 
             var fileName = InternalConfigStorage.GetCurrentFileName(ConfigLocationType.Local, "TestConfig");
-            Assert.That(fileName, Is.EqualTo(originalFileName));
+            Assert.That(fileName, Is.EqualTo(newFileName));
         }
 
         [Test]
