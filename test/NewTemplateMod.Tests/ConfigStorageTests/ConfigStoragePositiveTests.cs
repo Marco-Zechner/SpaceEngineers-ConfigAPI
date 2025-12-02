@@ -1,5 +1,6 @@
 using mz.Config.Core.Storage;
 using mz.Config.Domain;
+using mz.SemanticVersioning;
 using NUnit.Framework;
 
 namespace NewTemplateMod.Tests.ConfigStorageTests
@@ -14,7 +15,7 @@ namespace NewTemplateMod.Tests.ConfigStorageTests
 
             Assert.That(cfg, Is.Not.Null);
             Assert.That(cfg, Is.InstanceOf<TestConfig>());
-            Assert.That(cfg.ConfigVersion, Is.EqualTo("0.1.0"));
+            Assert.That(cfg.ConfigVersion, Is.EqualTo((SemanticVersion)"0.1.0"));
 
             var currentFileName = InternalConfigStorage.GetCurrentFileName(ConfigLocationType.Local, "TestConfig");
             Assert.That(currentFileName, Is.EqualTo("TestConfigDefault.toml"));

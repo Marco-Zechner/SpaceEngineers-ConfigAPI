@@ -1,6 +1,7 @@
 using System;
 using mz.Config.Core.Storage;
 using mz.Config.Domain;
+using mz.SemanticVersioning;
 using NUnit.Framework;
 
 namespace NewTemplateMod.Tests.ConfigStorageTests
@@ -53,7 +54,7 @@ namespace NewTemplateMod.Tests.ConfigStorageTests
 
         private class OtherConfig : ConfigBase
         {
-            public override string ConfigVersion => "1.0.0";
+            public override SemanticVersion ConfigVersion => "1.0.0";
         }
 
         [Test]

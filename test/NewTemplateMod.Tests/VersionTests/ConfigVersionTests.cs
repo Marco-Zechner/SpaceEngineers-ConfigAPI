@@ -3,13 +3,14 @@ using mz.Config.Abstractions.SE;
 using mz.Config.Core.Converter;
 using mz.Config.Core.Storage;
 using mz.Config.Domain;
+using mz.SemanticVersioning;
 using NUnit.Framework;
 
 namespace NewTemplateMod.Tests.VersionTests
 {
     public class ExampleVersionConfig : ConfigBase
     {
-        public override string ConfigVersion => "1.2.3";
+        public override SemanticVersion ConfigVersion => "1.2.3";
 
         public string Name { get; set; }
 

@@ -3,6 +3,7 @@ using mz.Config.Abstractions.SE;
 using mz.Config.Core.Converter;
 using mz.Config.Core.Storage;
 using mz.Config.Domain;
+using mz.SemanticVersioning;
 using NUnit.Framework;
 
 namespace NewTemplateMod.Tests.TomlTests
@@ -16,7 +17,7 @@ namespace NewTemplateMod.Tests.TomlTests
 
         public class ScalarConfig : ConfigBase
         {
-            public override string ConfigVersion => "1.0.0";
+            public override SemanticVersion ConfigVersion => "1.0.0";
             public override string ConfigNameOverride => "ScalarConfig";
 
             public bool Flag { get; set; }
@@ -48,10 +49,9 @@ namespace NewTemplateMod.Tests.TomlTests
             var toml = _converter.ToExternal(_def, xmlContent);
 
             // You can relax these expectations depending on how fancy you want to be
-            Assert.That(toml, Does.Contain("Flag"));
-            Assert.That(toml, Does.Contain("true")); // bool literal
+            Assert.That(toml, Does.Contain("Flag = true"));
             Assert.That(toml, Does.Contain("Count = 5")); // int literal
-            Assert.That(toml, Does.Contain("Ratio")); // maybe "0.5" literal
+            Assert.That(toml, Does.Contain("Ratio = 0.5")); // maybe "0.5" literal
             Assert.That(toml, Does.Contain("Name = \"hello\"")); // string quoted
         }
 

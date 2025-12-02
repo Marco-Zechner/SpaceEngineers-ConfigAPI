@@ -4,6 +4,7 @@ using mz.Config.Abstractions;
 using mz.Config.Core.Layout;
 using mz.Config.Core.Storage;
 using mz.Config.Domain;
+using mz.SemanticVersioning;
 using NUnit.Framework;
 
 namespace NewTemplateMod.Tests.NormalizeTests
@@ -328,7 +329,7 @@ namespace NewTemplateMod.Tests.NormalizeTests
 
         private class ComplexConfig : ConfigBase
         {
-            public override string ConfigVersion => "2.0.0";
+            public override SemanticVersion ConfigVersion => "2.0.0";
 
             public int IntA { get; set; } = 1;
             public int IntB { get; set; } = 2;

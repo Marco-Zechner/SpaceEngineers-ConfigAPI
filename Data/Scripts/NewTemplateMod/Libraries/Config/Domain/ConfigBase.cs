@@ -1,11 +1,12 @@
 using System.Xml.Serialization;
+using mz.SemanticVersioning;
 
 namespace mz.Config.Domain
 {
     public abstract class ConfigBase
     {
         [XmlIgnore]
-        public abstract string ConfigVersion { get; }
+        public abstract SemanticVersion ConfigVersion { get; }
         
         [XmlElement("ConfigVersion")]
         public string ConfigVersionSerialized
