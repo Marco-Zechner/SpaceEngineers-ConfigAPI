@@ -354,8 +354,10 @@ namespace mz.Config.Core.Storage
                 return slot;
             }
 
-            slot = new ConfigSlot();
-            slot.TypeName = typeName;
+            slot = new ConfigSlot
+            {
+                TypeName = typeName
+            };
 
             string fileName;
             if (!string.IsNullOrEmpty(initialFileNameOverride))

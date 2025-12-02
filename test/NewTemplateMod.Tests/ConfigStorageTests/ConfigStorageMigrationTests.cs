@@ -29,7 +29,7 @@ namespace NewTemplateMod.Tests.ConfigStorageTests
         {
             var oldToml =
                 "[ExampleConfig]\n" +
-                "StoredVersion = \"0.1.0\"\n" +
+                "ConfigVersion = \"0.1.0\"\n" +
                 "RespondToHello = false\n" +
                 "GreetingMessage = \"hello\"\n" +
                 "ExtraSetting = 5\n";
@@ -77,7 +77,7 @@ namespace NewTemplateMod.Tests.ConfigStorageTests
         {
             var oldToml =
                 "[ExampleConfig]\n" +
-                "StoredVersion = \"0.1.0\"\n" +
+                "ConfigVersion = \"0.1.0\"\n" +
                 "RespondToHello = true\n";
 
             _fileSystem.WriteFile(ConfigLocationType.Local, "missing.toml", oldToml);
@@ -118,9 +118,9 @@ namespace NewTemplateMod.Tests.ConfigStorageTests
             // Arrange: write only main config file, no .defaults file
             var toml =
                 "[ExampleConfig]\n" +
-                "StoredVersion = \"0.1.0\"\n" +
-                "RespondToHello = true # false\n" +
-                "GreetingMessage = \"hi\" # \"hello\"\n";
+                "ConfigVersion = \"0.1.0\"\n" +
+                "RespondToHello = true\n" +
+                "GreetingMessage = \"hi\"\n";
 
             _fileSystem.WriteFile(ConfigLocationType.Local, "example.toml", toml);
 
@@ -135,14 +135,20 @@ namespace NewTemplateMod.Tests.ConfigStorageTests
             var defaultsExists = _fileSystem.TryReadFile(
                 ConfigLocationType.Local, "example.defaults.toml", out defaultsContent);
 
-            Assert.That(defaultsExists, Is.True);
-            Assert.That(defaultsContent, Does.Contain("[ExampleConfig]"));
-            Assert.That(defaultsContent, Does.Contain("StoredVersion"));
+            Assert.Multiple(() =>
+            {
+                Assert.That(defaultsExists, Is.True);
+                Assert.That(defaultsContent, Does.Contain("[ExampleConfig]"));
+            });
+            Assert.That(defaultsContent, Does.Contain("ConfigVersion"));
 
             // In-memory config matches user values
             var cfg = InternalConfigStorage.GetOrCreate<ExampleConfig>(ConfigLocationType.Local);
-            Assert.That(cfg.RespondToHello, Is.True);
-            Assert.That(cfg.GreetingMessage, Is.EqualTo("hi"));
+            Assert.Multiple(() =>
+            {
+                Assert.That(cfg.RespondToHello, Is.True);
+                Assert.That(cfg.GreetingMessage, Is.EqualTo("hi"));
+            });
         }
         
         [Test]
@@ -161,8 +167,11 @@ namespace NewTemplateMod.Tests.ConfigStorageTests
             Assert.That(hasBackup, Is.False);
 
             var cfg = InternalConfigStorage.GetOrCreate<ExampleConfig>(ConfigLocationType.Local);
-            Assert.That(cfg.RespondToHello, Is.False);
-            Assert.That(cfg.GreetingMessage, Is.EqualTo("hello"));
+            Assert.Multiple(() =>
+            {
+                Assert.That(cfg.RespondToHello, Is.False);
+                Assert.That(cfg.GreetingMessage, Is.EqualTo("hello"));
+            });
         }
     }
 }

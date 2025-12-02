@@ -1,9 +1,6 @@
-using System;
 using System.Collections.Generic;
-using mz.Config.Abstractions;
 using mz.Config.Abstractions.SE;
 using mz.Config.Domain;
-using NUnit.Framework;
 
 namespace NewTemplateMod.Tests
 {
@@ -13,21 +10,24 @@ namespace NewTemplateMod.Tests
 
         public bool TryReadFile(ConfigLocationType location, string fileName, out string content)
         {
-            Debug.Log("TryRead: " + location + "/" + fileName);
             var key = MakeKey(location, fileName);
-            return _files.TryGetValue(key, out content);
+            var found = _files.TryGetValue(key, out content);
+            var text = content != null ? string.Join("\n\t", content.Split('\n')) : "null";
+            Debug.Log("TryRead: " + location + "/" + fileName + "\n\t" + text);
+            return found;
         }
 
         public void WriteFile(ConfigLocationType location, string fileName, string content)
         {
-            Debug.Log("Write: " + location + "/" + fileName);
+            var text = content != null ? string.Join("\n\t", content.Split('\n')) : "null";
+            Debug.Log("Write: " + location + "/" + fileName + "\n\t" + text);
             var key = MakeKey(location, fileName);
             _files[key] = content;
         }
 
         private static string MakeKey(ConfigLocationType location, string fileName)
         {
-            return ((int)location) + "|" + fileName;
+            return (int)location + "|" + fileName;
         }
     }
 }

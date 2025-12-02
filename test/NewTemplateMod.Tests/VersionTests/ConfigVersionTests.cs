@@ -20,15 +20,17 @@ namespace NewTemplateMod.Tests.VersionTests
     public class ConfigVersionTests
     {
         [Test]
-        public void StoredVersion_IsAlwaysTakenFromCode_NotFromFile()
+        public void ConfigVersion_IsAlwaysTakenFromCode_NotFromFile()
         {
             // Arrange
             IConfigXmlSerializer xml = new TestXmlSerializer();
             var converter = new TomlXmlConverter(xml);
             IConfigDefinition def = new ConfigDefinition<ExampleVersionConfig>();
 
-            var cfg = new ExampleVersionConfig();
-            cfg.Name = "Test";
+            var cfg = new ExampleVersionConfig
+            {
+                Name = "Test"
+            };
 
             // First save: create a TOML string
             var xmlContent = xml.SerializeToXml(cfg);
@@ -45,8 +47,8 @@ namespace NewTemplateMod.Tests.VersionTests
             var xmlReserialized = xml.SerializeToXml(reloaded);
             var tomlResaved = converter.ToExternal(def, xmlReserialized);
 
-            // Assert: StoredVersion in final TOML must be 1.2.3, not 999.999.999
-            Assert.That(tomlResaved, Does.Contain("StoredVersion = \"1.2.3\""));
+            // Assert: ConfigVersion in final TOML must be 1.2.3, not 999.999.999
+            Assert.That(tomlResaved, Does.Contain("ConfigVersion = \"1.2.3\""));
             Assert.That(tomlResaved, Does.Not.Contain("999.999.999"));
         }
     }

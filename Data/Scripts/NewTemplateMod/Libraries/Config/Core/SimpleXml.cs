@@ -47,7 +47,7 @@ namespace mz.Config.Core
                 }
 
                 var spaceIndex = tagContent.IndexOf(' ');
-                rootName = (spaceIndex >= 0)
+                rootName = spaceIndex >= 0
                     ? tagContent.Substring(0, spaceIndex)
                     : tagContent;
 
@@ -98,7 +98,7 @@ namespace mz.Config.Core
                 }
 
                 var spaceIndex = startTagContent.IndexOf(' ');
-                var tagName = (spaceIndex >= 0)
+                var tagName = spaceIndex >= 0
                     ? startTagContent.Substring(0, spaceIndex)
                     : startTagContent;
 

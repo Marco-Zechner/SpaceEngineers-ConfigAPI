@@ -52,7 +52,7 @@ namespace NewTemplateMod.Tests.ConfigStorageTests
             // Prepare a TOML file for TestConfig with SomeValue = 99
             var toml =
                 "[TestConfig]\n" +
-                "StoredVersion = \"0.1.0\"\n" +
+                "ConfigVersion = \"0.1.0\"\n" +
                 "SomeValue = 99\n";
 
             FileSystem.WriteFile(ConfigLocationType.Local, "existing.toml", toml);

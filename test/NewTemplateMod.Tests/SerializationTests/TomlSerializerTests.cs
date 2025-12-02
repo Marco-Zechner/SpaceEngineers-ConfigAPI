@@ -30,7 +30,7 @@ namespace NewTemplateMod.Tests.SerializationTests
             var toml = _converter.ToExternal(_definition, xmlContent);
 
             Assert.That(toml, Does.Contain("[ExampleConfig]"));
-            Assert.That(toml, Does.Contain("StoredVersion"));
+            Assert.That(toml, Does.Contain("ConfigVersion"));
             Assert.That(toml, Does.Contain("\"0.1.0\""));
 
             Assert.That(toml, Does.Contain("RespondToHello"));
@@ -43,9 +43,11 @@ namespace NewTemplateMod.Tests.SerializationTests
         [Test]
         public void Serialize_ModifiedExampleConfig_ContainsUpdatedValues()
         {
-            var config = new ExampleConfig();
-            config.RespondToHello = true;
-            config.GreetingMessage = "hi";
+            var config = new ExampleConfig
+            {
+                RespondToHello = true,
+                GreetingMessage = "hi"
+            };
 
             var xmlContent = _xml.SerializeToXml(config);
             var toml = _converter.ToExternal(_definition, xmlContent);
@@ -60,9 +62,11 @@ namespace NewTemplateMod.Tests.SerializationTests
         [Test]
         public void Deserialize_RoundTrip_ProducesEquivalentConfig()
         {
-            var original = new ExampleConfig();
-            original.RespondToHello = true;
-            original.GreetingMessage = "hi";
+            var original = new ExampleConfig
+            {
+                RespondToHello = true,
+                GreetingMessage = "hi"
+            };
 
             var xml1 = _xml.SerializeToXml(original);
             var toml = _converter.ToExternal(_definition, xml1);
@@ -70,8 +74,11 @@ namespace NewTemplateMod.Tests.SerializationTests
             var cfg = _xml.DeserializeFromXml<ExampleConfig>(xml2);
 
             Assert.That(cfg, Is.Not.Null);
-            Assert.That(cfg.RespondToHello, Is.True);
-            Assert.That(cfg.GreetingMessage, Is.EqualTo("hi"));
+            Assert.Multiple(() =>
+            {
+                Assert.That(cfg.RespondToHello, Is.True);
+                Assert.That(cfg.GreetingMessage, Is.EqualTo("hi"));
+            });
         }
 
         [Test]
@@ -79,7 +86,7 @@ namespace NewTemplateMod.Tests.SerializationTests
         {
             var toml =
                 "[ExampleConfig]\n" +
-                "StoredVersion = \"0.1.0\"\n" +
+                "ConfigVersion = \"0.1.0\"\n" +
                 "RespondToHello = true\n" +
                 "GreetingMessage = \"custom\"\n";
 
@@ -87,8 +94,11 @@ namespace NewTemplateMod.Tests.SerializationTests
             var cfg = _xml.DeserializeFromXml<ExampleConfig>(xmlInput);
 
             Assert.That(cfg, Is.Not.Null);
-            Assert.That(cfg.RespondToHello, Is.True);
-            Assert.That(cfg.GreetingMessage, Is.EqualTo("custom"));
+            Assert.Multiple(() =>
+            {
+                Assert.That(cfg.RespondToHello, Is.True);
+                Assert.That(cfg.GreetingMessage, Is.EqualTo("custom"));
+            });
         }
     }
 }

@@ -54,8 +54,10 @@ namespace NewTemplateMod.Tests.NormalizeTests
             var xmlCurrentDefaults = BuildXml(_definition.TypeName, defaults);
             var xmlOldDefaults = xmlCurrentDefaults;
 
-            var fileValues = new Dictionary<string, string>(defaults);
-            fileValues["ExtraKey"] = "XYZ";
+            var fileValues = new Dictionary<string, string>(defaults)
+            {
+                ["ExtraKey"] = "XYZ"
+            };
             var xmlCurrentFromFile = BuildXml(_definition.TypeName, fileValues);
 
             var result = _migrator.Normalize(
