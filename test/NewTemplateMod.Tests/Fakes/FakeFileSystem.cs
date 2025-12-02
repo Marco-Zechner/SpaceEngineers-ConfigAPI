@@ -13,14 +13,14 @@ namespace NewTemplateMod.Tests
             var key = MakeKey(location, fileName);
             var found = _files.TryGetValue(key, out content);
             var text = content != null ? string.Join("\n\t", content.Split('\n')) : "null";
-            Debug.Log("TryRead: " + location + "/" + fileName + "\n\t" + text);
+            Logger.Log("TryRead: " + location + "/" + fileName + "\n\t" + text);
             return found;
         }
 
         public void WriteFile(ConfigLocationType location, string fileName, string content)
         {
             var text = content != null ? string.Join("\n\t", content.Split('\n')) : "null";
-            Debug.Log("Write: " + location + "/" + fileName + "\n\t" + text);
+            Logger.Log("Write: " + location + "/" + fileName + "\n\t" + text);
             var key = MakeKey(location, fileName);
             _files[key] = content;
         }

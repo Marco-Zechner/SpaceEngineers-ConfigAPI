@@ -1,4 +1,5 @@
 ﻿using System;
+using mz.Config.Abstractions;
 using mz.Config.Abstractions.Converter;
 using mz.Config.Abstractions.Layout;
 using mz.Config.Abstractions.SE;
@@ -13,6 +14,7 @@ namespace mz.Config.Core
     public static class ConfigStorage
     {
         private static bool _initialized;
+        public static IDebug Debug { get; set; }
 
         public static void CustomInitialize(
             IConfigLayoutMigrator layoutMigrator,
@@ -51,7 +53,9 @@ namespace mz.Config.Core
             
             InternalConfigStorage.Register<T>(location, fileName);
             var typeName = typeof(T).Name;
+            Debug.Log("Loading config of type " + typeName + " from location " + location, "ConfigStorage.Load");
             var currentFile = InternalConfigStorage.GetCurrentFileName(location, typeName);
+            Debug.Log("Using file name: " + (fileName ?? currentFile), "ConfigStorage.Load");
             InternalConfigStorage.Load(location, typeName, fileName ?? currentFile);
             return InternalConfigStorage.GetOrCreate<T>(location);
         }
@@ -70,7 +74,9 @@ namespace mz.Config.Core
             
             InternalConfigStorage.Register<T>(location, fileName);
             var typeName = typeof(T).Name;
+            Debug.Log("Saving config of type " + typeName + " to location " + location, "ConfigStorage.Save");
             var currentFile = InternalConfigStorage.GetCurrentFileName(location, typeName);
+            Debug.Log("Using file name: " + (fileName ?? currentFile), "ConfigStorage.Save");
             InternalConfigStorage.Save(location, typeName, fileName ?? currentFile);
         }
 

@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using mz.Config;
 using mz.Config.Core;
 using mz.Config.Domain;
+using mz.Config.SeImpl;
 using mz.Logging;
 using VRage.Game.Components;
 
@@ -19,8 +20,19 @@ namespace mz.NewTemplateMod
 
         public override void LoadData()
         {
+            ConfigStorage.Debug = new Debug(); //TODO do this better
             _simpleConfig = ConfigStorage.Load<SimpleConfig>(ConfigLocationType.Local, "CoolName");
             _configs.Add(_simpleConfig);
+            
+            /* TODO:
+             * Implement Multiplayer support (client-server config sync)
+             * Remember which files the user loaded as custom configs, so we can load them again next time by default.
+             * Auto save configs on change?
+             * Add comments to config files?
+             * Test & add support for more complex config structures (dictionaries, nested collections, etc.)
+             */
+            
+            
             // _intermediateConfig = ConfigStorage.Register<IntermediateConfig>(ConfigStorageKind.Local);
             // _configs.Add(_intermediateConfig);
             // _collectionConfig = ConfigStorage.Register<CollectionConfig>(ConfigStorageKind.Local);

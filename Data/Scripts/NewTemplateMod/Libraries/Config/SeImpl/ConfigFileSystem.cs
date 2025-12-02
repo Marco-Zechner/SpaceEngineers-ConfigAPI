@@ -29,26 +29,31 @@ namespace mz.Config.SeImpl
                     break;
             }
             content = reader.ReadToEnd();
+            reader.Close();
             return true;
         }
 
         public void WriteFile(ConfigLocationType location, string fileName, string content)
         {
             var utils = MyAPIGateway.Utilities;
+            TextWriter writer;
             
             switch (location)
             {
                 default:
                 case ConfigLocationType.World:
-                    utils.WriteFileInWorldStorage(fileName, typeof(ConfigFileSystem));
+                    writer = utils.WriteFileInWorldStorage(fileName, typeof(ConfigFileSystem));
                     break;
                 case ConfigLocationType.Global:
-                    utils.WriteFileInGlobalStorage(fileName);
+                    writer = utils.WriteFileInGlobalStorage(fileName);
                     break;
                 case ConfigLocationType.Local:
-                    utils.WriteFileInLocalStorage(fileName, typeof(ConfigFileSystem));
+                    writer = utils.WriteFileInLocalStorage(fileName, typeof(ConfigFileSystem));
                     break;
             }
+            writer.Write(content);
+            writer.Flush();
+            writer.Close();
         }
     }
 }

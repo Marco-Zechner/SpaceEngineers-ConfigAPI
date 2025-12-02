@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Xml.Serialization;
 using mz.SemanticVersioning;
 
@@ -16,5 +17,6 @@ namespace mz.Config.Domain
         }
 
         public virtual string ConfigNameOverride => GetType().Name;
+        public virtual Dictionary<string, string> VariableDescriptions => new Dictionary<string, string>();
     }
 }
