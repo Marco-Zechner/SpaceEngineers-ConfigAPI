@@ -6,6 +6,7 @@ using mz.Config.Abstractions;
 using mz.Config.Abstractions.Converter;
 using mz.Config.Abstractions.SE;
 using mz.Config.Core.Storage;
+using mz.Config.Domain;
 
 namespace mz.Config.Core.Converter
 {
@@ -15,7 +16,7 @@ namespace mz.Config.Core.Converter
     /// </summary>
     public sealed class TomlXmlConverter : IXmlConverter
     {
-        public string GetExtension { get { return ".toml"; } }
+        public string GetExtension => ".toml";
 
         private readonly IConfigXmlSerializer _backupXmlSerializer;
 
@@ -28,15 +29,31 @@ namespace mz.Config.Core.Converter
         {
         }
 
+        private static IConfigXmlSerializer GetXmlSerializer(IConfigXmlSerializer backup)
+        {
+            var xml = InternalConfigStorage.XmlSerializer ?? backup;
+            if (xml == null)
+                throw new InvalidOperationException("No XML serializer available for TomlXmlConverter.");
+            return xml;
+        }
+
         public string ToExternal(IConfigDefinition definition, string xmlContent)
         {
             if (definition == null)
-                throw new ArgumentNullException("definition");
+                throw new ArgumentNullException(nameof(definition));
             if (xmlContent == null)
                 xmlContent = string.Empty;
 
             // Parse current XML into key/value map
             var values = SimpleXml.ParseSimpleElements(xmlContent);
+
+            // Optional descriptions from default instance
+            IReadOnlyDictionary<string, string> descriptions = null;
+            var defaultInstance = definition.CreateDefaultInstance();
+            if (defaultInstance != null)
+            {
+                descriptions = defaultInstance.VariableDescriptions;
+            }
 
             var sb = new StringBuilder();
 
@@ -46,11 +63,35 @@ namespace mz.Config.Core.Converter
               .Append(']')
               .AppendLine();
 
-            // One plain key = value per element
+            // One plain key = value per element, with optional doc comments above
             foreach (var kv in values)
             {
                 var key = kv.Key;
                 var raw = kv.Value;
+
+                // Insert multiline description as comments, if present
+                if (descriptions != null)
+                {
+                    string desc;
+                    if (descriptions.TryGetValue(key, out desc) && !string.IsNullOrEmpty(desc))
+                    {
+                        // Support \n and \r\n
+                        var split = desc.Replace("\r\n", "\n").Split('\n');
+                        foreach (var line in split)
+                        {
+                            if (!string.IsNullOrEmpty(line))
+                            {
+                                sb.Append("# ").Append(line).AppendLine();
+                            }
+                            else
+                            {
+                                // empty line -> still emit a bare comment to keep spacing
+                                sb.Append("#").AppendLine();
+                            }
+                        }
+                    }
+                }
+
                 var literal = ToTomlLiteral(raw);
 
                 sb.Append(key)
@@ -65,11 +106,9 @@ namespace mz.Config.Core.Converter
         public string ToInternal(IConfigDefinition definition, string externalContent)
         {
             if (definition == null)
-                throw new ArgumentNullException("definition");
+                throw new ArgumentNullException(nameof(definition));
 
-            var xmlSerializer = InternalConfigStorage.XmlSerializer ?? _backupXmlSerializer;
-            if (xmlSerializer == null)
-                throw new InvalidOperationException("No XML serializer available for TomlXmlConverter.");
+            var xmlSerializer = GetXmlSerializer(_backupXmlSerializer);
 
             // Empty file => default instance XML
             if (string.IsNullOrEmpty(externalContent))
@@ -90,7 +129,7 @@ namespace mz.Config.Core.Converter
                 if (line.Length == 0)
                     continue;
 
-                // full-line comment
+                // full-line comment (including description lines)
                 if (line[0] == '#')
                     continue;
 
@@ -147,7 +186,7 @@ namespace mz.Config.Core.Converter
                 return d.ToString("G", CultureInfo.InvariantCulture);
 
             // fallback: string
-            var escaped = raw.Replace("\\", "\\\\").Replace("\"", "\\\"");
+            var escaped = raw.Replace("\\", @"\\").Replace("\"", "\\\"");
             return "\"" + escaped + "\"";
         }
 
@@ -159,15 +198,13 @@ namespace mz.Config.Core.Converter
             var s = value.Trim();
 
             // quoted -> unescape
-            if (s.Length >= 2 && s[0] == '"' && s[s.Length - 1] == '"')
-            {
-                s = s.Substring(1, s.Length - 2);
-                s = s.Replace("\\\"", "\"").Replace("\\\\", "\\");
-                return s;
-            }
+            if (s.Length < 2 || s[0] != '"' || s[s.Length - 1] != '"') return s;
+            
+            s = s.Substring(1, s.Length - 2);
+            s = s.Replace("\\\"", "\"").Replace(@"\\", "\\");
+            return s;
 
             // bare token (true, 5, 0.5, etc.) => keep as text
-            return s;
         }
     }
 }
