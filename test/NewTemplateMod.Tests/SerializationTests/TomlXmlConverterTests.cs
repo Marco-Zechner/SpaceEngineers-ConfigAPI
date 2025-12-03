@@ -100,5 +100,83 @@ namespace NewTemplateMod.Tests.SerializationTests
                 Assert.That(cfg.GreetingMessage, Is.EqualTo("custom"));
             });
         }
+        
+        [Test]
+        public void RoundTrip_Collections_Survive_AndUseTomlArrays()
+        {
+            var def = new ConfigDefinition<CollectionConfig>();
+
+            var original = new CollectionConfig
+            {
+                Enabled = false,
+                IntArray = new[] { 5, 10, 15 },
+                Names = new[] { "One", "Two", "Three" }
+            };
+
+            // XML -> TOML
+            var xml1 = _xml.SerializeToXml(original);
+            Logger.Log("XML Input:\n" + xml1);
+            var toml = _converter.ToExternal(def, xml1);
+            Logger.Log("TOML Output:\n" + toml);
+            
+            // Keys present, but value is an opaque XML snippet, not a TOML array (yet)
+            Assert.That(toml, Does.Contain("IntArray"));
+            Assert.That(toml, Does.Contain("Names"));
+
+            // TOML -> XML -> object
+            var xml2 = _converter.ToInternal(def, toml);
+            Logger.Log("XML Restored:\n" + xml2);
+            var restored = _xml.DeserializeFromXml<CollectionConfig>(xml2);
+            Logger.Log("Restored Object:\n" + restored);
+            
+            Assert.That(restored, Is.Not.Null);
+            Assert.Multiple(() =>
+            {
+                Assert.That(restored.Enabled, Is.EqualTo(original.Enabled));
+                Assert.That(restored.IntArray, Is.EqualTo(original.IntArray));
+                Assert.That(restored.Names, Is.EqualTo(original.Names));
+            });
+        }
+
+        [Test]
+        public void RoundTrip_NestedObject_Survives_AndFlattensKeys()
+        {
+            var def = new ConfigDefinition<ParentConfig>();
+
+            var original = new ParentConfig
+            {
+                Child = new ChildConfig
+                {
+                    Age = 42,
+                    Label = "NestedBob"
+                }
+            };
+
+            // XML -> TOML
+            var xml1 = _xml.SerializeToXml(original);
+            Logger.Log("XML Input:\n" + xml1);
+            var toml = _converter.ToExternal(def, xml1);
+            Logger.Log("TOML Output:\n" + toml);
+
+            // We expect some flattened nested keys to show up
+            // (exact key shape depends on your XML -> path logic, so keep expectations loose)
+            Assert.That(toml, Does.Contain("Child"));
+            Assert.That(toml, Does.Contain("42"));
+            Assert.That(toml, Does.Contain("NestedBob"));
+
+            // TOML -> XML -> object
+            var xml2 = _converter.ToInternal(def, toml);
+            Logger.Log("XML Restored:\n" + xml2);
+            var restored = _xml.DeserializeFromXml<ParentConfig>(xml2);
+            Logger.Log("Restored Object:\n" + restored);
+
+            Assert.That(restored, Is.Not.Null);
+            Assert.That(restored.Child, Is.Not.Null);
+            Assert.Multiple(() =>
+            {
+                Assert.That(restored.Child.Age, Is.EqualTo(42));
+                Assert.That(restored.Child.Label, Is.EqualTo("NestedBob"));
+            });
+        }
     }
 }

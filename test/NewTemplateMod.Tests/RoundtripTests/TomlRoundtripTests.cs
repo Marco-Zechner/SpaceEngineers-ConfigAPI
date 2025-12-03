@@ -47,5 +47,81 @@ namespace NewTemplateMod.Tests.RoundtripTests
                 Assert.That(restored2.Message, Is.EqualTo("hi there"));
             });
         }
+        
+        [Test]
+        [Timeout(10000)]
+        public void Toml_Roundtrip_Supports_Collections()
+        {
+            IConfigXmlSerializer xml = new TestXmlSerializer();
+            var converter = new TomlXmlConverter(xml);
+
+            IConfigDefinition def = new ConfigDefinition<CollectionConfig>();
+
+            var original = new CollectionConfig
+            {
+                IntArray = new[] { 5, 10, 15 },
+                Names = new[] { "One", "Two", "Three" }
+            };
+
+            var xml1 = xml.SerializeToXml(original);
+            Logger.Log("XML1:\n" + xml1);
+            var toml = converter.ToExternal(def, xml1);
+            Logger.Log("TOML:\n" + toml);
+            var xml2 = converter.ToInternal(def, toml);
+            Logger.Log("XML2:\n" + xml2);
+            var restored = xml.DeserializeFromXml<CollectionConfig>(xml2);
+            Logger.Log("Restored:\n" + restored);
+
+            Assert.Multiple(() =>
+            {
+                // object roundtrip
+                Assert.That(restored.IntArray, Is.EqualTo(new[] { 5, 10, 15 }));
+                Assert.That(restored.Names, Is.EqualTo(new[] { "One", "Two", "Three" }));
+
+                // TOML contains the keys (value is an opaque XML blob)
+                Assert.That(toml, Does.Contain("IntArray"));
+                Assert.That(toml, Does.Contain("Names"));
+            });
+        }
+
+        [Test]
+        [Timeout(10000)]
+        public void Toml_Roundtrip_Supports_NestedObjects()
+        {
+            IConfigXmlSerializer xml = new TestXmlSerializer();
+            var converter = new TomlXmlConverter(xml);
+
+            IConfigDefinition def = new ConfigDefinition<ParentConfig>();
+
+            var original = new ParentConfig
+            {
+                Child = new ChildConfig
+                {
+                    Age = 42,
+                    Name = "NestedBob"
+                }
+            };
+
+            var xml1 = xml.SerializeToXml(original);
+            Logger.Log("XML1:\n" + xml1);
+            var toml = converter.ToExternal(def, xml1);
+            Logger.Log("TOML:\n" + toml);
+            var xml2 = converter.ToInternal(def, toml);
+            Logger.Log("XML2:\n" + xml2);
+            var restored = xml.DeserializeFromXml<ParentConfig>(xml2);
+            Logger.Log("Restored:\n" + restored);
+            
+            Assert.Multiple(() =>
+            {
+                Assert.That(restored.Child, Is.Not.Null);
+                Assert.That(restored.Child.Age, Is.EqualTo(42));
+                Assert.That(restored.Child.Name, Is.EqualTo("NestedBob"));
+
+                // We at least see the nested blob
+                Assert.That(toml, Does.Contain("Child"));
+                Assert.That(toml, Does.Contain("42"));
+                Assert.That(toml, Does.Contain("NestedBob"));
+            });
+        }
     }
 }

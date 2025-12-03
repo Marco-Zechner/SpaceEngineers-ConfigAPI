@@ -55,6 +55,7 @@ namespace mz.Config.Core.Storage
                 return _xmlConverter;
             }
         }
+        public static bool IsInitialized => _initialized;
 
         // TypeName -> definition (for metadata + default instance)
         private static readonly Dictionary<string, IConfigDefinition> _definitions =
