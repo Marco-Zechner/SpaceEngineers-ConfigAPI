@@ -32,7 +32,7 @@ namespace NewTemplateMod.Tests.ConfigStorageTests
             Assert.That(cfg, Is.Not.Null);
 
             var currentFileName = InternalConfigStorage.GetCurrentFileName(ConfigLocationType.Local, "TestConfig");
-            Assert.That(currentFileName, Is.EqualTo("TestConfigDefault.xml"));
+            Assert.That(currentFileName, Is.EqualTo("TestConfig.xml"));
         }
     }
 }

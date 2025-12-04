@@ -36,9 +36,7 @@ namespace NewTemplateMod.Tests.ConfigStorageTests
 
             _fileSystem.WriteFile(ConfigLocationType.Local, "cfg.toml", oldToml);
 
-            var result = InternalConfigStorage.Load(ConfigLocationType.Local, "ExampleConfig", "cfg.toml");
-
-            Assert.That(result, Is.True);
+            InternalConfigStorage.Load(ConfigLocationType.Local, "ExampleConfig", "cfg.toml");
 
             // Backup must exist and contain original content
             string backupContent;
@@ -82,9 +80,7 @@ namespace NewTemplateMod.Tests.ConfigStorageTests
 
             _fileSystem.WriteFile(ConfigLocationType.Local, "missing.toml", oldToml);
 
-            var result = InternalConfigStorage.Load(ConfigLocationType.Local, "ExampleConfig", "missing.toml");
-
-            Assert.That(result, Is.True);
+            InternalConfigStorage.Load(ConfigLocationType.Local, "ExampleConfig", "missing.toml");
 
             // No backup, because there was no extra key, only a missing one.
             string backupContent;
@@ -125,15 +121,13 @@ namespace NewTemplateMod.Tests.ConfigStorageTests
             _fileSystem.WriteFile(ConfigLocationType.Local, "example.toml", toml);
 
             // Act
-            var result = InternalConfigStorage.Load(ConfigLocationType.Local, "ExampleConfig", "example.toml");
+            InternalConfigStorage.Load(ConfigLocationType.Local, "ExampleConfig", "example.toml");
 
-            // Assert: load succeeded
-            Assert.That(result, Is.True);
 
             // Defaults file got created
             string defaultsContent;
             var defaultsExists = _fileSystem.TryReadFile(
-                ConfigLocationType.Local, "example.defaults.toml", out defaultsContent);
+                ConfigLocationType.Local, "ExampleConfig.defaults.toml", out defaultsContent);
 
             Assert.Multiple(() =>
             {
@@ -156,9 +150,7 @@ namespace NewTemplateMod.Tests.ConfigStorageTests
         {
             _fileSystem.WriteFile(ConfigLocationType.Local, "empty.toml", string.Empty);
 
-            var result = InternalConfigStorage.Load(ConfigLocationType.Local, "ExampleConfig", "empty.toml");
-
-            Assert.That(result, Is.True);
+            InternalConfigStorage.Load(ConfigLocationType.Local, "ExampleConfig", "empty.toml");
 
             // No backup, nothing destructive happened
             string backup;

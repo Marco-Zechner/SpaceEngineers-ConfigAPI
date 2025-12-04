@@ -1,26 +1,34 @@
-// using System.Collections.Generic;
-// using mz.Config;
-// using mz.SemanticVersioning;
+using System.Collections.Generic;
+using mz.Config;
+using mz.Config.Domain;
+using mz.SemanticVersioning;
+using VRage.Serialization;
 
-// namespace mz.NewTemplateMod
-// {
-//     public class CollectionConfig : ConfigBase
-//     {
-//         public override SemanticVersion ConfigVersion => "0.3.0";
+namespace mz.NewTemplateMod
+{
+    public class CollectionConfig : ConfigBase
+    {
+        public override SemanticVersion ConfigVersion => "0.3.0";
 
-//         public TriggerSave<List<string>> Tags { get; set; } = new List<string>() { "alpha", "beta" };
+        public List<string> Tags { get; set; } = new List<string>() { "alpha", "beta" };
 
-//         public TriggerSave<Dictionary<string, int>> NamedValues { get; set; }
-//             = new Dictionary<string, int>() { { "start", 1 }, { "end", 10 } };
+        public SerializableDictionary<string, int> NamedValues { get; set; }
+            = new SerializableDictionary<string, int>();
 
-//         public TriggerSave<SubConfig> Nested { get; set; } = new SubConfig();
+        public CollectionConfig()
+        {
+            NamedValues.Dictionary.Add("start", 1);
+            NamedValues.Dictionary.Add("end", 10);
+        }
 
-//         public class SubConfig
-//         {
-//             public TriggerSave<float> Threshold { get; set; } = 0.75f;
-//             public TriggerSave<bool> Allowed { get; set; } = true;
-//         }
-//     }
+        public SubConfig Nested { get; set; } = new SubConfig();
+
+        public class SubConfig
+        {
+            public float Threshold { get; set; } = 0.75f;
+            public bool Allowed { get; set; } = true;
+        }
+    }
 
 
-// }
+}

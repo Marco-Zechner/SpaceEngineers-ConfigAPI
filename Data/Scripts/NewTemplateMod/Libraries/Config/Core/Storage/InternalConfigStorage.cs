@@ -182,7 +182,7 @@ namespace mz.Config.Core.Storage
             slot.CurrentFileName = fileName + XmlConverter.GetExtension;
         }
 
-        public static bool Load(ConfigLocationType location, string typeName, string fileName)
+        public static void Load(ConfigLocationType location, string typeName, string fileName)
         {
             EnsureInitialized();
 
@@ -198,7 +198,7 @@ namespace mz.Config.Core.Storage
             var slot = GetOrCreateSlot(location, typeName, null);
 
             var fullName = fileName + XmlConverter.GetExtension;
-            var defaultsFileName = fileName + ".defaults";
+            var defaultsFileName = slot.TypeName + ".defaults";
             var fullDefaultsName = defaultsFileName + XmlConverter.GetExtension;
 
             // 1) Try to read current external config
@@ -232,11 +232,14 @@ namespace mz.Config.Core.Storage
                 // Deserialize into memory
                 var config = def.DeserializeFromXml(XmlSerializer, defaultXml);
                 if (config == null)
-                    return false;
+                {
+                    throw new InvalidOperationException(
+                        "Failed to deserialize newly created default config for type: " + typeName + "\nHOW?");
+                }
 
                 slot.Instance = config;
                 slot.CurrentFileName = fullName;
-                return true;
+                return;
             }
 
             ConfigStorage.Debug?.Log(
@@ -311,11 +314,29 @@ namespace mz.Config.Core.Storage
             // 8) Deserialize config from normalized current XML
             var finalConfig = def.DeserializeFromXml(XmlSerializer, layoutResult.NormalizedXml);
             if (finalConfig == null)
-                return false;
+            {
+                ConfigStorage.Debug?.Log("Deserialization failed for type: " + typeName +
+                                         " after normalization. Using default instance.", "InternalConfigStorage.Load");
+                
+                var backupName = fileName + ".bak" + XmlConverter.GetExtension;
+                FileSystem.WriteFile(location, backupName, externalCurrent);
+                ConfigStorage.Debug?.Log(
+                    "Backup created for type: " + typeName + " at: " + backupName +
+                    " with content:\n" + externalCurrent,
+                    "InternalConfigStorage.Load");
+                
+                finalConfig = def.CreateDefaultInstance();
+                var finalXml = XmlSerializer.SerializeToXml(finalConfig);
+                var finalExternal = XmlConverter.ToExternal(def, finalXml);
+                FileSystem.WriteFile(location, fullName, finalExternal);
+                ConfigStorage.Debug?.Log(
+                    "Wrote new config with default values for type: " + typeName + " at: " + fullName +
+                    " with content:\n" + finalExternal,
+                    "InternalConfigStorage.Load");
+            }
 
             slot.Instance = finalConfig;
             slot.CurrentFileName = fullName;
-            return true;
         }
 
 
@@ -440,17 +461,9 @@ namespace mz.Config.Core.Storage
                 TypeName = typeName
             };
 
-            string fileName;
-            if (!string.IsNullOrEmpty(initialFileNameOverride))
-            {
-                fileName = initialFileNameOverride;
-                if (fileName.EndsWith(XmlConverter.GetExtension))
-                    fileName = fileName.Remove(fileName.Length - XmlConverter.GetExtension.Length);
-            }
-            else
-            {
-                fileName = typeName + "Default";
-            }
+            var fileName = !string.IsNullOrEmpty(initialFileNameOverride) ? initialFileNameOverride : typeName;
+            if (fileName.EndsWith(XmlConverter.GetExtension))
+                fileName = fileName.Remove(fileName.Length - XmlConverter.GetExtension.Length);
 
             ConfigStorage.Debug?.Log("Creating new slot for type: " + typeName + " at location: " + location +
                                      " with file name: " + fileName + XmlConverter.GetExtension, "InternalConfigStorage.GetOrCreateSlot");

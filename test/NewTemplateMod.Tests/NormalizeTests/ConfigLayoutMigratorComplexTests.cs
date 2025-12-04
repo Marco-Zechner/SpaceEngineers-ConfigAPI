@@ -29,10 +29,13 @@ namespace NewTemplateMod.Tests.NormalizeTests
             sb.Append('<').Append(rootName).Append('>');
             foreach (var kv in values)
             {
+                sb.Append("\r\n  ");
                 sb.Append('<').Append(kv.Key).Append('>');
                 sb.Append(kv.Value);
                 sb.Append("</").Append(kv.Key).Append('>');
             }
+
+            sb.Append("\r\n");
             sb.Append("</").Append(rootName).Append('>');
             return sb.ToString();
         }

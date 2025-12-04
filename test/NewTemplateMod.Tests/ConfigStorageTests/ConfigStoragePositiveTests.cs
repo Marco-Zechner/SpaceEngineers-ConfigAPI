@@ -18,7 +18,7 @@ namespace NewTemplateMod.Tests.ConfigStorageTests
             Assert.That(cfg.ConfigVersion, Is.EqualTo((SemanticVersion)"0.1.0"));
 
             var currentFileName = InternalConfigStorage.GetCurrentFileName(ConfigLocationType.Local, "TestConfig");
-            Assert.That(currentFileName, Is.EqualTo("TestConfigDefault.toml"));
+            Assert.That(currentFileName, Is.EqualTo("TestConfig.toml"));
         }
 
         [Test]
@@ -58,9 +58,7 @@ namespace NewTemplateMod.Tests.ConfigStorageTests
 
             FileSystem.WriteFile(ConfigLocationType.Local, "existing.toml", toml);
 
-            var result = InternalConfigStorage.Load(ConfigLocationType.Local, "TestConfig", "existing.toml");
-
-            Assert.That(result, Is.True);
+            InternalConfigStorage.Load(ConfigLocationType.Local, "TestConfig", "existing.toml");
 
             var cfg = InternalConfigStorage.GetOrCreate<TestConfig>(ConfigLocationType.Local);
             Assert.Multiple(() =>

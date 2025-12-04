@@ -12,26 +12,8 @@ public class AdvancedConfig : ConfigBase
 
         public class SettingsRoot
         {
-            public List<IPluginConfig> Plugins { get; set; }
             public DisplayConfig Display { get; set; } = new DisplayConfig();
             public NetworkConfig Network { get; set; } = null;
-        }
-
-        public interface IPluginConfig
-        {
-            string Id { get; }
-        }
-
-        public class MathPluginConfig : IPluginConfig
-        {
-            public string Id => "MathPlugin";
-            public int Precision { get; set; } = 6;
-        }
-
-        public class GraphicsPluginConfig : IPluginConfig
-        {
-            public string Id => "GraphicsPlugin";
-            public bool UseGpu { get; set; } = true;
         }
 
         public class DisplayConfig
@@ -47,7 +29,6 @@ public class AdvancedConfig : ConfigBase
             public string Host { get; set; } = "localhost";
             public int Port { get; set; } = 8080;
 
-            // Previously optional; now mandatory
             public bool UseTls { get; set; } = true;
         }
     }
