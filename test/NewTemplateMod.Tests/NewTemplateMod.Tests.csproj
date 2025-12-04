@@ -19,4 +19,10 @@
     <PackageReference Include="NUnit.Analyzers" Version="4.4.0" />
     <PackageReference Include="NUnit3TestAdapter" Version="4.6.0" />
   </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="VRage.Library">
+      <HintPath>E:\SteamLibrary\SteamApps\common\SpaceEngineers\Bin64\VRage.Library.dll</HintPath>
+    </Reference>
+  </ItemGroup>
 </Project>

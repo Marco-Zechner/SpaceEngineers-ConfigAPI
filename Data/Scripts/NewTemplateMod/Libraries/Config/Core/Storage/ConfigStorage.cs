@@ -13,30 +13,28 @@ namespace mz.Config.Core
 {
     public static class ConfigStorage
     {
-        private static bool _initialized;
+        private static bool Initialized => InternalConfigStorage.IsInitialized;
         public static IDebug Debug { get; set; }
 
         public static void CustomInitialize(
             IConfigLayoutMigrator layoutMigrator,
             IXmlConverter xmlConverter)
         {
-            if (_initialized)
+            if (Initialized)
                 throw new InvalidOperationException("ConfigStorage has already been initialized.");
 
             IConfigFileSystem fileSystem = new ConfigFileSystem();
             IConfigXmlSerializer xmlSerializer = new ConfigXmlSerializer();
             
             InternalConfigStorage.Initialize(fileSystem, xmlSerializer, layoutMigrator, xmlConverter);
-            _initialized = true;
         }
 
         private static void EnsureInitialized()
         {
-            if (_initialized) return;
+            if (Initialized) return;
             var layout = new ConfigLayoutMigrator();
             var converter = new IdentityXmlConverter();
             CustomInitialize(layout, converter);
-            _initialized = true;
         }
 
         public static T Load<T>(ConfigLocationType location, string fileName = null)
