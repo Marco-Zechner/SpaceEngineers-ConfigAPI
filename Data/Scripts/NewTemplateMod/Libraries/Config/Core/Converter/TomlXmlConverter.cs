@@ -6,26 +6,25 @@ using mz.Config.Abstractions;
 using mz.Config.Abstractions.Converter;
 using mz.Config.Abstractions.SE;
 using mz.Config.Core.Storage;
-using mz.Config.Domain;
 
 namespace mz.Config.Core.Converter
 {
     /// <summary>
-    /// Pure XML <-> TOML converter for a single config instance.
+    /// Pure XML &lt;-&gt; TOML converter for a single config instance.
     /// No defaults, no migration, no version logic.
     ///
     /// Rules:
-    /// - Scalars: <Key>value</Key>                  <=>  Key = value
-    /// - Arrays:  <IntList><int>1</int>...</IntList> <=> IntList = [1, 2, 3]
-    /// - Nested:  <Nested><Threshold>..</Threshold>  <=> Nested.Threshold = ...
-    /// - Dictionary<string,int> (SerializableDictionary):
-    ///       <NamedValues><dictionary><item>...</item>...</dictionary></NamedValues>
-    ///       <=>
+    /// - Scalars: &lt;Key&gt;value&lt;/Key&gt;                  &lt;=&gt;  Key = value
+    /// - Arrays:  &lt;IntList&gt;&lt;int&gt;1&lt;/int&gt;...&lt;/IntList&gt; &lt;=&gt; IntList = [1, 2, 3]
+    /// - Nested:  &lt;Nested&gt;&lt;Threshold&gt;...&lt;/Threshold&gt;  &lt;=&gt; Nested.Threshold = ...
+    /// - Dictionary&lt;string,int&gt; (SerializableDictionary):
+    ///       &lt;NamedValues&gt;&lt;dictionary&gt;&lt;item&gt;...&lt;/item&gt;...&lt;/dictionary&gt;&lt;/NamedValues&gt;
+    ///       &lt;=&gt;
     ///       NamedValues.start = 1
     ///       NamedValues.end   = 99
     ///
     /// Nullable values:
-    ///   <OptionalInt xsi:nil="true" />  <=> OptionalInt = null
+    ///   &lt;OptionalInt xsi:nil="true" /&gt;  &lt;=&gt; OptionalInt = null
     /// </summary>
     public sealed class TomlXmlConverter : IXmlConverter
     {
@@ -75,19 +74,21 @@ namespace mz.Config.Core.Converter
             string rootName;
             var rootChildren = ParseRootChildren(xmlContent, out rootName);
 
-            // Default instance for descriptions & dictionary detection
-            ConfigBase defaultInstance = definition.CreateDefaultInstance();
+            // Default instance for descriptions & dictionary detection (for other places)
+            var defaultInstance = definition.CreateDefaultInstance();
             IReadOnlyDictionary<string, string> descriptions = null;
-            HashSet<string> dictionaryParents = null;
 
             if (defaultInstance != null)
             {
                 descriptions = defaultInstance.VariableDescriptions;
-                dictionaryParents = DetectDictionaryParents(descriptions);
+                DetectDictionaryParents(descriptions);
             }
 
-            // Flatten into key -> list of raw string values
+            // Flatten non-dictionary fields into key -> list of raw string values
             var flat = new Dictionary<string, List<string>>();
+
+            // Dictionary sections: parentName -> (dictKey -> value)
+            var dictSections = new Dictionary<string, Dictionary<string, string>>(StringComparer.Ordinal);
 
             foreach (var kv in rootChildren)
             {
@@ -118,25 +119,30 @@ namespace mz.Config.Core.Converter
                 //       <item><Key>k</Key><Value>v</Value></item>...
                 //     </dictionary>
                 //   </PropName>
-                bool isDictionaryParent = dictionaryParents != null && dictionaryParents.Contains(propName);
-                if (isDictionaryParent &&
-                    children.Count == 1 &&
+                //
+                // We now detect purely by XML shape (child tag "dictionary"), not by VariableDescriptions.
+                if (children.Count == 1 &&
                     string.Equals(children[0].Name, "dictionary", StringComparison.OrdinalIgnoreCase))
                 {
-                    var dictItems = ParseSnippetChildren(children[0].Value);
-                    for (int i = 0; i < dictItems.Count; i++)
+                    Dictionary<string, string> dict;
+                    if (!dictSections.TryGetValue(propName, out dict))
                     {
-                        var item = dictItems[i];
+                        dict = new Dictionary<string, string>(StringComparer.Ordinal);
+                        dictSections[propName] = dict;
+                    }
+
+                    var dictItems = ParseSnippetChildren(children[0].Value);
+                    foreach (var item in dictItems)
+                    {
                         if (!string.Equals(item.Name, "item", StringComparison.OrdinalIgnoreCase))
                             continue;
 
                         var kvChildren = ParseSnippetChildren(item.Value);
                         string keyText = null;
-                        string valueText = string.Empty;
+                        var valueText = string.Empty;
 
-                        for (int j = 0; j < kvChildren.Count; j++)
+                        foreach (var child in kvChildren)
                         {
-                            var child = kvChildren[j];
                             if (string.Equals(child.Name, "Key", StringComparison.OrdinalIgnoreCase))
                             {
                                 keyText = child.Value.Trim();
@@ -149,18 +155,19 @@ namespace mz.Config.Core.Converter
 
                         if (!string.IsNullOrEmpty(keyText))
                         {
-                            var flatKey = propName + "." + keyText;
-                            AddFlatValue(flat, flatKey, valueText);
+                            // Latest value wins for duplicate keys
+                            dict[keyText] = valueText;
                         }
                     }
 
+                    // We fully handled this property as a dictionary section
                     continue;
                 }
 
                 // Array-of-primitive or nested object
-                bool sameName = true;
-                string firstName = children[0].Name;
-                for (int i = 1; i < children.Count; i++)
+                var sameName = true;
+                var firstName = children[0].Name;
+                for (var i = 1; i < children.Count; i++)
                 {
                     if (children[i].Name != firstName)
                     {
@@ -169,13 +176,13 @@ namespace mz.Config.Core.Converter
                     }
                 }
 
-                // Array-of-primitive: IntList.int, StringList.string, etc.
                 if (sameName)
                 {
+                    // Array-of-primitive: IntList.int, StringList.string, etc.
                     var elementTag = firstName;                  // "int", "string", "float", ...
                     var flatKey = propName + "." + elementTag;   // e.g. "IntList.int"
 
-                    for (int i = 0; i < children.Count; i++)
+                    for (var i = 0; i < children.Count; i++)
                     {
                         AddFlatValue(flat, flatKey, children[i].Value.Trim());
                     }
@@ -183,9 +190,8 @@ namespace mz.Config.Core.Converter
                 else
                 {
                     // Nested object: Nested.Threshold, Nested.Flag, ...
-                    for (int i = 0; i < children.Count; i++)
+                    foreach (var child in children)
                     {
-                        var child = children[i];
                         var key = propName + "." + child.Name;
                         AddFlatValue(flat, key, child.Value.Trim());
                     }
@@ -200,6 +206,7 @@ namespace mz.Config.Core.Converter
               .Append(']')
               .AppendLine();
 
+            // Emit all non-dictionary fields under the main section
             foreach (var kv in flat)
             {
                 var key = kv.Key;
@@ -210,8 +217,8 @@ namespace mz.Config.Core.Converter
                 // Description comments: match by top-level property name
                 if (descriptions != null)
                 {
-                    string lookupKey = key;
-                    int dotIndex = key.IndexOf('.');
+                    var lookupKey = key;
+                    var dotIndex = key.IndexOf('.');
                     if (dotIndex > 0)
                         lookupKey = key.Substring(0, dotIndex);
 
@@ -219,9 +226,8 @@ namespace mz.Config.Core.Converter
                     if (descriptions.TryGetValue(lookupKey, out desc) && !string.IsNullOrEmpty(desc))
                     {
                         var split = desc.Replace("\r\n", "\n").Split('\n');
-                        for (int i = 0; i < split.Length; i++)
+                        foreach (var line in split)
                         {
-                            var line = split[i];
                             if (!string.IsNullOrEmpty(line))
                             {
                                 sb.Append("# ").Append(line).AppendLine();
@@ -247,7 +253,7 @@ namespace mz.Config.Core.Converter
                     sb.Append(key)
                       .Append(" = [");
 
-                    for (int i = 0; i < list.Count; i++)
+                    for (var i = 0; i < list.Count; i++)
                     {
                         if (i > 0)
                             sb.Append(", ");
@@ -261,9 +267,44 @@ namespace mz.Config.Core.Converter
                 }
             }
 
+            // Emit dictionary sections:
+            // [TypeName.NamedValues-dictionary]
+            // "start" = 5
+            // "end"   = 42
+            foreach (var section in dictSections)
+            {
+                var parentName = section.Key;
+                var dict = section.Value;
+
+                if (dict == null || dict.Count == 0)
+                    continue;
+
+                sb.AppendLine();
+                sb.Append('[')
+                  .Append(definition.TypeName)
+                  .Append('.')
+                  .Append(parentName)
+                  .Append("-dictionary]")
+                  .AppendLine();
+
+                var keys = new List<string>(dict.Keys);
+
+                foreach (var k in keys)
+                {
+                    var v = dict[k];
+
+                    sb.Append('"')
+                        .Append(k)
+                        .Append('"')
+                        .Append(" = ")
+                        .Append(ToTomlLiteral(v))
+                        .AppendLine();
+                }
+            }
+
             return sb.ToString();
         }
-        
+
         // helper near the top of the class (private static)
         private static bool IsPrimitiveElementTag(string tag)
         {
@@ -289,13 +330,12 @@ namespace mz.Config.Core.Converter
             }
 
             // Dictionary detection based on VariableDescriptions
-            ConfigBase defaultInstance = definition.CreateDefaultInstance();
-            IReadOnlyDictionary<string, string> descriptions = null;
-            HashSet<string> dictionaryParents = null;
+            var defaultInstance = definition.CreateDefaultInstance();
+            HashSet<string> dictionaryParents;
 
             if (defaultInstance != null)
             {
-                descriptions = defaultInstance.VariableDescriptions;
+                var descriptions = defaultInstance.VariableDescriptions;
                 dictionaryParents = DetectDictionaryParents(descriptions);
             }
             else
@@ -304,7 +344,7 @@ namespace mz.Config.Core.Converter
             }
 
             // Parse TOML into key -> list of raw values
-            var flat = ParseTomlToFlatMap(externalContent);
+            var flat = ParseTomlToFlatMap(externalContent, definition.TypeName);
 
             // Split into:
             // - root scalars / arrays: key
@@ -420,12 +460,12 @@ namespace mz.Config.Core.Converter
                     // Array of primitive -> wrap in parent + element tags
                     sb.Append('<').Append(name).Append('>');
 
-                    string elementTag = InferArrayElementTag(list);
+                    var elementTag = InferArrayElementTag(list);
 
-                    for (int i = 0; i < list.Count; i++)
+                    foreach (var t in list)
                     {
                         sb.Append('<').Append(elementTag).Append('>');
-                        sb.Append(XmlEscape(list[i]));
+                        sb.Append(XmlEscape(t));
                         sb.Append("</").Append(elementTag).Append('>');
                     }
 
@@ -602,21 +642,17 @@ namespace mz.Config.Core.Converter
                 return "string";
 
             // Check if all look like ints
-            bool allInts = true;
-            for (int i = 0; i < values.Count; i++)
+            var allInts = true;
+            foreach (var t in values)
             {
                 int tmp;
-                if (!int.TryParse(values[i], NumberStyles.Integer, CultureInfo.InvariantCulture, out tmp))
-                {
-                    allInts = false;
-                    break;
-                }
+                if (int.TryParse(t, NumberStyles.Integer, CultureInfo.InvariantCulture, out tmp)) continue;
+                allInts = false;
+                break;
             }
-            if (allInts)
-                return "int";
 
             // Could add more heuristics (double, bool) here if needed.
-            return "string";
+            return allInts ? "int" : "string";
         }
 
         // ====================================================================
@@ -631,46 +667,46 @@ namespace mz.Config.Core.Converter
             if (string.IsNullOrEmpty(xml))
                 return result;
 
-            int len = xml.Length;
-            int pos = 0;
+            var len = xml.Length;
+            var pos = 0;
 
             // Find root
             string foundRoot = null;
-            int rootStartClose = -1;
-            int endRootIndex = -1;
+            var rootStartClose = -1;
+            var endRootIndex = -1;
 
             while (pos < len && foundRoot == null)
             {
-                int lt = xml.IndexOf('<', pos);
+                var lt = xml.IndexOf('<', pos);
                 if (lt < 0)
                     break;
 
-                int gt = xml.IndexOf('>', lt + 1);
+                var gt = xml.IndexOf('>', lt + 1);
                 if (gt < 0)
                     break;
 
-                string tagContent = xml.Substring(lt + 1, gt - lt - 1).Trim();
+                var tagContent = xml.Substring(lt + 1, gt - lt - 1).Trim();
                 if (tagContent.Length == 0)
                 {
                     pos = gt + 1;
                     continue;
                 }
 
-                char first = tagContent[0];
+                var first = tagContent[0];
                 if (first == '?' || first == '!' || first == '/')
                 {
                     pos = gt + 1;
                     continue;
                 }
 
-                int spaceIndex = tagContent.IndexOf(' ');
+                var spaceIndex = tagContent.IndexOf(' ');
                 foundRoot = spaceIndex >= 0
                     ? tagContent.Substring(0, spaceIndex)
                     : tagContent;
 
                 rootStartClose = gt;
 
-                string endRootTag = "</" + foundRoot + ">";
+                var endRootTag = "</" + foundRoot + ">";
                 endRootIndex = xml.LastIndexOf(endRootTag, StringComparison.Ordinal);
                 if (endRootIndex < 0)
                     return result;
@@ -681,37 +717,37 @@ namespace mz.Config.Core.Converter
 
             rootName = foundRoot;
 
-            string inner = xml.Substring(rootStartClose + 1, endRootIndex - (rootStartClose + 1));
-            int innerLen = inner.Length;
-            int innerPos = 0;
+            var inner = xml.Substring(rootStartClose + 1, endRootIndex - (rootStartClose + 1));
+            var innerLen = inner.Length;
+            var innerPos = 0;
 
             while (true)
             {
-                int startTagOpen = inner.IndexOf('<', innerPos);
+                var startTagOpen = inner.IndexOf('<', innerPos);
                 if (startTagOpen < 0 || startTagOpen >= innerLen)
                     break;
 
-                int startTagClose = inner.IndexOf('>', startTagOpen + 1);
+                var startTagClose = inner.IndexOf('>', startTagOpen + 1);
                 if (startTagClose < 0)
                     break;
 
-                string startTagContent = inner.Substring(startTagOpen + 1, startTagClose - startTagOpen - 1).Trim();
+                var startTagContent = inner.Substring(startTagOpen + 1, startTagClose - startTagOpen - 1).Trim();
                 if (startTagContent.Length == 0)
                 {
                     innerPos = startTagClose + 1;
                     continue;
                 }
 
-                char first = startTagContent[0];
+                var first = startTagContent[0];
                 if (first == '?' || first == '!' || first == '/')
                 {
                     innerPos = startTagClose + 1;
                     continue;
                 }
 
-                int spaceIndex = startTagContent.IndexOf(' ');
-                bool selfClosing = startTagContent.EndsWith("/", StringComparison.Ordinal);
-                string tagName = spaceIndex >= 0
+                var spaceIndex = startTagContent.IndexOf(' ');
+                var selfClosing = startTagContent.EndsWith("/", StringComparison.Ordinal);
+                var tagName = spaceIndex >= 0
                     ? startTagContent.Substring(0, spaceIndex)
                     : (selfClosing
                         ? startTagContent.TrimEnd('/')
@@ -719,22 +755,22 @@ namespace mz.Config.Core.Converter
 
                 if (selfClosing)
                 {
-                    bool hasNil = startTagContent.IndexOf("xsi:nil=\"true\"", StringComparison.Ordinal) >= 0;
+                    var hasNil = startTagContent.IndexOf("xsi:nil=\"true\"", StringComparison.Ordinal) >= 0;
                     result[tagName] = hasNil ? NULL_SENTINEL : string.Empty;
                     innerPos = startTagClose + 1;
                     continue;
                 }
 
-                string endTag = "</" + tagName + ">";
-                int endTagIndex = inner.IndexOf(endTag, startTagClose + 1, StringComparison.Ordinal);
+                var endTag = "</" + tagName + ">";
+                var endTagIndex = inner.IndexOf(endTag, startTagClose + 1, StringComparison.Ordinal);
                 if (endTagIndex < 0)
                 {
                     innerPos = startTagClose + 1;
                     continue;
                 }
 
-                int valueStart = startTagClose + 1;
-                string innerValue = inner.Substring(valueStart, endTagIndex - valueStart);
+                var valueStart = startTagClose + 1;
+                var innerValue = inner.Substring(valueStart, endTagIndex - valueStart);
 
                 result[tagName] = innerValue;
 
@@ -757,36 +793,36 @@ namespace mz.Config.Core.Converter
             if (string.IsNullOrEmpty(snippet))
                 return result;
 
-            int len = snippet.Length;
-            int pos = 0;
+            var len = snippet.Length;
+            var pos = 0;
 
             while (true)
             {
-                int lt = snippet.IndexOf('<', pos);
+                var lt = snippet.IndexOf('<', pos);
                 if (lt < 0 || lt >= len)
                     break;
 
-                int gt = snippet.IndexOf('>', lt + 1);
+                var gt = snippet.IndexOf('>', lt + 1);
                 if (gt < 0)
                     break;
 
-                string tagContent = snippet.Substring(lt + 1, gt - lt - 1).Trim();
+                var tagContent = snippet.Substring(lt + 1, gt - lt - 1).Trim();
                 if (tagContent.Length == 0)
                 {
                     pos = gt + 1;
                     continue;
                 }
 
-                char first = tagContent[0];
+                var first = tagContent[0];
                 if (first == '?' || first == '!' || first == '/')
                 {
                     pos = gt + 1;
                     continue;
                 }
 
-                int spaceIndex = tagContent.IndexOf(' ');
-                bool selfClosing = tagContent.EndsWith("/", StringComparison.Ordinal);
-                string tagName = spaceIndex >= 0
+                var spaceIndex = tagContent.IndexOf(' ');
+                var selfClosing = tagContent.EndsWith("/", StringComparison.Ordinal);
+                var tagName = spaceIndex >= 0
                     ? tagContent.Substring(0, spaceIndex)
                     : (selfClosing
                         ? tagContent.TrimEnd('/')
@@ -794,7 +830,7 @@ namespace mz.Config.Core.Converter
 
                 if (selfClosing)
                 {
-                    bool hasNil = tagContent.IndexOf("xsi:nil=\"true\"", StringComparison.Ordinal) >= 0;
+                    var hasNil = tagContent.IndexOf("xsi:nil=\"true\"", StringComparison.Ordinal) >= 0;
                     result.Add(new SnippetChild
                     {
                         Name = tagName,
@@ -804,16 +840,16 @@ namespace mz.Config.Core.Converter
                     continue;
                 }
 
-                string endTag = "</" + tagName + ">";
-                int endTagIndex = snippet.IndexOf(endTag, gt + 1, StringComparison.Ordinal);
+                var endTag = "</" + tagName + ">";
+                var endTagIndex = snippet.IndexOf(endTag, gt + 1, StringComparison.Ordinal);
                 if (endTagIndex < 0)
                 {
                     pos = gt + 1;
                     continue;
                 }
 
-                int valueStart = gt + 1;
-                string innerValue = snippet.Substring(valueStart, endTagIndex - valueStart);
+                var valueStart = gt + 1;
+                var innerValue = snippet.Substring(valueStart, endTagIndex - valueStart);
 
                 result.Add(new SnippetChild
                 {
@@ -844,17 +880,18 @@ namespace mz.Config.Core.Converter
         // TOML parsing
         // ====================================================================
 
-        private static Dictionary<string, List<string>> ParseTomlToFlatMap(string toml)
+        private static Dictionary<string, List<string>> ParseTomlToFlatMap(string toml, string typeName)
         {
             var result = new Dictionary<string, List<string>>();
 
             if (string.IsNullOrEmpty(toml))
                 return result;
 
+            string currentSection = null;
+
             var lines = toml.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
-            for (int i = 0; i < lines.Length; i++)
+            foreach (var raw in lines)
             {
-                var raw = lines[i];
                 if (string.IsNullOrEmpty(raw))
                     continue;
 
@@ -868,7 +905,11 @@ namespace mz.Config.Core.Converter
 
                 // section header
                 if (line.StartsWith("[") && line.EndsWith("]"))
+                {
+                    var sectionName = line.Substring(1, line.Length - 2).Trim();
+                    currentSection = sectionName;
                     continue;
+                }
 
                 var eqIndex = line.IndexOf('=');
                 if (eqIndex <= 0)
@@ -886,9 +927,12 @@ namespace mz.Config.Core.Converter
 
                 if (string.IsNullOrEmpty(valuePart))
                 {
-                    AddFlatValue(result, key, string.Empty);
+                    var finalKeyEmpty = QualifyTomlKey(key, currentSection, typeName);
+                    AddFlatValue(result, finalKeyEmpty, string.Empty);
                     continue;
                 }
+
+                var finalKey = QualifyTomlKey(key, currentSection, typeName);
 
                 // Array: key = [ ... ]
                 if (valuePart.Length >= 2 &&
@@ -898,24 +942,63 @@ namespace mz.Config.Core.Converter
                     var inner = valuePart.Substring(1, valuePart.Length - 2);
 
                     var items = SplitTomlArray(inner);
-                    for (int j = 0; j < items.Count; j++)
+                    foreach (var t in items)
                     {
-                        var itemText = items[j].Trim();
+                        var itemText = t.Trim();
                         if (itemText.Length == 0)
                             continue;
 
                         var rawValue = FromTomlLiteral(itemText);
-                        AddFlatValue(result, key, rawValue);
+                        AddFlatValue(result, finalKey, rawValue);
                     }
                 }
                 else
                 {
                     var rawValue = FromTomlLiteral(valuePart);
-                    AddFlatValue(result, key, rawValue);
+                    AddFlatValue(result, finalKey, rawValue);
                 }
             }
 
             return result;
+        }
+        
+        private static string QualifyTomlKey(string key, string currentSection, string typeName)
+        {
+            // Default: no section or irrelevant section -> keep key as-is
+            if (string.IsNullOrEmpty(currentSection))
+                return key;
+
+            // Main type section: [TypeName]
+            if (string.Equals(currentSection, typeName, StringComparison.Ordinal))
+                return key;
+
+            // Subsections of the type: [TypeName.Something]
+            if (currentSection.StartsWith(typeName + ".", StringComparison.Ordinal))
+            {
+                var suffix = currentSection.Substring(typeName.Length + 1); // e.g. "NamedValues-dictionary"
+
+                // Dictionary section: [TypeName.NamedValues-dictionary]
+                if (suffix.EndsWith("-dictionary", StringComparison.Ordinal))
+                {
+                    var propName = suffix.Substring(0, suffix.Length - "-dictionary".Length);
+
+                    // remove quotes from TOML key: "start" -> start
+                    var dictKey = key;
+                    if (dictKey.Length >= 2 && dictKey[0] == '"' && dictKey[dictKey.Length - 1] == '"')
+                    {
+                        dictKey = dictKey.Substring(1, dictKey.Length - 2);
+                    }
+
+                    return propName + "." + dictKey; // NamedValues.start
+                }
+
+                // Generic subsection (not used yet, but keep sane behavior):
+                // e.g. [TypeName.Nested] Threshold = 0.9  ->  Nested.Threshold
+                return suffix + "." + key;
+            }
+
+            // Unknown section; leave as-is
+            return key;
         }
 
         private static List<string> SplitTomlArray(string inner)
@@ -925,13 +1008,11 @@ namespace mz.Config.Core.Converter
                 return result;
 
             var sb = new StringBuilder();
-            bool inString = false;
-            bool escape = false;
+            var inString = false;
+            var escape = false;
 
-            for (int i = 0; i < inner.Length; i++)
+            foreach (var c in inner)
             {
-                var c = inner[i];
-
                 if (escape)
                 {
                     sb.Append(c);
@@ -939,18 +1020,16 @@ namespace mz.Config.Core.Converter
                     continue;
                 }
 
-                if (c == '\\')
+                switch (c)
                 {
-                    sb.Append(c);
-                    escape = true;
-                    continue;
-                }
-
-                if (c == '"')
-                {
-                    sb.Append(c);
-                    inString = !inString;
-                    continue;
+                    case '\\':
+                        sb.Append(c);
+                        escape = true;
+                        continue;
+                    case '"':
+                        sb.Append(c);
+                        inString = !inString;
+                        continue;
                 }
 
                 if (c == ',' && !inString)

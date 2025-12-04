@@ -55,7 +55,7 @@ namespace mz.Config.Core.Layout
 
                 var normalizedCurrentChildren = new Dictionary<string, string>();
                 var normalizedDefaultChildren = new Dictionary<string, string>();
-                bool requiresBackup = false;
+                var requiresBackup = false;
 
                 // Work across keys present in the "current" default layout
                 foreach (var kv in newDefaultChildren)
@@ -64,10 +64,10 @@ namespace mz.Config.Core.Layout
                     var newDefaultElement = kv.Value;
 
                     string currentElement;
-                    bool hasCurrent = currentChildren.TryGetValue(key, out currentElement);
+                    var hasCurrent = currentChildren.TryGetValue(key, out currentElement);
 
                     string oldDefaultElement;
-                    bool hasOldDefault = oldDefaultChildren.TryGetValue(key, out oldDefaultElement);
+                    var hasOldDefault = oldDefaultChildren.TryGetValue(key, out oldDefaultElement);
 
                     string finalCurrentElement;
 

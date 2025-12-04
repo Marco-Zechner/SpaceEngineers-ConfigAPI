@@ -236,6 +236,7 @@ IntValue = 10
 Text = ""Dict test""
 IntList.int = [1, 2, 3]
 StringList.string = [""alpha"", ""beta""]
+
 [TomlConfig3Dictionary.NamedValues-dictionary]
 ""start"" = 5
 ""end"" = 42";
@@ -322,12 +323,15 @@ IntValue = 99
 Text = ""Nested test""
 IntList.int = [1, 2, 3]
 StringList.string = [""alpha"", ""beta""]
+
 [TomlConfig4Nested.NamedValues-dictionary]
 ""start"" = 1
 ""end"" = 99
+
 [TomlConfig4Nested.Nested]
 Threshold = 0.9
 Flag = true
+
 [TomlConfig4Nested]
 FloatValue = 0.5";
 

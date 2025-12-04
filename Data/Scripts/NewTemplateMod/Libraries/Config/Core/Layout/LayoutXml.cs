@@ -31,35 +31,35 @@ namespace mz.Config.Core
             if (string.IsNullOrEmpty(xml))
                 return result;
 
-            int len = xml.Length;
-            int pos = 0;
+            var len = xml.Length;
+            var pos = 0;
 
             // 1) Find root element (skip xml decl, comments, etc.)
             while (pos < len)
             {
-                int lt = xml.IndexOf('<', pos);
+                var lt = xml.IndexOf('<', pos);
                 if (lt < 0)
                     return result;
 
-                int gt = xml.IndexOf('>', lt + 1);
+                var gt = xml.IndexOf('>', lt + 1);
                 if (gt < 0)
                     return result;
 
-                string tagContent = xml.Substring(lt + 1, gt - lt - 1).Trim();
+                var tagContent = xml.Substring(lt + 1, gt - lt - 1).Trim();
                 if (tagContent.Length == 0)
                 {
                     pos = gt + 1;
                     continue;
                 }
 
-                char first = tagContent[0];
+                var first = tagContent[0];
                 if (first == '?' || first == '!' || first == '/')
                 {
                     pos = gt + 1;
                     continue;
                 }
 
-                int spaceIdx = tagContent.IndexOf(' ');
+                var spaceIdx = tagContent.IndexOf(' ');
                 rootName = spaceIdx >= 0
                     ? tagContent.Substring(0, spaceIdx)
                     : tagContent;
@@ -71,15 +71,15 @@ namespace mz.Config.Core
             if (string.IsNullOrEmpty(rootName))
                 return result;
 
-            string endRootTag = "</" + rootName + ">";
-            int endIndex = xml.LastIndexOf(endRootTag, StringComparison.Ordinal);
+            var endRootTag = "</" + rootName + ">";
+            var endIndex = xml.LastIndexOf(endRootTag, StringComparison.Ordinal);
             if (endIndex < 0 || endIndex <= pos)
                 return result;
 
             // Inner content between <root ...> and </root>
-            string inner = xml.Substring(pos, endIndex - pos);
-            int innerLen = inner.Length;
-            int i = 0;
+            var inner = xml.Substring(pos, endIndex - pos);
+            var innerLen = inner.Length;
+            var i = 0;
 
             // 2) Scan inner for direct children
             while (i < innerLen)
@@ -97,83 +97,83 @@ namespace mz.Config.Core
                     continue;
                 }
 
-                int startTagOpen = i;
-                int startTagClose = inner.IndexOf('>', startTagOpen + 1);
+                var startTagOpen = i;
+                var startTagClose = inner.IndexOf('>', startTagOpen + 1);
                 if (startTagClose < 0)
                     break;
 
-                string startContent = inner.Substring(startTagOpen + 1, startTagClose - startTagOpen - 1).Trim();
+                var startContent = inner.Substring(startTagOpen + 1, startTagClose - startTagOpen - 1).Trim();
                 if (startContent.Length == 0)
                 {
                     i = startTagClose + 1;
                     continue;
                 }
 
-                char c0 = startContent[0];
+                var c0 = startContent[0];
                 if (c0 == '?' || c0 == '!' || c0 == '/')
                 {
                     i = startTagClose + 1;
                     continue;
                 }
 
-                int spaceIndex = startContent.IndexOf(' ');
-                string childName = spaceIndex >= 0
+                var spaceIndex = startContent.IndexOf(' ');
+                var childName = spaceIndex >= 0
                     ? startContent.Substring(0, spaceIndex)
                     : startContent;
 
-                bool selfClosing = startContent.Length > 0 &&
-                                   startContent[startContent.Length - 1] == '/';
+                var selfClosing = startContent.Length > 0 &&
+                                  startContent[startContent.Length - 1] == '/';
 
                 if (selfClosing)
                 {
-                    int childEnd = startTagClose + 1;
-                    string block = inner.Substring(startTagOpen, childEnd - startTagOpen);
+                    var childEnd = startTagClose + 1;
+                    var block = inner.Substring(startTagOpen, childEnd - startTagOpen);
                     result[childName] = block;
                     i = childEnd;
                     continue;
                 }
 
                 // Non self-closing: find matching </childName> with depth tracking
-                int depth = 1;
-                int searchPos = startTagClose + 1;
+                var depth = 1;
+                var searchPos = startTagClose + 1;
 
                 while (searchPos < innerLen && depth > 0)
                 {
-                    int nextLt = inner.IndexOf('<', searchPos);
+                    var nextLt = inner.IndexOf('<', searchPos);
                     if (nextLt < 0)
                         break;
 
-                    int nextGt = inner.IndexOf('>', nextLt + 1);
+                    var nextGt = inner.IndexOf('>', nextLt + 1);
                     if (nextGt < 0)
                         break;
 
-                    string t = inner.Substring(nextLt + 1, nextGt - nextLt - 1).Trim();
+                    var t = inner.Substring(nextLt + 1, nextGt - nextLt - 1).Trim();
                     if (t.Length == 0)
                     {
                         searchPos = nextGt + 1;
                         continue;
                     }
 
-                    char t0 = t[0];
+                    var t0 = t[0];
                     if (t0 == '!' || t0 == '?')
                     {
                         searchPos = nextGt + 1;
                         continue;
                     }
 
-                    bool closing = t0 == '/';
+                    var closing = t0 == '/';
                     string name;
 
                     if (closing)
                     {
                         name = t.Substring(1);
-                        int sp = name.IndexOf(' ');
+                        var sp = name.IndexOf(' ');
                         if (sp >= 0)
                             name = name.Substring(0, sp);
                     }
                     else
                     {
-                        int sp = t.IndexOf(' ');
+                        var sp = t.IndexOf(' ');
                         name = sp >= 0 ? t.Substring(0, sp) : t;
                     }
 
@@ -190,8 +190,8 @@ namespace mz.Config.Core
 
                     if (depth == 0)
                     {
-                        int childEnd = nextGt + 1;
-                        string block = inner.Substring(startTagOpen, childEnd - startTagOpen);
+                        var childEnd = nextGt + 1;
+                        var block = inner.Substring(startTagOpen, childEnd - startTagOpen);
                         result[childName] = block;
                         i = childEnd;
                         break;
@@ -235,9 +235,9 @@ namespace mz.Config.Core
                 block = block.Replace("\r\n", "\n");
 
                 var lines = block.Split(new[] { '\n' }, StringSplitOptions.None);
-                bool firstLineEmitted = false;
+                var firstLineEmitted = false;
 
-                for (int i = 0; i < lines.Length; i++)
+                for (var i = 0; i < lines.Length; i++)
                 {
                     var line = lines[i];
 
