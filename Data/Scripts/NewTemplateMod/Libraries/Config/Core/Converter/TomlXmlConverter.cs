@@ -68,7 +68,7 @@ namespace mz.Config.Core.Converter
         public string ToExternal(IConfigDefinition definition, string xmlContent)
         {
             if (definition == null)
-                throw new ArgumentNullException("definition");
+                throw new ArgumentNullException(nameof(definition));
             if (xmlContent == null)
                 xmlContent = string.Empty;
 
@@ -169,12 +169,15 @@ namespace mz.Config.Core.Converter
                     }
                 }
 
+                // Array-of-primitive: IntList.int, StringList.string, etc.
                 if (sameName)
                 {
-                    // IntList / StringList style: IntList = [1, 2, 3]
+                    var elementTag = firstName;                  // "int", "string", "float", ...
+                    var flatKey = propName + "." + elementTag;   // e.g. "IntList.int"
+
                     for (int i = 0; i < children.Count; i++)
                     {
-                        AddFlatValue(flat, propName, children[i].Value.Trim());
+                        AddFlatValue(flat, flatKey, children[i].Value.Trim());
                     }
                 }
                 else
@@ -260,11 +263,21 @@ namespace mz.Config.Core.Converter
 
             return sb.ToString();
         }
+        
+        // helper near the top of the class (private static)
+        private static bool IsPrimitiveElementTag(string tag)
+        {
+            if (tag == null)
+                return false;
+
+            tag = tag.ToLowerInvariant();
+            return tag == "int" || tag == "string" || tag == "float" || tag == "double" || tag == "bool";
+        }
 
         public string ToInternal(IConfigDefinition definition, string externalContent)
         {
             if (definition == null)
-                throw new ArgumentNullException("definition");
+                throw new ArgumentNullException(nameof(definition));
 
             var xmlSerializer = GetXmlSerializer(_backupXmlSerializer);
 
@@ -307,8 +320,29 @@ namespace mz.Config.Core.Converter
                 var list = kv.Value ?? new List<string>();
 
                 var segments = key.Split('.');
+                if (segments.Length == 2 &&
+                    !dictionaryParents.Contains(segments[0]) &&
+                    IsPrimitiveElementTag(segments[1]))
+                {
+                    // Case: IntArray.int, Names.string, etc.
+                    // Treat as an array for the parent property (IntArray / Names).
+                    var parent = segments[0];
+
+                    List<string> arr;
+                    if (!rootMap.TryGetValue(parent, out arr))
+                    {
+                        arr = new List<string>();
+                        rootMap[parent] = arr;
+                    }
+
+                    // Append all values from TOML array to this parent list
+                    arr.AddRange(list);
+                    continue;
+                }
+
                 if (segments.Length == 1)
                 {
+                    // Root scalar or array (simple key)
                     rootMap[key] = list;
                 }
                 else
@@ -319,6 +353,7 @@ namespace mz.Config.Core.Converter
 
                     if (dictionaryParents.Contains(parent))
                     {
+                        // Dictionary<string,int>: NamedValues.start, NamedValues.end, ...
                         Dictionary<string, string> dict;
                         if (!dictionaries.TryGetValue(parent, out dict))
                         {
@@ -329,6 +364,7 @@ namespace mz.Config.Core.Converter
                     }
                     else
                     {
+                        // Normal nested object: Nested.Threshold, Nested.Flag, ...
                         Dictionary<string, string> childMap;
                         if (!nested.TryGetValue(parent, out childMap))
                         {
