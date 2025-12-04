@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Xml.Serialization;
 using mz.Config.Domain;
 using mz.SemanticVersioning;
 using VRage.Serialization;
@@ -21,26 +22,27 @@ namespace NewTemplateMod.Tests.TomlFormatSpecTests
 
         public int? OptionalInt { get; set; } = null;
         public float? OptionalFloat { get; set; } = null;
+        [XmlElement(IsNullable = true)]
         public string OptionalText { get; set; } = null;
 
-        public override IReadOnlyDictionary<string, string> VariableDescriptions
-        {
-            get
-            {
-                var map = new Dictionary<string, string>
-                {
-                    { "IntValue", "int" },
-                    { "DoubleValue", "double" },
-                    { "FloatValue", "float" },
-                    { "BoolValue", "bool" },
-                    { "Text", "string" },
-                    { "OptionalInt", "nullable int" },
-                    { "OptionalFloat", "nullable float" },
-                    { "OptionalText", "nullable string" }
-                };
-                return map;
-            }
-        }
+        // public override IReadOnlyDictionary<string, string> VariableDescriptions
+        // {
+        //     get
+        //     {
+        //         var map = new Dictionary<string, string>
+        //         {
+        //             { "IntValue", "int" },
+        //             { "DoubleValue", "double" },
+        //             { "FloatValue", "float" },
+        //             { "BoolValue", "bool" },
+        //             { "Text", "string" },
+        //             { "OptionalInt", "nullable int" },
+        //             { "OptionalFloat", "nullable float" },
+        //             { "OptionalText", "nullable string" }
+        //         };
+        //         return map;
+        //     }
+        // }
     }
 
     /// <summary>
@@ -65,20 +67,20 @@ namespace NewTemplateMod.Tests.TomlFormatSpecTests
             StringList = new List<string> { "alpha", "beta" };
         }
 
-        public override IReadOnlyDictionary<string, string> VariableDescriptions
-        {
-            get
-            {
-                var map = new Dictionary<string, string>
-                {
-                    { "IntValue", "int" },
-                    { "Text", "string" },
-                    { "IntList", "List<int>" },
-                    { "StringList", "List<string>" }
-                };
-                return map;
-            }
-        }
+        // public override IReadOnlyDictionary<string, string> VariableDescriptions
+        // {
+        //     get
+        //     {
+        //         var map = new Dictionary<string, string>
+        //         {
+        //             { "IntValue", "int" },
+        //             { "Text", "string" },
+        //             { "IntList", "List<int>" },
+        //             { "StringList", "List<string>" }
+        //         };
+        //         return map;
+        //     }
+        // }
     }
 
     /// <summary>
@@ -114,21 +116,21 @@ namespace NewTemplateMod.Tests.TomlFormatSpecTests
             };
         }
 
-        public override IReadOnlyDictionary<string, string> VariableDescriptions
-        {
-            get
-            {
-                var map = new Dictionary<string, string>
-                {
-                    { "IntValue", "int" },
-                    { "Text", "string" },
-                    { "IntList", "List<int>" },
-                    { "StringList", "List<string>" },
-                    { "NamedValues", "Dictionary<string,int>" }
-                };
-                return map;
-            }
-        }
+        // public override IReadOnlyDictionary<string, string> VariableDescriptions
+        // {
+        //     get
+        //     {
+        //         var map = new Dictionary<string, string>
+        //         {
+        //             { "IntValue", "int" },
+        //             { "Text", "string" },
+        //             { "IntList", "List<int>" },
+        //             { "StringList", "List<string>" },
+        //             { "NamedValues", "Dictionary<string,int>" }
+        //         };
+        //         return map;
+        //     }
+        // }
     }
 
     /// <summary>
@@ -188,23 +190,23 @@ namespace NewTemplateMod.Tests.TomlFormatSpecTests
             };
         }
 
-        public override IReadOnlyDictionary<string, string> VariableDescriptions
-        {
-            get
-            {
-                var map = new Dictionary<string, string>
-                {
-                    { "IntValue", "int" },
-                    { "Text", "string" },
-                    { "IntList", "List<int>" },
-                    { "StringList", "List<string>" },
-                    { "NamedValues", "Dictionary<string,int>" },
-                    { "Nested.Threshold", "float (0..1)" },
-                    { "Nested.Flag", "bool" },
-                    { "FloatValue", "float" }
-                };
-                return map;
-            }
-        }
+        // public override IReadOnlyDictionary<string, string> VariableDescriptions
+        // {
+        //     get
+        //     {
+        //         var map = new Dictionary<string, string>
+        //         {
+        //             { "IntValue", "int" },
+        //             { "Text", "string" },
+        //             { "IntList", "List<int>" },
+        //             { "StringList", "List<string>" },
+        //             { "NamedValues", "Dictionary<string,int>" },
+        //             { "Nested.Threshold", "float (0..1)" },
+        //             { "Nested.Flag", "bool" },
+        //             { "FloatValue", "float" }
+        //         };
+        //         return map;
+        //     }
+        // }
     }
 }

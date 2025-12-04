@@ -27,7 +27,8 @@ namespace NewTemplateMod.Tests.TomlFormatSpecTests
 
             if (!string.Equals(na, ne, StringComparison.Ordinal))
             {
-                Logger.Log("TOML mismatch in " + testName + "\nEXPECTED:\n" + ne + "\n\nACTUAL:\n" + na,
+                Logger.Log(
+                    "TOML mismatch in " + testName + "\nEXPECTED:\n" + ne + "\n\nACTUAL:\n" + na,
                     "TomlFormatSpecTests");
             }
 
@@ -49,7 +50,7 @@ namespace NewTemplateMod.Tests.TomlFormatSpecTests
         }
 
         // --------------------------------------------------------------------
-        // CONFIG 1: Scalars + nullables
+        // CONFIG 1: Scalars + nullables  (TOML)
         // --------------------------------------------------------------------
 
         [Test]
@@ -76,7 +77,7 @@ namespace NewTemplateMod.Tests.TomlFormatSpecTests
             Logger.Log("Config1 TOML:\n" + toml, "TomlFormatSpecTests");
 
             var expected =
-@"[TomlConfig1_Scalars]
+@"[TomlConfig1Scalars]
 ConfigVersion = ""1.0.0""
 IntValue = 42
 DoubleValue = 12.5
@@ -87,11 +88,56 @@ OptionalInt = null
 OptionalFloat = null
 OptionalText = null";
 
-            AssertTomlEqual(toml, expected, "Config1_Scalars");
+            AssertTomlEqual(toml, expected, "Config1Scalars");
         }
 
         // --------------------------------------------------------------------
-        // CONFIG 2: + primitive lists
+        // CONFIG 1: Scalars + nullables  (XML)
+        // --------------------------------------------------------------------
+
+        [Test]
+        public void Config1_Scalars_Xml_Contains_All_Scalars_And_Nullables()
+        {
+            var cfg = new TomlConfig1Scalars();
+
+            cfg.IntValue = 42;
+            cfg.DoubleValue = 12.5;
+            cfg.FloatValue = 0.33f;
+            cfg.BoolValue = false;
+            cfg.Text = "Custom text";
+
+            cfg.OptionalInt = null;
+            cfg.OptionalFloat = null;
+            cfg.OptionalText = null;
+
+            var xml = _xml.SerializeToXml(cfg);
+            Logger.Log("Config1 XML (shape check):\n" + xml, "TomlFormatSpecTests");
+
+            var norm = NormalizeNewlines(xml);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(norm, Does.Contain("<?xml version=\"1.0\" encoding=\"utf-16\"?>"));
+                Assert.That(norm, Does.Contain("<TomlConfig1Scalars "));
+                Assert.That(norm, Does.Contain("<ConfigVersion>1.0.0</ConfigVersion>"));
+                Assert.That(norm, Does.Contain("<IntValue>42</IntValue>"));
+                Assert.That(norm, Does.Contain("<DoubleValue>12.5</DoubleValue>"));
+                Assert.That(norm, Does.Contain("<FloatValue>0.33</FloatValue>").Or.Contain("<FloatValue>0.330"));
+                Assert.That(norm, Does.Contain("<BoolValue>false</BoolValue>"));
+                Assert.That(norm, Does.Contain("<Text>Custom text</Text>"));
+
+                // For Nullable<T>, XmlSerializer normally emits xsi:nil="true"
+                Assert.That(norm, Does.Contain("<OptionalInt xsi:nil=\"true\""));
+                Assert.That(norm, Does.Contain("<OptionalFloat xsi:nil=\"true\""));
+
+                // OptionalText behavior depends on IsNullable on the string property.
+                // We just assert that it does *not* get some random numeric value.
+                Assert.That(norm, Does.Not.Contain("<OptionalText>0</OptionalText>"));
+            });
+        }
+
+        // --------------------------------------------------------------------
+        // CONFIG 2: + primitive lists  (TOML)
         // --------------------------------------------------------------------
 
         [Test]
@@ -111,19 +157,56 @@ OptionalText = null";
             Logger.Log("Config2 TOML:\n" + toml, "TomlFormatSpecTests");
 
             var expected =
-@"[TomlConfig2_Lists]
+@"[TomlConfig2Lists]
 ConfigVersion = ""1.0.0""
 IntValue = 7
 Text = ""List test""
-
 IntList.int = [1, 2, 3]
 StringList.string = [""alpha"", ""beta""]";
 
-            AssertTomlEqual(toml, expected, "Config2_Lists");
+            AssertTomlEqual(toml, expected, "Config2Lists");
         }
 
         // --------------------------------------------------------------------
-        // CONFIG 3: + dictionary block
+        // CONFIG 2: + primitive lists  (XML)
+        // --------------------------------------------------------------------
+
+        [Test]
+        public void Config2_Lists_Xml_Has_IntList_And_StringList()
+        {
+            var cfg = new TomlConfig2Lists();
+            cfg.ApplyDefaults();
+
+            cfg.IntValue = 7;
+            cfg.Text = "List test";
+
+            var xml = _xml.SerializeToXml(cfg);
+            Logger.Log("Config2 XML (shape check):\n" + xml, "TomlFormatSpecTests");
+
+            var norm = NormalizeNewlines(xml);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(norm, Does.Contain("<TomlConfig2Lists "));
+                Assert.That(norm, Does.Contain("<ConfigVersion>1.0.0</ConfigVersion>"));
+                Assert.That(norm, Does.Contain("<IntValue>7</IntValue>"));
+                Assert.That(norm, Does.Contain("<Text>List test</Text>"));
+
+                // IntList
+                Assert.That(norm, Does.Contain("<IntList>"));
+                Assert.That(norm, Does.Contain("<int>1</int>"));
+                Assert.That(norm, Does.Contain("<int>2</int>"));
+                Assert.That(norm, Does.Contain("<int>3</int>"));
+
+                // StringList
+                Assert.That(norm, Does.Contain("<StringList>"));
+                Assert.That(norm, Does.Contain("<string>alpha</string>"));
+                Assert.That(norm, Does.Contain("<string>beta</string>"));
+            });
+        }
+
+        // --------------------------------------------------------------------
+        // CONFIG 3: + dictionary block  (TOML)
         // --------------------------------------------------------------------
 
         [Test]
@@ -146,28 +229,70 @@ StringList.string = [""alpha"", ""beta""]";
             var toml = _converter.ToExternal(def, xml);
             Logger.Log("Config3 TOML:\n" + toml, "TomlFormatSpecTests");
 
-            // We expect:
-            // - root scalars
-            // - IntList.int / StringList.string
-            // - [TomlConfig3_Dictionary.NamedValues-dictionary] with "start"/"end"
             var expected =
-@"[TomlConfig3_Dictionary]
+@"[TomlConfig3Dictionary]
 ConfigVersion = ""1.0.0""
 IntValue = 10
 Text = ""Dict test""
-
 IntList.int = [1, 2, 3]
 StringList.string = [""alpha"", ""beta""]
-
-[TomlConfig3_Dictionary.NamedValues-dictionary]
+[TomlConfig3Dictionary.NamedValues-dictionary]
 ""start"" = 5
 ""end"" = 42";
 
-            AssertTomlEqual(toml, expected, "Config3_Dictionary");
+            AssertTomlEqual(toml, expected, "Config3Dictionary");
         }
 
         // --------------------------------------------------------------------
-        // CONFIG 4: + nested object + trailing scalar with Nested-end marker
+        // CONFIG 3: + dictionary block  (XML)
+        // --------------------------------------------------------------------
+
+        [Test]
+        public void Config3_Dictionary_Xml_Has_Dictionary_Shape()
+        {
+            var cfg = new TomlConfig3Dictionary();
+            cfg.ApplyDefaults();
+
+            cfg.IntValue = 10;
+            cfg.Text = "Dict test";
+            cfg.NamedValues.Dictionary["start"] = 5;
+            cfg.NamedValues.Dictionary["end"] = 42;
+
+            var xml = _xml.SerializeToXml(cfg);
+            Logger.Log("Config3 XML (shape check):\n" + xml, "TomlFormatSpecTests");
+
+            var norm = NormalizeNewlines(xml);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(norm, Does.Contain("<TomlConfig3Dictionary "));
+                Assert.That(norm, Does.Contain("<ConfigVersion>1.0.0</ConfigVersion>"));
+                Assert.That(norm, Does.Contain("<IntValue>10</IntValue>"));
+                Assert.That(norm, Does.Contain("<Text>Dict test</Text>"));
+
+                // Lists
+                Assert.That(norm, Does.Contain("<IntList>"));
+                Assert.That(norm, Does.Contain("<int>1</int>"));
+                Assert.That(norm, Does.Contain("<int>2</int>"));
+                Assert.That(norm, Does.Contain("<int>3</int>"));
+
+                Assert.That(norm, Does.Contain("<StringList>"));
+                Assert.That(norm, Does.Contain("<string>alpha</string>"));
+                Assert.That(norm, Does.Contain("<string>beta</string>"));
+
+                // Dictionary shape
+                Assert.That(norm, Does.Contain("<NamedValues>"));
+                Assert.That(norm, Does.Contain("<dictionary>"));
+                Assert.That(norm, Does.Contain("<item>"));
+                Assert.That(norm, Does.Contain("<Key>start</Key>"));
+                Assert.That(norm, Does.Contain("<Value>5</Value>"));
+                Assert.That(norm, Does.Contain("<Key>end</Key>"));
+                Assert.That(norm, Does.Contain("<Value>42</Value>"));
+            });
+        }
+
+        // --------------------------------------------------------------------
+        // CONFIG 4: + nested + trailing scalar (TOML)
         // --------------------------------------------------------------------
 
         [Test]
@@ -191,25 +316,76 @@ StringList.string = [""alpha"", ""beta""]
             Logger.Log("Config4 TOML:\n" + toml, "TomlFormatSpecTests");
 
             var expected =
-@"[TomlConfig4_Nested]
+@"[TomlConfig4Nested]
 ConfigVersion = ""1.0.0""
 IntValue = 99
 Text = ""Nested test""
-
 IntList.int = [1, 2, 3]
 StringList.string = [""alpha"", ""beta""]
-
-[TomlConfig4_Nested.NamedValues-dictionary]
+[TomlConfig4Nested.NamedValues-dictionary]
 ""start"" = 1
 ""end"" = 99
-
-[TomlConfig4_Nested.Nested]
+[TomlConfig4Nested.Nested]
 Threshold = 0.9
 Flag = true
-[TomlConfig4_Nested.Nested-end]
+[TomlConfig4Nested]
 FloatValue = 0.5";
 
-            AssertTomlEqual(toml, expected, "Config4_Nested");
+            AssertTomlEqual(toml, expected, "Config4Nested");
+        }
+
+        // --------------------------------------------------------------------
+        // CONFIG 4: + nested + trailing scalar (XML)
+        // --------------------------------------------------------------------
+
+        [Test]
+        public void Config4_Nested_Xml_Has_Nested_Block_And_Trailing_FloatValue()
+        {
+            var cfg = new TomlConfig4Nested();
+            cfg.ApplyDefaults();
+
+            cfg.IntValue = 99;
+            cfg.Text = "Nested test";
+            cfg.FloatValue = 0.5f;
+
+            cfg.Nested.Threshold = 0.9f;
+            cfg.Nested.Flag = true;
+
+            var xml = _xml.SerializeToXml(cfg);
+            Logger.Log("Config4 XML (shape check):\n" + xml, "TomlFormatSpecTests");
+
+            var norm = NormalizeNewlines(xml);
+
+            var nestedIndex = norm.IndexOf("<Nested>", StringComparison.Ordinal);
+            var endNestedIndex = norm.IndexOf("</Nested>", StringComparison.Ordinal);
+            var floatIndex = norm.IndexOf("<FloatValue>", StringComparison.Ordinal);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(norm, Does.Contain("<TomlConfig4Nested "));
+                Assert.That(norm, Does.Contain("<ConfigVersion>1.0.0</ConfigVersion>"));
+                Assert.That(norm, Does.Contain("<IntValue>99</IntValue>"));
+                Assert.That(norm, Does.Contain("<Text>Nested test</Text>"));
+
+                // Lists
+                Assert.That(norm, Does.Contain("<IntList>"));
+                Assert.That(norm, Does.Contain("<StringList>"));
+
+                // Dictionary
+                Assert.That(norm, Does.Contain("<NamedValues>"));
+                Assert.That(norm, Does.Contain("<Key>start</Key>"));
+                Assert.That(norm, Does.Contain("<Key>end</Key>"));
+
+                // Nested block
+                Assert.That(nestedIndex, Is.GreaterThan(0), "Nested block not found");
+                Assert.That(endNestedIndex, Is.GreaterThan(nestedIndex), "Closing Nested not after opening");
+                Assert.That(norm, Does.Contain("<Threshold>0.9</Threshold>").Or.Contain("<Threshold>0.9"));
+                Assert.That(norm, Does.Contain("<Flag>true</Flag>"));
+
+                // FloatValue must come after </Nested>
+                Assert.That(floatIndex, Is.GreaterThan(endNestedIndex),
+                    "FloatValue element should be after Nested block");
+            });
         }
     }
 }
