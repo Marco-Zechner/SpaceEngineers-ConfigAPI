@@ -31,10 +31,7 @@ namespace mz.Config.Core.Converter
     {
         private const string NULL_SENTINEL = "null";
 
-        public string GetExtension
-        {
-            get { return ".toml"; }
-        }
+        public string GetExtension => ".toml";
 
         private readonly IConfigXmlSerializer _backupXmlSerializer;
 
