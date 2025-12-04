@@ -4,23 +4,29 @@ using System.Text;
 
 namespace mz.Config.Core
 {
-    internal static class LayoutXml
+    /// <summary>
+    /// XML layout helper:
+    /// - Parse direct children of the root into raw XML fragments.
+    /// - Build a canonical document with stable, idempotent indentation.
+    ///
+    /// No reflection, no XmlReader. Pure string parsing.
+    /// </summary>
+    public static class LayoutXml
     {
+        private const string XML_DECL = "<?xml version=\"1.0\" encoding=\"utf-16\"?>";
+        private const string XSD_NS = "http://www.w3.org/2001/XMLSchema";
+        private const string XSI_NS = "http://www.w3.org/2001/XMLSchema-instance";
+        private const string ROOT_INDENT = "  ";
+
         /// <summary>
-        /// Parse an XML document into:
-        /// - rootName   : the root element name (e.g. "IntermediateConfig")
-        /// - children   : map from immediate child element name to the full element XML
-        ///                (e.g. "OptionalValue" -> "&lt;OptionalValue xsi:nil=\"true\" /&gt;").
-        /// 
-        /// Only the first occurrence of a child name is kept. This matches the
-        /// "simple property per element" layout we have for configs.
+        /// Extracts direct child elements of the root as raw XML blocks.
+        /// Each value starts with '&lt;ChildName&gt;' (no leading spaces)
+        /// and ends at the matching closing tag.
         /// </summary>
-        public static Dictionary<string, string> ParseChildren(
-            string xml,
-            out string rootName)
+        public static Dictionary<string, string> ParseChildren(string xml, out string rootName)
         {
-            rootName = string.Empty;
             var result = new Dictionary<string, string>();
+            rootName = string.Empty;
 
             if (string.IsNullOrEmpty(xml))
                 return result;
@@ -28,146 +34,174 @@ namespace mz.Config.Core
             int len = xml.Length;
             int pos = 0;
 
-            // Skip BOM/whitespace
-            while (pos < len && char.IsWhiteSpace(xml[pos]))
-                pos++;
-
-            // Skip XML declaration if present: <?xml ... ?>
-            if (pos + 5 < len && xml[pos] == '<' && xml[pos + 1] == '?')
+            // 1) Find root element (skip xml decl, comments, etc.)
+            while (pos < len)
             {
-                int declEnd = xml.IndexOf("?>", pos, StringComparison.Ordinal);
-                if (declEnd >= 0)
-                    pos = declEnd + 2;
-            }
-
-            // Skip whitespace after declaration
-            while (pos < len && char.IsWhiteSpace(xml[pos]))
-                pos++;
-
-            // Find root start tag
-            int rootStart = xml.IndexOf('<', pos);
-            if (rootStart < 0)
-                return result;
-
-            int rootTagEnd = xml.IndexOf('>', rootStart + 1);
-            if (rootTagEnd < 0)
-                return result;
-
-            var rootTagContent = xml.Substring(rootStart + 1, rootTagEnd - rootStart - 1).Trim();
-            if (rootTagContent.Length == 0)
-                return result;
-
-            // Root name is up to first whitespace or '/'
-            int spaceIdx = rootTagContent.IndexOf(' ');
-            int slashIdx = rootTagContent.IndexOf('/');
-            int endIdx = rootTagContent.Length;
-
-            if (spaceIdx >= 0 && spaceIdx < endIdx)
-                endIdx = spaceIdx;
-            if (slashIdx >= 0 && slashIdx < endIdx)
-                endIdx = slashIdx;
-
-            rootName = rootTagContent.Substring(0, endIdx);
-
-            // Find closing root tag
-            string closeRootTag = "</" + rootName + ">";
-            int rootCloseIndex = xml.LastIndexOf(closeRootTag, StringComparison.Ordinal);
-            if (rootCloseIndex < 0)
-                return result;
-
-            int innerStart = rootTagEnd + 1;
-            int innerLen = rootCloseIndex - innerStart;
-            if (innerLen <= 0)
-                return result;
-
-            string inner = xml.Substring(innerStart, innerLen);
-            int innerPos = 0;
-            int innerTotal = inner.Length;
-
-            while (innerPos < innerTotal)
-            {
-                // Skip whitespace
-                while (innerPos < innerTotal && char.IsWhiteSpace(inner[innerPos]))
-                    innerPos++;
-
-                if (innerPos >= innerTotal)
-                    break;
-
-                int lt = inner.IndexOf('<', innerPos);
+                int lt = xml.IndexOf('<', pos);
                 if (lt < 0)
-                    break;
+                    return result;
 
-                // Skip any stray text before '<'
-                if (lt > innerPos)
-                    innerPos = lt;
+                int gt = xml.IndexOf('>', lt + 1);
+                if (gt < 0)
+                    return result;
 
-                if (innerPos >= innerTotal)
-                    break;
-
-                int tagEnd = inner.IndexOf('>', innerPos + 1);
-                if (tagEnd < 0)
-                    break;
-
-                string tagContent = inner.Substring(innerPos + 1, tagEnd - innerPos - 1).Trim();
+                string tagContent = xml.Substring(lt + 1, gt - lt - 1).Trim();
                 if (tagContent.Length == 0)
                 {
-                    innerPos = tagEnd + 1;
+                    pos = gt + 1;
                     continue;
                 }
 
                 char first = tagContent[0];
-                // Skip comments, declarations, closing tags inside root
                 if (first == '?' || first == '!' || first == '/')
                 {
-                    innerPos = tagEnd + 1;
+                    pos = gt + 1;
                     continue;
                 }
 
-                // Child tag name
-                int childSpace = tagContent.IndexOf(' ');
-                int childSlash = tagContent.IndexOf('/');
-                int childEnd = tagContent.Length;
+                int spaceIdx = tagContent.IndexOf(' ');
+                rootName = spaceIdx >= 0
+                    ? tagContent.Substring(0, spaceIdx)
+                    : tagContent;
 
-                if (childSpace >= 0 && childSpace < childEnd)
-                    childEnd = childSpace;
-                if (childSlash >= 0 && childSlash < childEnd)
-                    childEnd = childSlash;
+                pos = gt + 1;
+                break;
+            }
 
-                string childName = tagContent.Substring(0, childEnd);
+            if (string.IsNullOrEmpty(rootName))
+                return result;
 
-                bool selfClosing = tagContent.EndsWith("/", StringComparison.Ordinal);
+            string endRootTag = "</" + rootName + ">";
+            int endIndex = xml.LastIndexOf(endRootTag, StringComparison.Ordinal);
+            if (endIndex < 0 || endIndex <= pos)
+                return result;
+
+            // Inner content between <root ...> and </root>
+            string inner = xml.Substring(pos, endIndex - pos);
+            int innerLen = inner.Length;
+            int i = 0;
+
+            // 2) Scan inner for direct children
+            while (i < innerLen)
+            {
+                // Skip whitespace
+                while (i < innerLen && char.IsWhiteSpace(inner[i]))
+                    i++;
+
+                if (i >= innerLen)
+                    break;
+
+                if (inner[i] != '<')
+                {
+                    i++;
+                    continue;
+                }
+
+                int startTagOpen = i;
+                int startTagClose = inner.IndexOf('>', startTagOpen + 1);
+                if (startTagClose < 0)
+                    break;
+
+                string startContent = inner.Substring(startTagOpen + 1, startTagClose - startTagOpen - 1).Trim();
+                if (startContent.Length == 0)
+                {
+                    i = startTagClose + 1;
+                    continue;
+                }
+
+                char c0 = startContent[0];
+                if (c0 == '?' || c0 == '!' || c0 == '/')
+                {
+                    i = startTagClose + 1;
+                    continue;
+                }
+
+                int spaceIndex = startContent.IndexOf(' ');
+                string childName = spaceIndex >= 0
+                    ? startContent.Substring(0, spaceIndex)
+                    : startContent;
+
+                bool selfClosing = startContent.Length > 0 &&
+                                   startContent[startContent.Length - 1] == '/';
 
                 if (selfClosing)
                 {
-                    // Entire child is just this tag
-                    int childEndIndex = tagEnd;
-                    string childXml = inner.Substring(innerPos, childEndIndex - innerPos + 1);
-
-                    if (!result.ContainsKey(childName))
-                        result.Add(childName, childXml);
-
-                    innerPos = childEndIndex + 1;
+                    int childEnd = startTagClose + 1;
+                    string block = inner.Substring(startTagOpen, childEnd - startTagOpen);
+                    result[childName] = block;
+                    i = childEnd;
                     continue;
                 }
-                else
+
+                // Non self-closing: find matching </childName> with depth tracking
+                int depth = 1;
+                int searchPos = startTagClose + 1;
+
+                while (searchPos < innerLen && depth > 0)
                 {
-                    // Need to find matching closing tag </childName>
-                    string closeTag = "</" + childName + ">";
-                    int closeIndex = inner.IndexOf(closeTag, tagEnd + 1, StringComparison.Ordinal);
-                    if (closeIndex < 0)
-                    {
-                        // malformed; stop parsing further
+                    int nextLt = inner.IndexOf('<', searchPos);
+                    if (nextLt < 0)
                         break;
+
+                    int nextGt = inner.IndexOf('>', nextLt + 1);
+                    if (nextGt < 0)
+                        break;
+
+                    string t = inner.Substring(nextLt + 1, nextGt - nextLt - 1).Trim();
+                    if (t.Length == 0)
+                    {
+                        searchPos = nextGt + 1;
+                        continue;
                     }
 
-                    int childEndIndex = closeIndex + closeTag.Length - 1;
-                    string childXml = inner.Substring(innerPos, childEndIndex - innerPos + 1);
+                    char t0 = t[0];
+                    if (t0 == '!' || t0 == '?')
+                    {
+                        searchPos = nextGt + 1;
+                        continue;
+                    }
 
-                    if (!result.ContainsKey(childName))
-                        result.Add(childName, childXml);
+                    bool closing = t0 == '/';
+                    string name;
 
-                    innerPos = childEndIndex + 1;
-                    continue;
+                    if (closing)
+                    {
+                        name = t.Substring(1);
+                        int sp = name.IndexOf(' ');
+                        if (sp >= 0)
+                            name = name.Substring(0, sp);
+                    }
+                    else
+                    {
+                        int sp = t.IndexOf(' ');
+                        name = sp >= 0 ? t.Substring(0, sp) : t;
+                    }
+
+                    if (!closing && name == childName)
+                    {
+                        depth++;
+                    }
+                    else if (closing && name == childName)
+                    {
+                        depth--;
+                    }
+
+                    searchPos = nextGt + 1;
+
+                    if (depth == 0)
+                    {
+                        int childEnd = nextGt + 1;
+                        string block = inner.Substring(startTagOpen, childEnd - startTagOpen);
+                        result[childName] = block;
+                        i = childEnd;
+                        break;
+                    }
+                }
+
+                if (depth > 0)
+                {
+                    // malformed; stop scanning to avoid weird slices
+                    break;
                 }
             }
 
@@ -175,47 +209,60 @@ namespace mz.Config.Core
         }
 
         /// <summary>
-        /// Build a nicely formatted XML document:
-        /// - Adds XML declaration
-        /// - Adds xmlns:xsd and xmlns:xsi on the root
-        /// - Indents each child element by two spaces
-        /// 
-        /// Children are given as full element XML snippets (&lt;Key&gt;...&lt;/Key&gt;,
-        /// &lt;OptionalValue xsi:nil="true" /&gt;, &lt;Tags&gt;...&lt;/Tags&gt;, etc.).
+        /// Build a full, canonical XML doc:
+        /// - Fixed xml declaration + namespaces.
+        /// - Root children indented by 2 spaces.
+        /// - For each child block, only the *first* line gets root indent;
+        ///   inner lines keep their existing indentation.
+        /// This makes Build ∘ ParseChildren idempotent.
         /// </summary>
         public static string Build(string rootName, IDictionary<string, string> children)
         {
-            if (rootName == null)
-                rootName = string.Empty;
-
-            var nl = Environment.NewLine;
             var sb = new StringBuilder();
 
-            sb.Append("<?xml version=\"1.0\" encoding=\"utf-16\"?>").Append(nl);
+            sb.Append(XML_DECL).Append("\r\n");
             sb.Append('<').Append(rootName)
-              .Append(" xmlns:xsd=\"http://www.w3.org/2001/XMLSchema\"")
-              .Append(" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\">")
-              .Append(nl);
+              .Append(" xmlns:xsd=\"").Append(XSD_NS).Append('"')
+              .Append(" xmlns:xsi=\"").Append(XSI_NS).Append('"')
+              .Append('>')
+              .Append("\r\n");
 
-            if (children != null)
+            foreach (var kv in children)
             {
-                foreach (var kv in children)
-                {
-                    var childXml = kv.Value ?? string.Empty;
+                var block = kv.Value ?? string.Empty;
 
-                    // Split existing child XML into lines and indent each line by two spaces.
-                    var lines = childXml.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
-                    for (int i = 0; i < lines.Length; i++)
+                // Normalize newlines for internal processing
+                block = block.Replace("\r\n", "\n");
+
+                var lines = block.Split(new[] { '\n' }, StringSplitOptions.None);
+                bool firstLineEmitted = false;
+
+                for (int i = 0; i < lines.Length; i++)
+                {
+                    var line = lines[i];
+
+                    // Skip completely empty / whitespace-only lines
+                    if (string.IsNullOrWhiteSpace(line))
+                        continue;
+
+                    // Normalize trailing whitespace, keep leading as-is
+                    var trimmedEnd = line.TrimEnd('\r', ' ', '\t');
+
+                    if (!firstLineEmitted)
                     {
-                        var line = lines[i];
-                        if (line.Length == 0)
-                        {
-                            sb.Append("  ").Append(nl);
-                        }
-                        else
-                        {
-                            sb.Append("  ").Append(line).Append(nl);
-                        }
+                        // First line of the block: add root indent.
+                        // Note: by construction from ParseChildren, this line starts at '<'
+                        // without leading spaces.
+                        sb.Append(ROOT_INDENT);
+                        sb.Append(trimmedEnd);
+                        sb.Append("\r\n");
+                        firstLineEmitted = true;
+                    }
+                    else
+                    {
+                        // Inner lines: keep existing indentation exactly.
+                        sb.Append(trimmedEnd);
+                        sb.Append("\r\n");
                     }
                 }
             }
