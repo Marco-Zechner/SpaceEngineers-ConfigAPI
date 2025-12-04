@@ -92,8 +92,11 @@ namespace NewTemplateMod.Tests.TomlTests
             // Optional: check ordering (comment directly before the key)
             var idxCommentFlag = toml.IndexOf("# Whether the feature is enabled.", StringComparison.Ordinal);
             var idxKeyFlag = toml.IndexOf("Flag = false", StringComparison.Ordinal);
-            Assert.That(idxCommentFlag, Is.GreaterThan(-1));
-            Assert.That(idxKeyFlag, Is.GreaterThan(idxCommentFlag));
+            Assert.Multiple(() =>
+            {
+                Assert.That(idxCommentFlag, Is.GreaterThan(-1));
+                Assert.That(idxKeyFlag, Is.GreaterThan(idxCommentFlag));
+            });
         }
 
         [Test]

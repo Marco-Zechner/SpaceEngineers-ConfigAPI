@@ -3,7 +3,7 @@ using mz.SemanticVersioning;
 
 namespace NewTemplateMod.Tests
 {
-    public class CollectionConfig : ConfigBase
+    public class SimpleCollectionConfig : ConfigBase
     {
         public override SemanticVersion ConfigVersion => "1.0.0";
 

@@ -55,9 +55,9 @@ namespace NewTemplateMod.Tests.RoundtripTests
             IConfigXmlSerializer xml = new TestXmlSerializer();
             var converter = new TomlXmlConverter(xml);
 
-            IConfigDefinition def = new ConfigDefinition<CollectionConfig>();
+            IConfigDefinition def = new ConfigDefinition<SimpleCollectionConfig>();
 
-            var original = new CollectionConfig
+            var original = new SimpleCollectionConfig
             {
                 IntArray = new[] { 5, 10, 15 },
                 Names = new[] { "One", "Two", "Three" }
@@ -69,7 +69,7 @@ namespace NewTemplateMod.Tests.RoundtripTests
             Logger.Log("TOML:\n" + toml);
             var xml2 = converter.ToInternal(def, toml);
             Logger.Log("XML2:\n" + xml2);
-            var restored = xml.DeserializeFromXml<CollectionConfig>(xml2);
+            var restored = xml.DeserializeFromXml<SimpleCollectionConfig>(xml2);
             Logger.Log("Restored:\n" + restored);
 
             Assert.Multiple(() =>

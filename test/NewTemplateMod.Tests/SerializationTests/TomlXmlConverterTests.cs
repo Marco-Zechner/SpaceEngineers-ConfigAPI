@@ -104,9 +104,9 @@ namespace NewTemplateMod.Tests.SerializationTests
         [Test]
         public void RoundTrip_Collections_Survive_AndUseTomlArrays()
         {
-            var def = new ConfigDefinition<CollectionConfig>();
+            var def = new ConfigDefinition<SimpleCollectionConfig>();
 
-            var original = new CollectionConfig
+            var original = new SimpleCollectionConfig
             {
                 Enabled = false,
                 IntArray = new[] { 5, 10, 15 },
@@ -126,7 +126,7 @@ namespace NewTemplateMod.Tests.SerializationTests
             // TOML -> XML -> object
             var xml2 = _converter.ToInternal(def, toml);
             Logger.Log("XML Restored:\n" + xml2);
-            var restored = _xml.DeserializeFromXml<CollectionConfig>(xml2);
+            var restored = _xml.DeserializeFromXml<SimpleCollectionConfig>(xml2);
             Logger.Log("Restored Object:\n" + restored);
             
             Assert.That(restored, Is.Not.Null);

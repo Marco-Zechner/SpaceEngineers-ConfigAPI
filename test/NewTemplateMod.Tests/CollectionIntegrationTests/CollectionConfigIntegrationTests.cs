@@ -5,13 +5,13 @@ using mz.Config.Core.Converter;
 using mz.Config.Core.Layout;
 using mz.Config.Core.Storage;
 using mz.Config.Domain;
-using mz.NewTemplateMod.Tests;
+using mz.NewTemplateMod;
 using NUnit.Framework;
 
 namespace NewTemplateMod.Tests.CollectionIntegrationTests
 {
     /// <summary>
-    /// Integration-style tests for CollectionConfig2 that go through
+    /// Integration-style tests for CollectionConfig that go through
     /// the full ConfigStorage + LayoutMigrator + IdentityXmlConverter pipeline.
     ///
     /// These tests are the unit-test equivalent of the in-game commands:
@@ -38,21 +38,21 @@ namespace NewTemplateMod.Tests.CollectionIntegrationTests
 
             InternalConfigStorage.Initialize(_fileSystem, _xml, _migrator, _converter);
 
-            // Register CollectionConfig2 exactly like the mod does
-            InternalConfigStorage.Register<CollectionConfig2>(ConfigLocationType.Local);
+            // Register CollectionConfig exactly like the mod does
+            InternalConfigStorage.Register<CollectionConfig>(ConfigLocationType.Local);
         }
 
-        private CollectionConfig2 Load()
+        private CollectionConfig Load()
         {
-            return ConfigStorage.Load<CollectionConfig2>(ConfigLocationType.Local);
+            return ConfigStorage.Load<CollectionConfig>(ConfigLocationType.Local);
         }
 
         private void Save()
         {
-            ConfigStorage.Save<CollectionConfig2>(ConfigLocationType.Local);
+            ConfigStorage.Save<CollectionConfig>(ConfigLocationType.Local);
         }
 
-        private static List<string> TagList(CollectionConfig2 cfg)
+        private static List<string> TagList(CollectionConfig cfg)
         {
             return cfg.Tags == null ? new List<string>() : new List<string>(cfg.Tags);
         }
@@ -75,7 +75,7 @@ namespace NewTemplateMod.Tests.CollectionIntegrationTests
 
                 // NamedValues (SerializableDictionary)
                 Assert.That(cfg.NamedValues, Is.Not.Null);
-                Assert.That(cfg.NamedValues.Dictionary.Count, Is.EqualTo(2));
+                Assert.That(cfg.NamedValues.Dictionary, Has.Count.EqualTo(2));
                 Assert.That(cfg.NamedValues.Dictionary["start"], Is.EqualTo(1));
                 Assert.That(cfg.NamedValues.Dictionary["end"], Is.EqualTo(10));
 
@@ -111,7 +111,7 @@ namespace NewTemplateMod.Tests.CollectionIntegrationTests
                 Assert.That(TagList(reloaded), Is.EqualTo(new[] { "alpha", "beta", "hi" }));
 
                 // NamedValues unchanged
-                Assert.That(reloaded.NamedValues.Dictionary.Count, Is.EqualTo(2));
+                Assert.That(reloaded.NamedValues.Dictionary, Has.Count.EqualTo(2));
                 Assert.That(reloaded.NamedValues.Dictionary["start"], Is.EqualTo(1));
                 Assert.That(reloaded.NamedValues.Dictionary["end"], Is.EqualTo(10));
 
@@ -185,7 +185,7 @@ namespace NewTemplateMod.Tests.CollectionIntegrationTests
             {
                 Assert.That(tags2, Does.Not.Contain("alpha"));
                 Assert.That(tags2, Does.Contain("beta"));
-                Assert.That(tags2.Count, Is.EqualTo(1));
+                Assert.That(tags2, Has.Count.EqualTo(1));
             });
         }
 
@@ -219,13 +219,11 @@ namespace NewTemplateMod.Tests.CollectionIntegrationTests
             cfg = Load();
             var tags = TagList(cfg);
 
-            // We don't care about exact order too strictly here, but there must be
-            // exactly one alpha, one beta, one gamma.
-            var expected = new HashSet<string>(new[] { "alpha", "beta", "gamma" });
+            var expected = new HashSet<string>(new[] { "beta", "gamma", "alpha" });
 
             Assert.Multiple(() =>
             {
-                Assert.That(tags.Count, Is.EqualTo(3));
+                Assert.That(tags, Has.Count.EqualTo(3));
                 Assert.That(new HashSet<string>(tags), Is.EqualTo(expected));
 
                 // NamedValues and Nested still intact

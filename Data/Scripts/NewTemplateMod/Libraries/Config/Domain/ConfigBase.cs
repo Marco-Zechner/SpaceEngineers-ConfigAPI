@@ -24,5 +24,16 @@ namespace mz.Config.Domain
 
         private static readonly IReadOnlyDictionary<string, string> _emptyDescriptions
             = new Dictionary<string, string>();
+
+        /// <summary>
+        /// Called when the framework creates a default instance.
+        /// Implementations should apply default values to collections etc.
+        /// Simple types like int, bool, string can be initialized inline, but Collections cause issues with XML serialization.
+        /// So these should be initialized here. (Simple types can also be initialized here if desired.)
+        /// </summary>
+        public virtual void ApplyDefaults()
+        {
+            
+        }
     }
 }

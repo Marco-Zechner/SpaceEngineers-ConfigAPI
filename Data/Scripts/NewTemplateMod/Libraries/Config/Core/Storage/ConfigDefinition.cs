@@ -38,7 +38,9 @@ namespace mz.Config.Core.Storage
 
         public ConfigBase CreateDefaultInstance()
         {
-            return new T();
+            var defaultConfig = new T();
+            defaultConfig.ApplyDefaults();
+            return defaultConfig;
         }
 
         public ConfigBase DeserializeFromXml(IConfigXmlSerializer xmlSerializer, string xml)

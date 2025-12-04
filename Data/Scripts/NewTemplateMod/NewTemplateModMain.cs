@@ -31,8 +31,9 @@ namespace mz.NewTemplateMod
              * Implement Multiplayer support (client-server config sync)
              * Remember which files the user loaded as custom configs, so we can load them again next time by default.
              * Auto save configs on change?
-             * Add comments to config files?
              * Test & add support for more complex config structures (dictionaries, nested collections, etc.)
+             * nullable fields in toml
+             * deserialize old xml and save as toml?
              */
             
             _simpleConfig       = ConfigStorage.Load<SimpleConfig>(ConfigLocationType.Local, "CoolName");
