@@ -26,7 +26,11 @@ namespace NewTemplateMod.Tests.NormalizeTests
         private static string BuildXml(string rootName, IDictionary<string, string> values)
         {
             var sb = new StringBuilder();
-            sb.Append('<').Append(rootName).Append('>');
+            sb.Append("<?xml version=\"1.0\" encoding=\"utf-16\"?>\r\n");
+            sb.Append('<').Append(rootName)
+                .Append(" xmlns:xsd=\"http://www.w3.org/2001/XMLSchema\"")
+                .Append(" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"")
+                .Append('>');
             foreach (var kv in values)
             {
                 sb.Append("\r\n  ");

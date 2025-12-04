@@ -68,7 +68,7 @@ namespace mz.Config.Core
             // Inner content between <root ...> and </root>
             var inner = xml.Substring(rootStartClose + 1, endRootIndex - (rootStartClose + 1));
 
-            // Parse direct child elements from inner
+            // Parse child elements from inner
             var innerLen = inner.Length;
             var innerPos = 0;
 
@@ -83,6 +83,7 @@ namespace mz.Config.Core
                     break;
 
                 var startTagContent = inner.Substring(startTagOpen + 1, startTagClose - startTagOpen - 1).Trim();
+
                 if (startTagContent.Length == 0)
                 {
                     innerPos = startTagClose + 1;
@@ -96,31 +97,11 @@ namespace mz.Config.Core
                     continue;
                 }
 
-                // Extract tag name before first space or slash
                 var spaceIndex = startTagContent.IndexOf(' ');
-                var slashIndex = startTagContent.IndexOf('/');
+                var tagName = spaceIndex >= 0
+                    ? startTagContent.Substring(0, spaceIndex)
+                    : startTagContent;
 
-                var endIndex = startTagContent.Length;
-                if (slashIndex >= 0 && slashIndex < endIndex)
-                    endIndex = slashIndex;
-                if (spaceIndex >= 0 && spaceIndex < endIndex)
-                    endIndex = spaceIndex;
-
-                var tagName = startTagContent.Substring(0, endIndex);
-
-                // Handle self-closing tags (e.g. <OptionalValue xsi:nil="true" />)
-                var selfClosing = startTagContent.Length > 0 &&
-                                  startTagContent[startTagContent.Length - 1] == '/';
-
-                if (selfClosing)
-                {
-                    // Represent as empty string value
-                    result[tagName] = string.Empty;
-                    innerPos = startTagClose + 1;
-                    continue;
-                }
-
-                // Normal <Tag>...</Tag>
                 var endTag = "</" + tagName + ">";
                 var endTagIndex = inner.IndexOf(endTag, startTagClose + 1, StringComparison.Ordinal);
                 if (endTagIndex < 0)
@@ -143,14 +124,19 @@ namespace mz.Config.Core
 
         public static string BuildSimpleXml(string rootName, IDictionary<string, string> values)
         {
+            if (rootName == null)
+                rootName = string.Empty;
+
+            var nl = Environment.NewLine;
             var sb = new StringBuilder();
-            sb.Append('<').Append(rootName).Append('>').AppendLine();
+
+            sb.Append('<').Append(rootName).Append('>').Append(nl);
 
             foreach (var kv in values)
             {
                 sb.Append("  <").Append(kv.Key).Append('>');
                 sb.Append(Escape(kv.Value));
-                sb.Append("</").Append(kv.Key).Append('>').AppendLine();
+                sb.Append("</").Append(kv.Key).Append('>').Append(nl);
             }
 
             sb.Append("</").Append(rootName).Append('>');

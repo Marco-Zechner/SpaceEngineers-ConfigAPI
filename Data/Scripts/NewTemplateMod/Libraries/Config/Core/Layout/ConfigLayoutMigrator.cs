@@ -2,9 +2,8 @@
 using System.Collections.Generic;
 using mz.Config.Abstractions;
 using mz.Config.Abstractions.Layout;
-using mz.Config.Abstractions.SE;
-using mz.Config.Core.Storage;
 using mz.Config.Domain;
+using mz.Config.Core;
 
 namespace mz.Config.Core.Layout
 {
@@ -15,10 +14,8 @@ namespace mz.Config.Core.Layout
     /// - keeps existing values where possible
     /// - upgrades values that are still equal to an old default to the new default
     ///
-    /// Implementation is intentionally "dumb":
-    /// - Works on flattened XML (SimpleXml) for simple configs (no nested '<' / '>' in values).
-    /// - For complex configs (nested objects, collections, dictionaries, xsi:nil deep inside),
-    ///   it leaves the XML unchanged and only uses SimpleXml to decide RequiresBackup.
+    /// It operates only on XML strings produced/consumed by the XML serializer,
+    /// using LayoutXml to handle full child elements (so xsi:nil, nested blocks etc. survive).
     /// </summary>
     public sealed class ConfigLayoutMigrator : IConfigLayoutMigrator
     {
@@ -43,138 +40,88 @@ namespace mz.Config.Core.Layout
 
             try
             {
-                // 1) Parse all three XML blobs into key/value maps
-                var currentValues = SimpleXml.ParseSimpleElements(xmlCurrentFromFile);
-                var oldDefaultValues = SimpleXml.ParseSimpleElements(xmlOldDefaultsFromFile);
-                var newDefaultValues = SimpleXml.ParseSimpleElements(xmlCurrentDefaults);
+                // Parse three layouts into: rootName + map of childName -> full child XML
+                string rootCurrent;
+                var currentChildren = LayoutXml.ParseChildren(xmlCurrentFromFile, out rootCurrent);
 
-                // 2) Decide if layout is "simple" (no nested XML in values)
-                var isSimpleLayout = IsSimpleLayout(newDefaultValues);
+                string rootOldDefaults;
+                var oldDefaultChildren = LayoutXml.ParseChildren(xmlOldDefaultsFromFile, out rootOldDefaults);
 
-                if (!isSimpleLayout)
-                {
-                    // Complex layout: do not rebuild XML at all.
-                    // Only detect removed keys for backup recommendation.
-                    var requiresBackup = DetectRemovedKeys(currentValues, newDefaultValues);
+                string rootNewDefaults;
+                var newDefaultChildren = LayoutXml.ParseChildren(xmlCurrentDefaults, out rootNewDefaults);
 
-                    result.NormalizedXml = xmlCurrentFromFile;
-                    result.NormalizedDefaultsXml = xmlCurrentDefaults;
-                    result.RequiresBackup = requiresBackup;
-                    return result;
-                }
+                // Use the config's type name as canonical root name (matches serializer)
+                var rootName = definition.TypeName;
 
-                // Simple layout: use original string-based migration algorithm.
+                var normalizedCurrentChildren = new Dictionary<string, string>();
+                var normalizedDefaultChildren = new Dictionary<string, string>();
+                bool requiresBackup = false;
 
-                var normalizedCurrent = new Dictionary<string, string>();
-                var normalizedDefaults = new Dictionary<string, string>();
-                var backupNeeded = false;
-
-                // 3) For every key in the *current* default layout:
-                foreach (var kv in newDefaultValues)
+                // Work across keys present in the "current" default layout
+                foreach (var kv in newDefaultChildren)
                 {
                     var key = kv.Key;
-                    var newDefault = kv.Value;
+                    var newDefaultElement = kv.Value;
 
-                    string currentValue;
-                    var hasCurrent = currentValues.TryGetValue(key, out currentValue);
+                    string currentElement;
+                    bool hasCurrent = currentChildren.TryGetValue(key, out currentElement);
 
-                    string oldDefault;
-                    var hasOldDefault = oldDefaultValues.TryGetValue(key, out oldDefault);
+                    string oldDefaultElement;
+                    bool hasOldDefault = oldDefaultChildren.TryGetValue(key, out oldDefaultElement);
 
-                    string finalCurrent;
+                    string finalCurrentElement;
 
                     if (!hasCurrent)
                     {
-                        // Missing key -> use new default
-                        finalCurrent = newDefault;
+                        // Missing key in user's file -> inject new default element
+                        finalCurrentElement = newDefaultElement;
                     }
                     else if (hasOldDefault &&
-                             currentValue == oldDefault &&
-                             oldDefault != newDefault)
+                             currentElement == oldDefaultElement &&
+                             oldDefaultElement != newDefaultElement)
                     {
-                        // Value is still equal to an old default that changed:
-                        // treat as unchanged by user and upgrade to new default.
-                        finalCurrent = newDefault;
+                        // User value is still exactly the old default element and the default changed:
+                        // treat as unchanged by user and upgrade to the new default element.
+                        finalCurrentElement = newDefaultElement;
                     }
                     else
                     {
-                        // Keep the user's current value
-                        finalCurrent = currentValue;
+                        // Keep whatever the user currently has (could be nil/number/nested block/etc.)
+                        finalCurrentElement = currentElement;
                     }
 
-                    normalizedCurrent[key] = finalCurrent;
-                    normalizedDefaults[key] = newDefault;
+                    normalizedCurrentChildren[key] = finalCurrentElement;
+                    normalizedDefaultChildren[key] = newDefaultElement;
                 }
 
-                // 4) Detect extra keys in the file that no longer exist in current layout
-                backupNeeded = DetectRemovedKeys(currentValues, newDefaultValues);
+                // Detect extra keys in current file that no longer exist in current layout
+                foreach (var kv in currentChildren)
+                {
+                    if (!newDefaultChildren.ContainsKey(kv.Key))
+                    {
+                        requiresBackup = true;
+                        break;
+                    }
+                }
 
-                // 5) Build normalized XML strings
-                var typeName = definition.TypeName;
+                // Rebuild normalized XML using a canonical header + namespaces for all configs
+                var normalizedCurrentXml = LayoutXml.Build(rootName, normalizedCurrentChildren);
+                var normalizedDefaultsXml = LayoutXml.Build(rootName, normalizedDefaultChildren);
 
-                var normalizedCurrentXml = SimpleXml.BuildSimpleXml(typeName, normalizedCurrent);
-                var normalizedDefaultsXml = SimpleXml.BuildSimpleXml(typeName, normalizedDefaults);
-
-                // 6) Populate result
                 result.NormalizedXml = normalizedCurrentXml;
                 result.NormalizedDefaultsXml = normalizedDefaultsXml;
-                result.RequiresBackup = backupNeeded;
+                result.RequiresBackup = requiresBackup;
 
                 return result;
             }
             catch
             {
-                // On any error, fall back to the original "current" XML and defaults XML.
+                // On any error, fall back to original "current" XML and no backup recommendation.
                 result.NormalizedXml = xmlCurrentFromFile;
                 result.NormalizedDefaultsXml = xmlCurrentDefaults;
                 result.RequiresBackup = false;
                 return result;
             }
-        }
-
-        // -------- helper methods --------
-
-        private static bool IsSimpleLayout(Dictionary<string, string> newDefaultValues)
-        {
-            if (newDefaultValues == null || newDefaultValues.Count == 0)
-                return false;
-
-            foreach (var kv in newDefaultValues)
-            {
-                var v = kv.Value;
-                if (string.IsNullOrEmpty(v))
-                    continue;
-
-                // If any default value contains '<' or '>', we treat the layout as complex
-                // (nested elements, dictionaries, collections, etc.).
-                if (v.IndexOf('<') >= 0 || v.IndexOf('>') >= 0)
-                    return false;
-            }
-
-            return true;
-        }
-
-        private static bool DetectRemovedKeys(
-            Dictionary<string, string> currentValues,
-            Dictionary<string, string> newDefaultValues)
-        {
-            if (currentValues == null || currentValues.Count == 0)
-                return false;
-            if (newDefaultValues == null || newDefaultValues.Count == 0)
-                return false;
-
-            foreach (var kv in currentValues)
-            {
-                if (!newDefaultValues.ContainsKey(kv.Key))
-                {
-                    // Unknown key in current file that does not exist in new defaults
-                    // -> it will be dropped in a "pure" layout normalization
-                    // -> recommend backup.
-                    return true;
-                }
-            }
-
-            return false;
         }
     }
 }
