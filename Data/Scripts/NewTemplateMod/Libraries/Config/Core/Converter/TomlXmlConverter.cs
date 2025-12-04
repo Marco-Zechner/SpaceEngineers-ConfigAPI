@@ -11,23 +11,26 @@ using mz.Config.Domain;
 namespace mz.Config.Core.Converter
 {
     /// <summary>
-    /// Pure XML &lt;-&gt; TOML converter for a single config instance.
+    /// Pure XML <-> TOML converter for a single config instance.
     /// No defaults, no migration, no version logic.
     ///
     /// Rules:
-    /// - Scalars: &lt;Key&gt;value&lt;/Key&gt;           &lt;=&gt;  Key = value
-    /// - Arrays:  &lt;IntArray&gt;&lt;int&gt;5&lt;/int&gt;...&lt;/IntArray&gt;
-    ///            &lt;=&gt;  IntArray = [5, 10, 15]
-    /// - Strings array: same but element tag "string".
-    /// - Nested object:
-    ///      &lt;Child&gt;&lt;Age&gt;42&lt;/Age&gt;...&lt;/Child&gt;
-    ///      &lt;=&gt; Child.Age = 42, Child.Name = "NestedBob", ...
+    /// - Scalars: <Key>value</Key>                  <=>  Key = value
+    /// - Arrays:  <IntList><int>1</int>...</IntList> <=> IntList = [1, 2, 3]
+    /// - Nested:  <Nested><Threshold>..</Threshold>  <=> Nested.Threshold = ...
+    /// - Dictionary<string,int> (SerializableDictionary):
+    ///       <NamedValues><dictionary><item>...</item>...</dictionary></NamedValues>
+    ///       <=>
+    ///       NamedValues.start = 1
+    ///       NamedValues.end   = 99
     ///
-    /// ToInternal rebuilds XML in the shapes above so the XML serializer
-    /// can reconstruct arrays and nested objects correctly.
+    /// Nullable values:
+    ///   <OptionalInt xsi:nil="true" />  <=> OptionalInt = null
     /// </summary>
     public sealed class TomlXmlConverter : IXmlConverter
     {
+        private const string NULL_SENTINEL = "null";
+
         public string GetExtension
         {
             get { return ".toml"; }
@@ -75,7 +78,18 @@ namespace mz.Config.Core.Converter
             string rootName;
             var rootChildren = ParseRootChildren(xmlContent, out rootName);
 
-            // Flatten into key -> list of raw values
+            // Default instance for descriptions & dictionary detection
+            ConfigBase defaultInstance = definition.CreateDefaultInstance();
+            IReadOnlyDictionary<string, string> descriptions = null;
+            HashSet<string> dictionaryParents = null;
+
+            if (defaultInstance != null)
+            {
+                descriptions = defaultInstance.VariableDescriptions;
+                dictionaryParents = DetectDictionaryParents(descriptions);
+            }
+
+            // Flatten into key -> list of raw string values
             var flat = new Dictionary<string, List<string>>();
 
             foreach (var kv in rootChildren)
@@ -86,61 +100,96 @@ namespace mz.Config.Core.Converter
 
                 if (trimmed.Length == 0 || trimmed.IndexOf('<') < 0)
                 {
-                    // Simple scalar text
+                    // Simple scalar text (including NullSentinel from self-closing elements)
                     AddFlatValue(flat, propName, trimmed);
+                    continue;
+                }
+
+                // Try to parse first-level children inside this snippet.
+                var children = ParseSnippetChildren(trimmed);
+
+                if (children.Count == 0)
+                {
+                    // Fallback: treat as scalar blob
+                    AddFlatValue(flat, propName, trimmed);
+                    continue;
+                }
+
+                // Special-case SerializableDictionary pattern:
+                //   <PropName>
+                //     <dictionary>
+                //       <item><Key>k</Key><Value>v</Value></item>...
+                //     </dictionary>
+                //   </PropName>
+                bool isDictionaryParent = dictionaryParents != null && dictionaryParents.Contains(propName);
+                if (isDictionaryParent &&
+                    children.Count == 1 &&
+                    string.Equals(children[0].Name, "dictionary", StringComparison.OrdinalIgnoreCase))
+                {
+                    var dictItems = ParseSnippetChildren(children[0].Value);
+                    for (int i = 0; i < dictItems.Count; i++)
+                    {
+                        var item = dictItems[i];
+                        if (!string.Equals(item.Name, "item", StringComparison.OrdinalIgnoreCase))
+                            continue;
+
+                        var kvChildren = ParseSnippetChildren(item.Value);
+                        string keyText = null;
+                        string valueText = string.Empty;
+
+                        for (int j = 0; j < kvChildren.Count; j++)
+                        {
+                            var child = kvChildren[j];
+                            if (string.Equals(child.Name, "Key", StringComparison.OrdinalIgnoreCase))
+                            {
+                                keyText = child.Value.Trim();
+                            }
+                            else if (string.Equals(child.Name, "Value", StringComparison.OrdinalIgnoreCase))
+                            {
+                                valueText = child.Value.Trim();
+                            }
+                        }
+
+                        if (!string.IsNullOrEmpty(keyText))
+                        {
+                            var flatKey = propName + "." + keyText;
+                            AddFlatValue(flat, flatKey, valueText);
+                        }
+                    }
+
+                    continue;
+                }
+
+                // Array-of-primitive or nested object
+                bool sameName = true;
+                string firstName = children[0].Name;
+                for (int i = 1; i < children.Count; i++)
+                {
+                    if (children[i].Name != firstName)
+                    {
+                        sameName = false;
+                        break;
+                    }
+                }
+
+                if (sameName)
+                {
+                    // IntList / StringList style: IntList = [1, 2, 3]
+                    for (int i = 0; i < children.Count; i++)
+                    {
+                        AddFlatValue(flat, propName, children[i].Value.Trim());
+                    }
                 }
                 else
                 {
-                    // Try to parse first-level children inside this snippet.
-                    var children = ParseSnippetChildren(trimmed);
-
-                    if (children.Count == 0)
+                    // Nested object: Nested.Threshold, Nested.Flag, ...
+                    for (int i = 0; i < children.Count; i++)
                     {
-                        // Fallback: treat as scalar blob
-                        AddFlatValue(flat, propName, trimmed);
-                    }
-                    else
-                    {
-                        // Check if this looks like an "array of primitive"
-                        bool sameName = true;
-                        string firstName = children[0].Name;
-                        for (int i = 1; i < children.Count; i++)
-                        {
-                            if (children[i].Name != firstName)
-                            {
-                                sameName = false;
-                                break;
-                            }
-                        }
-
-                        if (sameName)
-                        {
-                            // IntArray / Names style: IntArray = [5, 10, 15]
-                            for (int i = 0; i < children.Count; i++)
-                            {
-                                AddFlatValue(flat, propName, children[i].Value.Trim());
-                            }
-                        }
-                        else
-                        {
-                            // Nested object: Child.Age, Child.Name, ...
-                            for (int i = 0; i < children.Count; i++)
-                            {
-                                var child = children[i];
-                                var key = propName + "." + child.Name;
-                                AddFlatValue(flat, key, child.Value.Trim());
-                            }
-                        }
+                        var child = children[i];
+                        var key = propName + "." + child.Name;
+                        AddFlatValue(flat, key, child.Value.Trim());
                     }
                 }
-            }
-
-            // Optional descriptions from default instance
-            IReadOnlyDictionary<string, string> descriptions = null;
-            var defaultInstance = definition.CreateDefaultInstance();
-            if (defaultInstance != null)
-            {
-                descriptions = defaultInstance.VariableDescriptions;
             }
 
             var sb = new StringBuilder();
@@ -225,16 +274,35 @@ namespace mz.Config.Core.Converter
             // Empty file => default instance XML
             if (string.IsNullOrEmpty(externalContent))
             {
-                var defaultInstance = definition.CreateDefaultInstance();
-                return xmlSerializer.SerializeToXml(defaultInstance);
+                var defaultInstanceEmpty = definition.CreateDefaultInstance();
+                return xmlSerializer.SerializeToXml(defaultInstanceEmpty);
+            }
+
+            // Dictionary detection based on VariableDescriptions
+            ConfigBase defaultInstance = definition.CreateDefaultInstance();
+            IReadOnlyDictionary<string, string> descriptions = null;
+            HashSet<string> dictionaryParents = null;
+
+            if (defaultInstance != null)
+            {
+                descriptions = defaultInstance.VariableDescriptions;
+                dictionaryParents = DetectDictionaryParents(descriptions);
+            }
+            else
+            {
+                dictionaryParents = new HashSet<string>();
             }
 
             // Parse TOML into key -> list of raw values
             var flat = ParseTomlToFlatMap(externalContent);
 
-            // Split into root scalars/arrays vs nested groups
+            // Split into:
+            // - root scalars / arrays: key
+            // - nested objects: Parent.Child
+            // - dictionary entries: DictParent.DictKey
             var rootMap = new Dictionary<string, List<string>>();
             var nested = new Dictionary<string, Dictionary<string, string>>();
+            var dictionaries = new Dictionary<string, Dictionary<string, string>>();
 
             foreach (var kv in flat)
             {
@@ -250,22 +318,39 @@ namespace mz.Config.Core.Converter
                 {
                     var parent = segments[0];
                     var child = segments[1];
-
-                    Dictionary<string, string> childMap;
-                    if (!nested.TryGetValue(parent, out childMap))
-                    {
-                        childMap = new Dictionary<string, string>();
-                        nested[parent] = childMap;
-                    }
-
-                    // Nested fields are treated as single-value
                     var val = list.Count > 0 ? list[0] : string.Empty;
-                    childMap[child] = val;
+
+                    if (dictionaryParents.Contains(parent))
+                    {
+                        Dictionary<string, string> dict;
+                        if (!dictionaries.TryGetValue(parent, out dict))
+                        {
+                            dict = new Dictionary<string, string>();
+                            dictionaries[parent] = dict;
+                        }
+                        dict[child] = val;
+                    }
+                    else
+                    {
+                        Dictionary<string, string> childMap;
+                        if (!nested.TryGetValue(parent, out childMap))
+                        {
+                            childMap = new Dictionary<string, string>();
+                            nested[parent] = childMap;
+                        }
+                        childMap[child] = val;
+                    }
                 }
             }
 
             var sb = new StringBuilder();
-            sb.Append('<').Append(definition.TypeName).Append('>');
+
+            // XML declaration + namespaces so xsi:nil works correctly
+            sb.Append("<?xml version=\"1.0\" encoding=\"utf-16\"?>\r\n");
+            sb.Append('<').Append(definition.TypeName)
+              .Append(" xmlns:xsd=\"http://www.w3.org/2001/XMLSchema\"")
+              .Append(" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"")
+              .Append('>');
 
             // Root scalars and arrays
             foreach (var kv in rootMap)
@@ -282,10 +367,20 @@ namespace mz.Config.Core.Converter
 
                 if (list.Count == 1)
                 {
-                    // Scalar
-                    sb.Append('<').Append(name).Append('>');
-                    sb.Append(XmlEscape(list[0]));
-                    sb.Append("</").Append(name).Append('>');
+                    var val = list[0];
+
+                    // Null sentinel -> xsi:nil="true"
+                    if (string.Equals(val, NULL_SENTINEL, StringComparison.Ordinal))
+                    {
+                        sb.Append('<').Append(name).Append(" xsi:nil=\"true\" />");
+                    }
+                    else
+                    {
+                        // Scalar
+                        sb.Append('<').Append(name).Append('>');
+                        sb.Append(XmlEscape(val));
+                        sb.Append("</").Append(name).Append('>');
+                    }
                 }
                 else
                 {
@@ -305,6 +400,30 @@ namespace mz.Config.Core.Converter
                 }
             }
 
+            // Dictionary parents -> SerializableDictionary XML shape
+            foreach (var kd in dictionaries)
+            {
+                var parentName = kd.Key;
+                var dict = kd.Value;
+
+                sb.Append('<').Append(parentName).Append('>');
+                sb.Append("<dictionary>");
+
+                foreach (var entry in dict)
+                {
+                    sb.Append("<item>");
+                    sb.Append("<Key>").Append(XmlEscape(entry.Key)).Append("</Key>");
+
+                    // Dictionary values are not nullable in our current use-case,
+                    // treat NullSentinel as normal text if ever present.
+                    sb.Append("<Value>").Append(XmlEscape(entry.Value)).Append("</Value>");
+                    sb.Append("</item>");
+                }
+
+                sb.Append("</dictionary>");
+                sb.Append("</").Append(parentName).Append('>');
+            }
+
             // Nested objects
             foreach (var kn in nested)
             {
@@ -314,15 +433,55 @@ namespace mz.Config.Core.Converter
                 sb.Append('<').Append(parentName).Append('>');
                 foreach (var kvChild in childMap)
                 {
-                    sb.Append('<').Append(kvChild.Key).Append('>');
-                    sb.Append(XmlEscape(kvChild.Value));
-                    sb.Append("</").Append(kvChild.Key).Append('>');
+                    var val = kvChild.Value;
+                    if (string.Equals(val, NULL_SENTINEL, StringComparison.Ordinal))
+                    {
+                        sb.Append('<').Append(kvChild.Key).Append(" xsi:nil=\"true\" />");
+                    }
+                    else
+                    {
+                        sb.Append('<').Append(kvChild.Key).Append('>');
+                        sb.Append(XmlEscape(val));
+                        sb.Append("</").Append(kvChild.Key).Append('>');
+                    }
                 }
                 sb.Append("</").Append(parentName).Append('>');
             }
 
             sb.Append("</").Append(definition.TypeName).Append('>');
             return sb.ToString();
+        }
+
+        // ====================================================================
+        // Helpers: dictionary detection via VariableDescriptions
+        // ====================================================================
+
+        private static HashSet<string> DetectDictionaryParents(IReadOnlyDictionary<string, string> descriptions)
+        {
+            var set = new HashSet<string>(StringComparer.Ordinal);
+
+            if (descriptions == null)
+                return set;
+
+            foreach (var kv in descriptions)
+            {
+                var name = kv.Key;
+                var desc = kv.Value;
+                if (string.IsNullOrEmpty(name) || string.IsNullOrEmpty(desc))
+                    continue;
+
+                // Only consider top-level properties (no dots)
+                if (name.IndexOf('.') >= 0)
+                    continue;
+
+                var lower = desc.ToLowerInvariant();
+                if (lower.Contains("dictionary<") || lower.StartsWith("dictionary") || lower.Contains("dictionary"))
+                {
+                    set.Add(name);
+                }
+            }
+
+            return set;
         }
 
         // ====================================================================
@@ -333,6 +492,10 @@ namespace mz.Config.Core.Converter
         {
             if (raw == null)
                 raw = string.Empty;
+
+            // Null sentinel -> TOML null (bare token)
+            if (string.Equals(raw, NULL_SENTINEL, StringComparison.Ordinal))
+                return "null";
 
             bool b;
             int i;
@@ -367,6 +530,10 @@ namespace mz.Config.Core.Converter
                 return string.Empty;
 
             var s = value.Trim();
+
+            // TOML null -> our NullSentinel
+            if (string.Equals(s, "null", StringComparison.OrdinalIgnoreCase))
+                return NULL_SENTINEL;
 
             // quoted -> unescape
             if (s.Length >= 2 && s[0] == '"' && s[s.Length - 1] == '"')
@@ -519,7 +686,8 @@ namespace mz.Config.Core.Converter
 
                 if (selfClosing)
                 {
-                    result[tagName] = string.Empty;
+                    bool hasNil = startTagContent.IndexOf("xsi:nil=\"true\"", StringComparison.Ordinal) >= 0;
+                    result[tagName] = hasNil ? NULL_SENTINEL : string.Empty;
                     innerPos = startTagClose + 1;
                     continue;
                 }
@@ -593,10 +761,11 @@ namespace mz.Config.Core.Converter
 
                 if (selfClosing)
                 {
+                    bool hasNil = tagContent.IndexOf("xsi:nil=\"true\"", StringComparison.Ordinal) >= 0;
                     result.Add(new SnippetChild
                     {
                         Name = tagName,
-                        Value = string.Empty
+                        Value = hasNil ? NULL_SENTINEL : string.Empty
                     });
                     pos = gt + 1;
                     continue;

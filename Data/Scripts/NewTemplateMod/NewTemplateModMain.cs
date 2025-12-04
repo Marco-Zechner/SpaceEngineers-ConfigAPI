@@ -29,11 +29,10 @@ namespace mz.NewTemplateMod
             
             /* TODO:
              * Implement Multiplayer support (client-server config sync)
-             * Remember which files the user loaded as custom configs, so we can load them again next time by default.
-             * Auto save configs on change?
-             * Test & add support for more complex config structures (dictionaries, nested collections, etc.)
+             * qol Remember which files the user loaded as custom configs, so we can load them again next time by default.
+             * qol Auto save configs on change?
              * nullable fields in toml
-             * deserialize old xml and save as toml?
+             * qol deserialize old xml and save as toml?
              */
             
             _simpleConfig       = ConfigStorage.Load<SimpleConfig>(ConfigLocationType.Local, "CoolName");
