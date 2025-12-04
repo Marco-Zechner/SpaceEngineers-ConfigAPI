@@ -33,7 +33,7 @@ namespace mz.Config.Core
         {
             if (Initialized) return;
             var layout = new ConfigLayoutMigrator();
-            var converter = new IdentityXmlConverter();
+            var converter = new TomlXmlConverter();
             CustomInitialize(layout, converter);
         }
 

@@ -74,32 +74,47 @@ namespace mz.Config.Core.Converter
             string rootName;
             var rootChildren = ParseRootChildren(xmlContent, out rootName);
 
-            // Default instance for descriptions & dictionary detection (for other places)
+            // Default instance for descriptions (comments)
             var defaultInstance = definition.CreateDefaultInstance();
             IReadOnlyDictionary<string, string> descriptions = null;
 
             if (defaultInstance != null)
             {
                 descriptions = defaultInstance.VariableDescriptions;
+                // We no longer need the result of DetectDictionaryParents for ToExternal,
+                // but we may still call it elsewhere, so leave it alone.
                 DetectDictionaryParents(descriptions);
             }
 
-            // Flatten non-dictionary fields into key -> list of raw string values
-            var flat = new Dictionary<string, List<string>>();
+            // Main scalars/lists BEFORE the first nested parent
+            var flatPre = new Dictionary<string, List<string>>();
+            // Main scalars/lists AFTER the first nested parent
+            var flatPost = new Dictionary<string, List<string>>();
 
             // Dictionary sections: parentName -> (dictKey -> value)
             var dictSections = new Dictionary<string, Dictionary<string, string>>(StringComparer.Ordinal);
 
-            foreach (var kv in rootChildren)
+            // Nested sections: parentName -> (childName -> list of values)
+            var nestedSections = new Dictionary<string, Dictionary<string, List<string>>>(StringComparer.Ordinal);
+
+            var seenNested = false;
+
+            // Preserve the order we see properties in this iteration
+            var rootList = new List<KeyValuePair<string, string>>(rootChildren);
+
+            foreach (var kv in rootList)
             {
                 var propName = kv.Key;
                 var innerXml = kv.Value;
                 var trimmed = innerXml.Trim();
 
+                // Decide which flat map this property belongs to (pre or post nested)
+                var targetFlat = seenNested ? flatPost : flatPre;
+
                 if (trimmed.Length == 0 || trimmed.IndexOf('<') < 0)
                 {
                     // Simple scalar text (including NullSentinel from self-closing elements)
-                    AddFlatValue(flat, propName, trimmed);
+                    AddFlatValue(targetFlat, propName, trimmed);
                     continue;
                 }
 
@@ -109,7 +124,7 @@ namespace mz.Config.Core.Converter
                 if (children.Count == 0)
                 {
                     // Fallback: treat as scalar blob
-                    AddFlatValue(flat, propName, trimmed);
+                    AddFlatValue(targetFlat, propName, trimmed);
                     continue;
                 }
 
@@ -119,8 +134,6 @@ namespace mz.Config.Core.Converter
                 //       <item><Key>k</Key><Value>v</Value></item>...
                 //     </dictionary>
                 //   </PropName>
-                //
-                // We now detect purely by XML shape (child tag "dictionary"), not by VariableDescriptions.
                 if (children.Count == 1 &&
                     string.Equals(children[0].Name, "dictionary", StringComparison.OrdinalIgnoreCase))
                 {
@@ -169,11 +182,9 @@ namespace mz.Config.Core.Converter
                 var firstName = children[0].Name;
                 for (var i = 1; i < children.Count; i++)
                 {
-                    if (children[i].Name != firstName)
-                    {
-                        sameName = false;
-                        break;
-                    }
+                    if (children[i].Name == firstName) continue;
+                    sameName = false;
+                    break;
                 }
 
                 if (sameName)
@@ -184,29 +195,140 @@ namespace mz.Config.Core.Converter
 
                     for (var i = 0; i < children.Count; i++)
                     {
-                        AddFlatValue(flat, flatKey, children[i].Value.Trim());
+                        AddFlatValue(targetFlat, flatKey, children[i].Value.Trim());
                     }
                 }
                 else
                 {
                     // Nested object: Nested.Threshold, Nested.Flag, ...
+                    // Once we've seen a nested parent, everything that follows in rootList
+                    // goes into the trailing [TypeName] block (flatPost).
+                    seenNested = true;
+
                     foreach (var child in children)
                     {
-                        var key = propName + "." + child.Name;
-                        AddFlatValue(flat, key, child.Value.Trim());
+                        AddNestedValue(nestedSections, propName, child.Name, child.Value.Trim());
                     }
                 }
             }
 
             var sb = new StringBuilder();
 
-            // Section header: [TypeName]
+            // Main section header: [TypeName]
             sb.Append('[')
               .Append(definition.TypeName)
               .Append(']')
               .AppendLine();
 
-            // Emit all non-dictionary fields under the main section
+            // Main fields before nested
+            WriteFlatSection(sb, flatPre, descriptions);
+
+            // Dictionary sections:
+            // [TypeName.NamedValues-dictionary]
+            // "start" = 1
+            // "end"   = 99
+            foreach (var section in dictSections)
+            {
+                var parentName = section.Key;
+                var dict = section.Value;
+
+                if (dict == null || dict.Count == 0)
+                    continue;
+
+                sb.AppendLine();
+                sb.Append('[')
+                  .Append(definition.TypeName)
+                  .Append('.')
+                  .Append(parentName)
+                  .Append("-dictionary]")
+                  .AppendLine();
+
+                foreach (var entry in dict)
+                {
+                    var k = entry.Key;
+                    var v = entry.Value;
+
+                    sb.Append('"')
+                      .Append(k)
+                      .Append('"')
+                      .Append(" = ")
+                      .Append(ToTomlLiteral(v))
+                      .AppendLine();
+                }
+            }
+
+            // Nested sections:
+            // [TypeName.Nested]
+            // Threshold = 0.9
+            // Flag      = true
+            foreach (var nested in nestedSections)
+            {
+                var parentName = nested.Key;
+                var childMap = nested.Value;
+                if (childMap == null || childMap.Count == 0)
+                    continue;
+
+                sb.AppendLine();
+                sb.Append('[')
+                  .Append(definition.TypeName)
+                  .Append('.')
+                  .Append(parentName)
+                  .Append(']')
+                  .AppendLine();
+
+                foreach (var kvChild in childMap)
+                {
+                    var key = kvChild.Key;
+                    var list = kvChild.Value;
+                    if (list == null || list.Count == 0)
+                        continue;
+
+                    if (list.Count == 1)
+                    {
+                        var literal = ToTomlLiteral(list[0]);
+                        sb.Append(key)
+                          .Append(" = ")
+                          .Append(literal)
+                          .AppendLine();
+                    }
+                    else
+                    {
+                        sb.Append(key)
+                          .Append(" = [");
+
+                        for (var i = 0; i < list.Count; i++)
+                        {
+                            if (i > 0)
+                                sb.Append(", ");
+
+                            var literal = ToTomlLiteral(list[i]);
+                            sb.Append(literal);
+                        }
+
+                        sb.Append(']')
+                          .AppendLine();
+                    }
+                }
+            }
+
+            // Trailing scalars/lists after nested -> reopen [TypeName]
+            if (flatPost.Count <= 0) return sb.ToString();
+            sb.AppendLine();
+            sb.Append('[')
+                .Append(definition.TypeName)
+                .Append(']')
+                .AppendLine();
+
+            WriteFlatSection(sb, flatPost, descriptions);
+
+            return sb.ToString();
+        }
+        
+        private static void WriteFlatSection(
+            StringBuilder sb,
+            Dictionary<string, List<string>> flat,
+            IReadOnlyDictionary<string, string> descriptions)
+        {
             foreach (var kv in flat)
             {
                 var key = kv.Key;
@@ -266,44 +388,31 @@ namespace mz.Config.Core.Converter
                       .AppendLine();
                 }
             }
+        }
 
-            // Emit dictionary sections:
-            // [TypeName.NamedValues-dictionary]
-            // "start" = 5
-            // "end"   = 42
-            foreach (var section in dictSections)
+        private static void AddNestedValue(
+            Dictionary<string, Dictionary<string, List<string>>> nestedSections,
+            string parentName,
+            string childName,
+            string value)
+        {
+            Dictionary<string, List<string>> childMap;
+            if (!nestedSections.TryGetValue(parentName, out childMap))
             {
-                var parentName = section.Key;
-                var dict = section.Value;
-
-                if (dict == null || dict.Count == 0)
-                    continue;
-
-                sb.AppendLine();
-                sb.Append('[')
-                  .Append(definition.TypeName)
-                  .Append('.')
-                  .Append(parentName)
-                  .Append("-dictionary]")
-                  .AppendLine();
-
-                var keys = new List<string>(dict.Keys);
-
-                foreach (var k in keys)
-                {
-                    var v = dict[k];
-
-                    sb.Append('"')
-                        .Append(k)
-                        .Append('"')
-                        .Append(" = ")
-                        .Append(ToTomlLiteral(v))
-                        .AppendLine();
-                }
+                childMap = new Dictionary<string, List<string>>();
+                nestedSections[parentName] = childMap;
             }
 
-            return sb.ToString();
+            List<string> list;
+            if (!childMap.TryGetValue(childName, out list))
+            {
+                list = new List<string>();
+                childMap[childName] = list;
+            }
+
+            list.Add(value ?? string.Empty);
         }
+
 
         // helper near the top of the class (private static)
         private static bool IsPrimitiveElementTag(string tag)
