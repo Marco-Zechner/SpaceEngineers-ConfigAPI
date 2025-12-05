@@ -55,5 +55,20 @@ namespace mz.Config.SeImpl
             writer.Flush();
             writer.Close();
         }
+
+        public bool Exists(ConfigLocationType location, string fileName)
+        {
+            var utils = MyAPIGateway.Utilities;
+            switch (location)
+            {
+                default:
+                case ConfigLocationType.World:
+                    return utils.FileExistsInWorldStorage(fileName, typeof(ConfigFileSystem));
+                case ConfigLocationType.Global:
+                    return utils.FileExistsInGlobalStorage(fileName);
+                case ConfigLocationType.Local:
+                    return utils.FileExistsInLocalStorage(fileName, typeof(ConfigFileSystem));
+            }
+        }
     }
 }

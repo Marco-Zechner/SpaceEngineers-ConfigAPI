@@ -13,7 +13,7 @@ namespace NewTemplateMod.Tests
             var key = MakeKey(location, fileName);
             var found = _files.TryGetValue(key, out content);
             var text = content != null ? string.Join("\n\t", content.Split('\n')) : "null";
-            Logger.Log("TryRead: " + location + "/" + fileName + "\n\t" + text);
+            Logger.Log($"TryRead ({found}): " + location + "/" + fileName + "\n\t" + text);
             return found;
         }
 
@@ -28,6 +28,14 @@ namespace NewTemplateMod.Tests
         private static string MakeKey(ConfigLocationType location, string fileName)
         {
             return (int)location + "|" + fileName;
+        }
+        
+        public bool Exists(ConfigLocationType location, string fileName)
+        {
+            var key = MakeKey(location, fileName);
+            var exists = _files.ContainsKey(key);
+            Logger.Log("Exists: " + location + "/" + fileName + " = " + exists);
+            return exists;
         }
     }
 }

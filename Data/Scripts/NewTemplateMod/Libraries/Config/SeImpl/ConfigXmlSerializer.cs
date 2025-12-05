@@ -30,7 +30,12 @@ namespace mz.Config.SeImpl
                 if (message == null) throw;
                 var match = Regex.Match(message, INVALID_ENUM_PATTERN);
                 ConfigStorage.Debug?.Log(message);
-                if (!match.Success) throw;
+                if (!match.Success)
+                {
+                    ConfigStorage.Debug?.Log(
+                        $"Deserialization error in ConfigType {typeof(T).Name}: {message}");
+                    return null;
+                }
                 
                 var enumName = match.Groups["enum"].Value;
                 var attemptedValue = match.Groups["value"].Value;

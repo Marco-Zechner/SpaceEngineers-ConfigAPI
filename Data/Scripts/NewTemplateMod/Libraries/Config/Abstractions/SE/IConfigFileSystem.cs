@@ -19,5 +19,10 @@ namespace mz.Config.Abstractions.SE
         /// any existing contents.
         /// </summary>
         void WriteFile(ConfigLocationType location, string fileName, string content);
+
+        /// <summary>
+        /// Check if a file exists at the given location with the given file name.
+        /// </summary>
+        bool Exists(ConfigLocationType location, string fileName);
     }
 }

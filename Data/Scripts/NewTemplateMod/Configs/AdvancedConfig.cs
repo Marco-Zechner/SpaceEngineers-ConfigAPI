@@ -1,11 +1,12 @@
 using System.Collections.Generic;
+using System.Xml.Serialization;
 using mz.Config.Domain;
 using mz.SemanticVersioning;
 
 namespace mz.NewTemplateMod
 {
-public class AdvancedConfig : ConfigBase
-{
+    public class AdvancedConfig : ConfigBase
+    {
         public override SemanticVersion ConfigVersion => "0.5.0";
 
         public SettingsRoot Settings { get; set; } = new SettingsRoot();
@@ -13,6 +14,7 @@ public class AdvancedConfig : ConfigBase
         public class SettingsRoot
         {
             public DisplayConfig Display { get; set; } = new DisplayConfig();
+            [XmlElement(IsNullable = true)]
             public NetworkConfig Network { get; set; } = null;
         }
 

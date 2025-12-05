@@ -20,6 +20,7 @@ namespace mz.NewTemplateMod
         private CollectionConfig _collectionConfig;
         private MigrationConfig _migrationConfig;
         private AdvancedConfig _advancedConfig;
+        private KeybindConfig _keybindConfig;
 
         private const string COMMAND_PREFIX = "/ntcfg";
         
@@ -40,6 +41,7 @@ namespace mz.NewTemplateMod
             _collectionConfig   = ConfigStorage.Load<CollectionConfig>(ConfigLocationType.Local);
             _migrationConfig    = ConfigStorage.Load<MigrationConfig>(ConfigLocationType.Local);
             _advancedConfig     = ConfigStorage.Load<AdvancedConfig>(ConfigLocationType.Local);
+            _keybindConfig      = ConfigStorage.Load<KeybindConfig>(ConfigLocationType.Local);
 
             _configs.Clear();
             _configs.Add(_simpleConfig);
@@ -47,6 +49,7 @@ namespace mz.NewTemplateMod
             _configs.Add(_collectionConfig);
             _configs.Add(_migrationConfig);
             _configs.Add(_advancedConfig);
+            _configs.Add(_keybindConfig);
             
         }
 
@@ -125,6 +128,27 @@ namespace mz.NewTemplateMod
 
                 case "advanced":
                     HandleAdvancedCommand(args);
+                    break;
+
+                case "keybind":
+                    if (args.Length > 1 && args[1] == "reload")
+                    {
+                        string fileName = null;
+                        if (args.Length > 2 && args[2] != null)
+                        {
+                            fileName = args[2];
+                        }
+                        _keybindConfig = ConfigStorage.Load<KeybindConfig>(ConfigLocationType.Local, fileName);
+                        Chat.TryLine("KeybindConfig reloaded. \nSelect = " +
+                                     _keybindConfig.Keybinds.Select.Modifier + "+" +
+                                     _keybindConfig.Keybinds.Select.Action + ", Toggle=" +
+                                     _keybindConfig.Keybinds.Select.Toggle +
+                                     "\nThrow = " +
+                                     _keybindConfig.Keybinds.Throw.Modifier + "+" +
+                                     _keybindConfig.Keybinds.Throw.Action + ", Toggle=" +
+                                     _keybindConfig.Keybinds.Throw.Toggle,
+                            "NewTemplateMod");
+                    }
                     break;
 
                 default:

@@ -1,7 +1,9 @@
 using System;
 using System.IO;
+using System.Text.RegularExpressions;
 using System.Xml.Serialization;
 using mz.Config.Abstractions.SE;
+using mz.Config.Core;
 using mz.Config.Domain;
 
 namespace NewTemplateMod.Tests
@@ -22,6 +24,8 @@ namespace NewTemplateMod.Tests
                 return sw.ToString();
             }
         }
+        
+        private const string INVALID_ENUM_PATTERN = @"'(?<value>[^']+)' is not a valid value for (?<enum>\w+)";
 
         public T DeserializeFromXml<T>(string xml) where T : ConfigBase, new()
         {
@@ -31,8 +35,31 @@ namespace NewTemplateMod.Tests
             var serializer = new XmlSerializer(typeof(T));
             using (var sr = new StringReader(xml))
             {
-                var obj = serializer.Deserialize(sr);
-                return obj as T;
+                try
+                {
+                    var obj = serializer.Deserialize(sr);
+                    return obj as T;
+                    
+                }
+                catch (Exception ex) // catch invalid enum deserialization
+                {
+                    var message = ex.InnerException?.Message;
+                    if (message == null) throw;
+                    var match = Regex.Match(message, INVALID_ENUM_PATTERN);
+                    ConfigStorage.Debug?.Log(message);
+                    if (!match.Success)
+                    {
+                        ConfigStorage.Debug?.Log(
+                            $"Deserialization error in ConfigType {typeof(T).Name}: {message}");
+                        return null;
+                    }
+                
+                    var enumName = match.Groups["enum"].Value;
+                    var attemptedValue = match.Groups["value"].Value;
+                    ConfigStorage.Debug?.Log(
+                        $"Deserialization error in ConfigType {typeof(T).Name}: '{attemptedValue}' is not a valid value for enum '{enumName}'.");
+                    return null;
+                }
             }
         }
     }
