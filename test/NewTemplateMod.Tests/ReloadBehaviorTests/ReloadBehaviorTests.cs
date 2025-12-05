@@ -16,18 +16,15 @@ namespace NewTemplateMod.Tests.ReloadBehaviorTests
         // wired by SetUp into InternalConfigStorage
         private IConfigXmlSerializer _xml;
         private IXmlConverter _tomlConverter;
-        private IConfigFileSystem _fileSystem = new FakeFileSystem();
+        private IConfigFileSystem _fileSystem;
         private IConfigLayoutMigrator _layoutMigrator;
 
         [SetUp]
         public void SetUp()
         {
-            // Guard so we don't try to re-initialize InternalConfigStorage every test run.
-            if (InternalConfigStorage.IsInitialized)
-                return;
-
             _xml = new TestXmlSerializer();          // your existing test serializer
             _tomlConverter = new TomlXmlConverter(); // your TOML<->XML converter
+            _fileSystem = new FakeFileSystem();
             _layoutMigrator = new ConfigLayoutMigrator();
 
             ConfigStorage.Debug = new Debug();
