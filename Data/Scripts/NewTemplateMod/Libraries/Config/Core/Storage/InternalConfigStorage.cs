@@ -182,6 +182,17 @@ namespace mz.Config.Core.Storage
             slot.CurrentFileName = fileName + XmlConverter.GetExtension;
         }
 
+        private static bool HasConfigVersionElement(string xml)
+        {
+            if (string.IsNullOrEmpty(xml))
+                return false;
+
+            string rootName;
+            var children = LayoutXml.ParseChildren(xml, out rootName);
+            // We don't care about the value, only that the element exists.
+            return children != null && children.ContainsKey("ConfigVersion");
+        }
+        
         public static void Load(ConfigLocationType location, string typeName, string fileName)
         {
             EnsureInitialized();
@@ -274,6 +285,46 @@ namespace mz.Config.Core.Storage
             ConfigStorage.Debug?.Log(
                 "Converted current XML for type: " + typeName + ":\n" + xmlCurrentFromFile,
                 "InternalConfigStorage.Load");
+
+            // 4a) Hard validity check: ConfigVersion element must exist.
+            // If it's missing, the file is considered garbage (e.g. "garbage!" TOML
+            // that parsed into an empty <TypeName/> root). We backup the original
+            // external file and regenerate from current defaults.
+            if (!HasConfigVersionElement(xmlCurrentFromFile))
+            {
+                var backupName = fileName + ".bak" + XmlConverter.GetExtension;
+                FileSystem.WriteFile(location, backupName, externalCurrent);
+                ConfigStorage.Debug?.Log(
+                    "Missing <ConfigVersion> element for type: " + typeName +
+                    ". Treating file as invalid, backing up to: " + backupName +
+                    " and regenerating from defaults.",
+                    "InternalConfigStorage.Load");
+
+                var defaultInstance = def.CreateDefaultInstance();
+                var defaultXml = XmlSerializer.SerializeToXml(defaultInstance);
+                var externalDefault = XmlConverter.ToExternal(def, defaultXml);
+
+                // Overwrite current and defaults
+                FileSystem.WriteFile(location, fullName, externalDefault);
+                FileSystem.WriteFile(location, fullDefaultsName, externalDefault);
+
+                ConfigStorage.Debug?.Log(
+                    "Wrote new config and defaults for type: " + typeName +
+                    "\nCurrent/Defaults path: " + fullName + " / " + fullDefaultsName +
+                    "\nContent:\n" + externalDefault,
+                    "InternalConfigStorage.Load");
+
+                var config = def.DeserializeFromXml(XmlSerializer, defaultXml);
+                if (config == null)
+                {
+                    throw new InvalidOperationException(
+                        "Failed to deserialize regenerated default config for type: " + typeName);
+                }
+
+                slot.Instance = config;
+                slot.CurrentFileName = fullName;
+                return;
+            }
 
             // 5) Normalize layout
             var layoutResult = LayoutMigrator.Normalize(

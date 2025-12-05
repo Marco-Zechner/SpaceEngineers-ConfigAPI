@@ -210,7 +210,6 @@ CurrentMode = ""Expert""";
             // 3) Valid edit: flip everything
             var validEdited = @"[CollectionConfig]
 ConfigVersion = ""0.3.0""
-
 Tags.string = [""x"", ""y"", ""z""]
 
 [CollectionConfig.NamedValues-dictionary]

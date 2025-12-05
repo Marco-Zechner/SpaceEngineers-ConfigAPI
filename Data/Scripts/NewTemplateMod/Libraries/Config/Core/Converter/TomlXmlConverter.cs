@@ -518,22 +518,13 @@ namespace mz.Config.Core.Converter
                 return xmlSerializer.SerializeToXml(defaultInstanceEmpty);
             }
 
-            // Dictionary detection based on VariableDescriptions
-            var defaultInstance = definition.CreateDefaultInstance();
-            HashSet<string> dictionaryParents;
+            // Dictionary detection is now based purely on TOML sections (*-dictionary),
+            // NOT on VariableDescriptions.
+            var dictionaryParents = new HashSet<string>(StringComparer.Ordinal);
 
-            if (defaultInstance != null)
-            {
-                var descriptions = defaultInstance.VariableDescriptions;
-                dictionaryParents = DetectDictionaryParents(descriptions);
-            }
-            else
-            {
-                dictionaryParents = new HashSet<string>();
-            }
-
-            // Parse TOML into key -> list of raw values
-            var flat = ParseTomlToFlatMap(externalContent, definition.TypeName);
+            // Parse TOML into key -> list of raw values,
+            // and fill dictionaryParents from [TypeName.*-dictionary] sections.
+            var flat = ParseTomlToFlatMap(externalContent, definition.TypeName, dictionaryParents);
 
             // Split into:
             // - root scalars / arrays: key
@@ -630,7 +621,6 @@ namespace mz.Config.Core.Converter
 
                 childMap[nestedKey] = val;
             }
-
 
             var sb = new StringBuilder();
 
@@ -809,38 +799,6 @@ namespace mz.Config.Core.Converter
 
             sb.Append("</").Append(definition.TypeName).Append('>');
             return sb.ToString();
-        }
-
-        // ====================================================================
-        // Helpers: dictionary detection via VariableDescriptions
-        // ====================================================================
-
-        private static HashSet<string> DetectDictionaryParents(IReadOnlyDictionary<string, string> descriptions)
-        {
-            var set = new HashSet<string>(StringComparer.Ordinal);
-
-            if (descriptions == null)
-                return set;
-
-            foreach (var kv in descriptions)
-            {
-                var name = kv.Key;
-                var desc = kv.Value;
-                if (string.IsNullOrEmpty(name) || string.IsNullOrEmpty(desc))
-                    continue;
-
-                // Only consider top-level properties (no dots)
-                if (name.IndexOf('.') >= 0)
-                    continue;
-
-                var lower = desc.ToLowerInvariant();
-                if (lower.Contains("dictionary<") || lower.StartsWith("dictionary") || lower.Contains("dictionary"))
-                {
-                    set.Add(name);
-                }
-            }
-
-            return set;
         }
 
         // ====================================================================
@@ -1166,9 +1124,15 @@ namespace mz.Config.Core.Converter
         // TOML parsing
         // ====================================================================
 
-        private static Dictionary<string, List<string>> ParseTomlToFlatMap(string toml, string typeName)
+        private static Dictionary<string, List<string>> ParseTomlToFlatMap(
+            string toml,
+            string typeName,
+            HashSet<string> dictionaryParents)
         {
             var result = new Dictionary<string, List<string>>();
+
+            if (dictionaryParents == null)
+                dictionaryParents = new HashSet<string>(StringComparer.Ordinal);
 
             if (string.IsNullOrEmpty(toml))
                 return result;
@@ -1194,6 +1158,18 @@ namespace mz.Config.Core.Converter
                 {
                     var sectionName = line.Substring(1, line.Length - 2).Trim();
                     currentSection = sectionName;
+
+                    // Detect [TypeName.X-dictionary] sections and remember X as a dictionary parent
+                    if (sectionName.StartsWith(typeName + ".", StringComparison.Ordinal))
+                    {
+                        var suffix = sectionName.Substring(typeName.Length + 1); // e.g. "NamedValues-dictionary"
+                        if (suffix.EndsWith("-dictionary", StringComparison.Ordinal))
+                        {
+                            var parentName = suffix.Substring(0, suffix.Length - "-dictionary".Length);
+                            dictionaryParents.Add(parentName);
+                        }
+                    }
+
                     continue;
                 }
 

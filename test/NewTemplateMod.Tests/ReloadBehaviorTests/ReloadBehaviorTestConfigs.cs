@@ -2,6 +2,7 @@
 using System.Xml.Serialization;
 using mz.Config.Domain;
 using mz.SemanticVersioning;
+using VRage.Serialization;
 
 namespace NewTemplateMod.Tests.ReloadBehaviorTests
 {
@@ -36,12 +37,12 @@ namespace NewTemplateMod.Tests.ReloadBehaviorTests
         }
     }
 
-    public class SerializableDictionary<TKey, TValue>
-    {
-        // Minimal shape to make tests compile if your real type is elsewhere.
-        [XmlElement("dictionary")]
-        public Dictionary<TKey, TValue> Dictionary { get; set; } = new Dictionary<TKey, TValue>();
-    }
+    // public class SerializableDictionary<TKey, TValue>
+    // {
+    //     // Minimal shape to make tests compile if your real type is elsewhere.
+    //     [XmlElement("dictionary")]
+    //     public Dictionary<TKey, TValue> Dictionary { get; set; } = new Dictionary<TKey, TValue>();
+    // }
 
     public class CollectionConfig : ConfigBase
     {

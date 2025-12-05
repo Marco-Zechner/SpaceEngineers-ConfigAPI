@@ -4,6 +4,10 @@ using mz.SemanticVersioning;
 
 namespace mz.Config.Domain
 {
+    /// <summary>
+    /// Variables in your config should either be ALL public properties with getters and setters, or ALL public fields.
+    /// Mixing fields and properties can lead to the XML serializer reordering stuff.
+    /// </summary>
     public abstract class ConfigBase
     {
         [XmlIgnore]
