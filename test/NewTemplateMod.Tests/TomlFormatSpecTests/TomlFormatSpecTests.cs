@@ -20,7 +20,7 @@ namespace NewTemplateMod.Tests.TomlFormatSpecTests
             return s.Replace("\r\n", "\n").Replace("\r", "\n");
         }
 
-        private static void AssertTomlEqual(string actual, string expected, string testName)
+        private static void AssertTextEqual(string actual, string expected, string testName)
         {
             var na = NormalizeNewlines(actual).TrimEnd();
             var ne = NormalizeNewlines(expected).TrimEnd();
@@ -88,7 +88,7 @@ OptionalInt = null
 OptionalFloat = null
 OptionalText = null";
 
-            AssertTomlEqual(toml, expected, "Config1Scalars");
+            AssertTextEqual(toml, expected, "Config1Scalars");
         }
 
         // --------------------------------------------------------------------
@@ -164,7 +164,7 @@ Text = ""List test""
 IntList.int = [1, 2, 3]
 StringList.string = [""alpha"", ""beta""]";
 
-            AssertTomlEqual(toml, expected, "Config2Lists");
+            AssertTextEqual(toml, expected, "Config2Lists");
         }
 
         // --------------------------------------------------------------------
@@ -241,7 +241,7 @@ StringList.string = [""alpha"", ""beta""]
 ""start"" = 5
 ""end"" = 42";
 
-            AssertTomlEqual(toml, expected, "Config3Dictionary");
+            AssertTextEqual(toml, expected, "Config3Dictionary");
         }
 
         // --------------------------------------------------------------------
@@ -335,7 +335,7 @@ Flag = true
 [TomlConfig4Nested]
 FloatValue = 0.5";
 
-            AssertTomlEqual(toml, expected, "Config4Nested");
+            AssertTextEqual(toml, expected, "Config4Nested");
         }
 
         // --------------------------------------------------------------------
@@ -390,6 +390,58 @@ FloatValue = 0.5";
                 Assert.That(floatIndex, Is.GreaterThan(endNestedIndex),
                     "FloatValue element should be after Nested block");
             });
+        }
+        
+        [Test]
+        public void Config5_Advanced_Xml_Format_Is_As_Expected()
+        {
+            var cfg = new TomlConfig5Advanced();
+            var xml = _xml.SerializeToXml(cfg);
+            Logger.Log("Config5 XML:\n" + xml);
+
+            var expected = @"<?xml version=""1.0"" encoding=""utf-16""?>
+<TomlConfig5Advanced xmlns:xsd=""http://www.w3.org/2001/XMLSchema"" xmlns:xsi=""http://www.w3.org/2001/XMLSchema-instance"">
+  <ConfigVersion>0.5.0</ConfigVersion>
+  <Settings>
+    <Display>
+      <Width>1920</Width>
+      <Height>1080</Height>
+      <Theme>Dark</Theme>
+      <Dpi xsi:nil=""true"" />
+    </Display>
+    <Network xsi:nil=""true"" />
+  </Settings>
+</TomlConfig5Advanced>";
+
+            AssertTextEqual(xml, expected, "Config5Advance");
+        }
+
+        [Test]
+        public void Config5_Advanced_Toml_Format_Is_As_Expected()
+        {
+            var cfg = new TomlConfig5Advanced();
+            var def = new ConfigDefinition<TomlConfig5Advanced>();
+
+            var xml = _xml.SerializeToXml(cfg);
+            Logger.Log("Config5 XML:\n" + xml);
+
+            var toml = _converter.ToExternal(def, xml);
+            Logger.Log("Config5 TOML:\n" + toml);
+
+            var expectedToml = @"[TomlConfig5Advanced]
+ConfigVersion = ""0.5.0""
+
+[TomlConfig5Advanced.Settings.Display]
+Width = 1920
+Height = 1080
+Theme = ""Dark""
+Dpi = null
+
+[TomlConfig5Advanced.Settings]
+Network = null
+";
+
+            AssertTextEqual(toml, expectedToml, "Config5Advanced");
         }
     }
 }
