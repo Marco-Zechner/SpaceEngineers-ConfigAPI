@@ -81,9 +81,7 @@ namespace mz.Config.Core.Converter
             if (defaultInstance != null)
             {
                 descriptions = defaultInstance.VariableDescriptions;
-                // We no longer need the result of DetectDictionaryParents for ToExternal,
-                // but we may still call it elsewhere, so leave it alone.
-                DetectDictionaryParents(descriptions);
+                // DetectDictionaryParents(descriptions) is still used in ToInternal, we don't rely on it here.
             }
 
             // Main scalars/lists BEFORE the first nested parent
@@ -94,12 +92,12 @@ namespace mz.Config.Core.Converter
             // Dictionary sections: parentName -> (dictKey -> value)
             var dictSections = new Dictionary<string, Dictionary<string, string>>(StringComparer.Ordinal);
 
-            // Nested sections: parentName -> (childName -> list of values)
+            // Nested sections: parentPath -> (childName -> list of values)
             var nestedSections = new Dictionary<string, Dictionary<string, List<string>>>(StringComparer.Ordinal);
 
             var seenNested = false;
 
-            // Preserve the order we see properties in this iteration
+            // Preserve root property order
             var rootList = new List<KeyValuePair<string, string>>(rootChildren);
 
             foreach (var kv in rootList)
@@ -168,29 +166,30 @@ namespace mz.Config.Core.Converter
 
                         if (!string.IsNullOrEmpty(keyText))
                         {
-                            // Latest value wins for duplicate keys
                             dict[keyText] = valueText;
                         }
                     }
 
-                    // We fully handled this property as a dictionary section
+                    // Dictionary handled
                     continue;
                 }
 
-                // Array-of-primitive or nested object
+                // Array-of-primitive or nested object at root level
                 var sameName = true;
                 var firstName = children[0].Name;
                 for (var i = 1; i < children.Count; i++)
                 {
-                    if (children[i].Name == firstName) continue;
-                    sameName = false;
-                    break;
+                    if (children[i].Name != firstName)
+                    {
+                        sameName = false;
+                        break;
+                    }
                 }
 
                 if (sameName)
                 {
-                    // Array-of-primitive: IntList.int, StringList.string, etc.
-                    var elementTag = firstName;                  // "int", "string", "float", ...
+                    // Root array-of-primitive: IntList.int, StringList.string, etc.
+                    var elementTag = firstName;                  // "int", "string", ...
                     var flatKey = propName + "." + elementTag;   // e.g. "IntList.int"
 
                     for (var i = 0; i < children.Count; i++)
@@ -200,14 +199,26 @@ namespace mz.Config.Core.Converter
                 }
                 else
                 {
-                    // Nested object: Nested.Threshold, Nested.Flag, ...
-                    // Once we've seen a nested parent, everything that follows in rootList
-                    // goes into the trailing [TypeName] block (flatPost).
+                    // Nested object at root: e.g. Nested.{Threshold,Flag} or Settings.{Display,Network}
                     seenNested = true;
 
                     foreach (var child in children)
                     {
-                        AddNestedValue(nestedSections, propName, child.Name, child.Value.Trim());
+                        var val = child.Value.Trim();
+
+                        // If this child is null or pure text (no inner tags), treat as a nested scalar:
+                        // e.g. Settings.Network = null
+                        if (val.IndexOf('<') < 0 || string.Equals(val, NULL_SENTINEL, StringComparison.Ordinal))
+                        {
+                            AddNestedValue(nestedSections, propName, child.Name, val);
+                        }
+                        else
+                        {
+                            // This child itself has nested content: recurse.
+                            // e.g. parentPath = "Settings.Display" -> Width, Height, Theme, Dpi
+                            var childPath = propName + "." + child.Name;
+                            FlattenNestedXml(nestedSections, childPath, val);
+                        }
                     }
                 }
             }
@@ -261,9 +272,18 @@ namespace mz.Config.Core.Converter
             // [TypeName.Nested]
             // Threshold = 0.9
             // Flag      = true
+            //
+            // [TypeName.Settings.Display]
+            // Width  = 1920
+            // Height = 1080
+            // Theme  = "Dark"
+            // Dpi    = null
+            //
+            // [TypeName.Settings]
+            // Network = null
             foreach (var nested in nestedSections)
             {
-                var parentName = nested.Key;
+                var parentPath = nested.Key;
                 var childMap = nested.Value;
                 if (childMap == null || childMap.Count == 0)
                     continue;
@@ -272,7 +292,7 @@ namespace mz.Config.Core.Converter
                 sb.Append('[')
                   .Append(definition.TypeName)
                   .Append('.')
-                  .Append(parentName)
+                  .Append(parentPath)
                   .Append(']')
                   .AppendLine();
 
@@ -312,18 +332,78 @@ namespace mz.Config.Core.Converter
             }
 
             // Trailing scalars/lists after nested -> reopen [TypeName]
-            if (flatPost.Count <= 0) return sb.ToString();
-            sb.AppendLine();
-            sb.Append('[')
-                .Append(definition.TypeName)
-                .Append(']')
-                .AppendLine();
+            if (flatPost.Count > 0)
+            {
+                sb.AppendLine();
+                sb.Append('[')
+                  .Append(definition.TypeName)
+                  .Append(']')
+                  .AppendLine();
 
-            WriteFlatSection(sb, flatPost, descriptions);
+                WriteFlatSection(sb, flatPost, descriptions);
+            }
 
             return sb.ToString();
         }
         
+        private static void FlattenNestedXml(
+            Dictionary<string, Dictionary<string, List<string>>> nestedSections,
+            string parentPath,
+            string snippet)
+        {
+            if (string.IsNullOrEmpty(snippet))
+                return;
+
+            var children = ParseSnippetChildren(snippet.Trim());
+            if (children.Count == 0)
+            {
+                return;
+            }
+
+            var sameName = true;
+            var firstName = children[0].Name;
+            for (var i = 1; i < children.Count; i++)
+            {
+                if (children[i].Name != firstName)
+                {
+                    sameName = false;
+                    break;
+                }
+            }
+
+            if (sameName)
+            {
+                // Array-of-primitive under a nested object:
+                // we store it as key = firstName with multiple values, so it becomes:
+                // [TypeName.ParentPath]
+                // int = [1, 2, 3]
+                for (var i = 0; i < children.Count; i++)
+                {
+                    AddNestedValue(nestedSections, parentPath, firstName, children[i].Value.Trim());
+                }
+            }
+            else
+            {
+                // Normal nested object: multiple different children
+                foreach (var child in children)
+                {
+                    var val = child.Value.Trim();
+
+                    if (val.IndexOf('<') < 0 || string.Equals(val, NULL_SENTINEL, StringComparison.Ordinal))
+                    {
+                        // Scalar leaf under parentPath
+                        AddNestedValue(nestedSections, parentPath, child.Name, val);
+                    }
+                    else
+                    {
+                        // Deeper nesting: recurse
+                        var childPath = parentPath + "." + child.Name;
+                        FlattenNestedXml(nestedSections, childPath, val);
+                    }
+                }
+            }
+        }
+
         private static void WriteFlatSection(
             StringBuilder sb,
             Dictionary<string, List<string>> flat,
