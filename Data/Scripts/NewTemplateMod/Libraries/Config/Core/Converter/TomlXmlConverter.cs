@@ -537,7 +537,7 @@ namespace mz.Config.Core.Converter
 
             // Split into:
             // - root scalars / arrays: key
-            // - nested objects: Parent.Child
+            // - nested objects: Parent.Child, Parent.Child.GrandChild
             // - dictionary entries: DictParent.DictKey
             var rootMap = new Dictionary<string, List<string>>();
             var nested = new Dictionary<string, Dictionary<string, string>>();
@@ -573,37 +573,64 @@ namespace mz.Config.Core.Converter
                 {
                     // Root scalar or array (simple key)
                     rootMap[key] = list;
+                    continue;
+                }
+
+                // Everything with at least 2 segments from here on is nested or dictionary.
+                var top = segments[0];
+                var val = list.Count > 0 ? list[0] : string.Empty;
+
+                if (dictionaryParents.Contains(top))
+                {
+                    // Dictionary<string, int>: NamedValues.start, NamedValues.end, ...
+                    var dictKey = segments.Length >= 2
+                        ? segments[1]
+                        : string.Empty;
+
+                    Dictionary<string, string> dict;
+                    if (!dictionaries.TryGetValue(top, out dict))
+                    {
+                        dict = new Dictionary<string, string>();
+                        dictionaries[top] = dict;
+                    }
+
+                    if (!string.IsNullOrEmpty(dictKey))
+                    {
+                        dict[dictKey] = val;
+                    }
+
+                    continue;
+                }
+
+                // Normal nested object.
+                // We distinguish between:
+                //  - Parent.Child        (e.g. Nested.Threshold)
+                //  - Parent.Child.Field  (e.g. Settings.Display.Width or Keybinds.Select.Modifier)
+                var parentName = top;
+                string nestedKey;
+
+                if (segments.Length == 2)
+                {
+                    // Example: Nested.Threshold -> parent = "Nested", nestedKey = "Threshold"
+                    nestedKey = segments[1];
                 }
                 else
                 {
-                    var parent = segments[0];
-                    var child = segments[1];
-                    var val = list.Count > 0 ? list[0] : string.Empty;
-
-                    if (dictionaryParents.Contains(parent))
-                    {
-                        // Dictionary<string,int>: NamedValues.start, NamedValues.end, ...
-                        Dictionary<string, string> dict;
-                        if (!dictionaries.TryGetValue(parent, out dict))
-                        {
-                            dict = new Dictionary<string, string>();
-                            dictionaries[parent] = dict;
-                        }
-                        dict[child] = val;
-                    }
-                    else
-                    {
-                        // Normal nested object: Nested.Threshold, Nested.Flag, ...
-                        Dictionary<string, string> childMap;
-                        if (!nested.TryGetValue(parent, out childMap))
-                        {
-                            childMap = new Dictionary<string, string>();
-                            nested[parent] = childMap;
-                        }
-                        childMap[child] = val;
-                    }
+                    // Example: Settings.Display.Width -> parent = "Settings", nestedKey = "Display.Width"
+                    //          Keybinds.Select.Modifier -> parent = "Keybinds", nestedKey = "Select.Modifier"
+                    nestedKey = segments[1] + "." + segments[2];
                 }
+
+                Dictionary<string, string> childMap;
+                if (!nested.TryGetValue(parentName, out childMap))
+                {
+                    childMap = new Dictionary<string, string>();
+                    nested[parentName] = childMap;
+                }
+
+                childMap[nestedKey] = val;
             }
+
 
             var sb = new StringBuilder();
 
@@ -686,27 +713,97 @@ namespace mz.Config.Core.Converter
                 sb.Append("</").Append(parentName).Append('>');
             }
 
-            // Nested objects
+            // Nested objects (supports one and two levels: Parent.Child and Parent.Child.Field)
             foreach (var kn in nested)
             {
                 var parentName = kn.Key;
                 var childMap = kn.Value;
 
                 sb.Append('<').Append(parentName).Append('>');
+
+                // Split child keys into:
+                //  - direct children: "Threshold", "OpenMenu"
+                //  - nested children: "Select.Modifier", "Select.Action", "Display.Width", ...
+                var directChildren = new Dictionary<string, string>();
+                var nestedChildren = new Dictionary<string, Dictionary<string, string>>();
+
                 foreach (var kvChild in childMap)
                 {
+                    var rawName = kvChild.Key;
                     var val = kvChild.Value;
-                    if (string.Equals(val, NULL_SENTINEL, StringComparison.Ordinal))
+
+                    var parts = rawName.Split('.');
+                    if (parts.Length == 1)
                     {
-                        sb.Append('<').Append(kvChild.Key).Append(" xsi:nil=\"true\" />");
+                        // Direct child under <parentName>
+                        directChildren[rawName] = val;
                     }
                     else
                     {
-                        sb.Append('<').Append(kvChild.Key).Append('>');
-                        sb.Append(XmlEscape(val));
-                        sb.Append("</").Append(kvChild.Key).Append('>');
+                        // Two-level: mid.Leaf under <parentName>
+                        // e.g. "Select.Modifier", "Display.Width"
+                        var mid = parts[0];
+                        var leaf = parts[1];
+
+                        Dictionary<string, string> leafMap;
+                        if (!nestedChildren.TryGetValue(mid, out leafMap))
+                        {
+                            leafMap = new Dictionary<string, string>();
+                            nestedChildren[mid] = leafMap;
+                        }
+
+                        leafMap[leaf] = val;
                     }
                 }
+
+                // Emit direct children: <Threshold>, <OpenMenu>, etc.
+                foreach (var kvChild in directChildren)
+                {
+                    var name = kvChild.Key;
+                    var val = kvChild.Value;
+
+                    if (string.Equals(val, NULL_SENTINEL, StringComparison.Ordinal))
+                    {
+                        sb.Append('<').Append(name).Append(" xsi:nil=\"true\" />");
+                    }
+                    else
+                    {
+                        sb.Append('<').Append(name).Append('>');
+                        sb.Append(XmlEscape(val));
+                        sb.Append("</").Append(name).Append('>');
+                    }
+                }
+
+                // Emit nested children:
+                // <Select><Modifier>..</Modifier><Action>..</Action>...</Select>
+                // <Display><Width>..</Width>...</Display>
+                foreach (var nestedEntry in nestedChildren)
+                {
+                    var midName = nestedEntry.Key;
+                    var leaves = nestedEntry.Value;
+
+                    sb.Append('<').Append(midName).Append('>');
+
+                    foreach (var leafKv in leaves)
+                    {
+                        var leafName = leafKv.Key;
+                        var val = leafKv.Value;
+
+                        if (string.Equals(val, NULL_SENTINEL, StringComparison.Ordinal))
+                        {
+                            sb.Append('<').Append(leafName).Append(" xsi:nil=\"true\" />");
+                        }
+                        else
+                        {
+                            sb.Append('<').Append(leafName).Append('>');
+                            sb.Append(XmlEscape(val));
+                            sb.Append("</").Append(leafName).Append('>');
+                        }
+                    }
+
+                    sb.Append("</").Append(midName).Append('>');
+                }
+
                 sb.Append("</").Append(parentName).Append('>');
             }
 

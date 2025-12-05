@@ -2,8 +2,6 @@
 using System.Collections.Generic;
 using mz.Config.Abstractions;
 using mz.Config.Abstractions.Layout;
-using mz.Config.Domain;
-using mz.Config.Core;
 
 namespace mz.Config.Core.Layout
 {
@@ -53,48 +51,60 @@ namespace mz.Config.Core.Layout
                 // Use the config's type name as canonical root name (matches serializer)
                 var rootName = definition.TypeName;
 
-                var normalizedCurrentChildren = new Dictionary<string, string>();
-                var normalizedDefaultChildren = new Dictionary<string, string>();
-                var requiresBackup = false;
+                var normalizedCurrentChildren  = new Dictionary<string, string>();
+                var normalizedDefaultChildren  = new Dictionary<string, string>();
+                var requiresBackup             = false;
 
-                // Work across keys present in the "current" default layout
+                // ------------------------------------------------------------
+                // Canonical order: ALWAYS follow xmlCurrentDefaults order.
+                // newDefaultChildren comes from LayoutXml.ParseChildren(xmlCurrentDefaults),
+                // which reflects whatever order XmlSerializer uses for this type.
+                //
+                // For each key:
+                //   - if missing in current file  -> inject new default
+                //   - else if value == oldDefault and default changed -> upgrade
+                //   - else keep user value
+                // ------------------------------------------------------------
                 foreach (var kv in newDefaultChildren)
                 {
-                    var key = kv.Key;
-                    var newDefaultElement = kv.Value;
+                    var key             = kv.Key;
+                    var newDefaultElem  = kv.Value;
 
-                    string currentElement;
-                    var hasCurrent = currentChildren.TryGetValue(key, out currentElement);
+                    string currentElem;
+                    var hasCurrent      = currentChildren.TryGetValue(key, out currentElem);
 
-                    string oldDefaultElement;
-                    var hasOldDefault = oldDefaultChildren.TryGetValue(key, out oldDefaultElement);
+                    string oldDefaultElem;
+                    var hasOldDefault   = oldDefaultChildren.TryGetValue(key, out oldDefaultElem);
 
-                    string finalCurrentElement;
+                    string finalCurrentElem;
 
                     if (!hasCurrent)
                     {
                         // Missing key in user's file -> inject new default element
-                        finalCurrentElement = newDefaultElement;
+                        finalCurrentElem = newDefaultElem;
                     }
                     else if (hasOldDefault &&
-                             currentElement == oldDefaultElement &&
-                             oldDefaultElement != newDefaultElement)
+                             currentElem == oldDefaultElem &&
+                             oldDefaultElem != newDefaultElem)
                     {
                         // User value is still exactly the old default element and the default changed:
-                        // treat as unchanged by user and upgrade to the new default element.
-                        finalCurrentElement = newDefaultElement;
+                        // treat as unchanged-by-user and upgrade to the new default.
+                        finalCurrentElem = newDefaultElem;
                     }
                     else
                     {
-                        // Keep whatever the user currently has (could be nil/number/nested block/etc.)
-                        finalCurrentElement = currentElement;
+                        // Keep whatever the user currently has (nil / number / nested block / etc.)
+                        finalCurrentElem = currentElem;
                     }
 
-                    normalizedCurrentChildren[key] = finalCurrentElement;
-                    normalizedDefaultChildren[key] = newDefaultElement;
+                    normalizedCurrentChildren[key] = finalCurrentElem;
+                    normalizedDefaultChildren[key] = newDefaultElem;
                 }
 
-                // Detect extra keys in current file that no longer exist in current layout
+                // ------------------------------------------------------------
+                // Detect extra keys in current file that no longer exist
+                // in the current layout -> require backup.
+                // ------------------------------------------------------------
                 foreach (var kv in currentChildren)
                 {
                     if (!newDefaultChildren.ContainsKey(kv.Key))
@@ -104,22 +114,22 @@ namespace mz.Config.Core.Layout
                     }
                 }
 
-                // Rebuild normalized XML using a canonical header + namespaces for all configs
-                var normalizedCurrentXml = LayoutXml.Build(rootName, normalizedCurrentChildren);
+                // Rebuild normalized XML using canonical header + namespaces
+                var normalizedCurrentXml  = LayoutXml.Build(rootName, normalizedCurrentChildren);
                 var normalizedDefaultsXml = LayoutXml.Build(rootName, normalizedDefaultChildren);
 
-                result.NormalizedXml = normalizedCurrentXml;
+                result.NormalizedXml        = normalizedCurrentXml;
                 result.NormalizedDefaultsXml = normalizedDefaultsXml;
-                result.RequiresBackup = requiresBackup;
+                result.RequiresBackup       = requiresBackup;
 
                 return result;
             }
             catch
             {
                 // On any error, fall back to original "current" XML and no backup recommendation.
-                result.NormalizedXml = xmlCurrentFromFile;
+                result.NormalizedXml        = xmlCurrentFromFile;
                 result.NormalizedDefaultsXml = xmlCurrentDefaults;
-                result.RequiresBackup = false;
+                result.RequiresBackup       = false;
                 return result;
             }
         }

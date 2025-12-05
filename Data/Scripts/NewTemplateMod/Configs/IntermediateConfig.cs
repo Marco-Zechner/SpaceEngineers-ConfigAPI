@@ -13,7 +13,7 @@ namespace mz.NewTemplateMod
 
         public int? OptionalValue { get; set; } = null;
 
-        public Mode CurrentMode = Mode.Basic;
+        public Mode CurrentMode { get; set; } = Mode.Basic;
 
         // hmmm should all variables that use enums automatically have their valid values as a comment above them?
         public enum Mode

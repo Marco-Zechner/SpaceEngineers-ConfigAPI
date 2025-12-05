@@ -26,7 +26,7 @@ namespace NewTemplateMod.Tests.ReloadBehaviorTests
 
         public int? OptionalValue { get; set; } = null;
 
-        public Mode CurrentMode = Mode.Basic;
+        public Mode CurrentMode { get; set; } = Mode.Basic;
 
         public enum Mode
         {

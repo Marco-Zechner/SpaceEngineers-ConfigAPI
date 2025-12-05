@@ -1,6 +1,4 @@
-﻿using System;
-using NUnit.Framework;
-using mz.Config.Abstractions;
+﻿using NUnit.Framework;
 using mz.Config.Abstractions.Converter;
 using mz.Config.Abstractions.Layout;
 using mz.Config.Abstractions.SE;
@@ -18,7 +16,7 @@ namespace NewTemplateMod.Tests.ReloadBehaviorTests
         // wired by SetUp into InternalConfigStorage
         private IConfigXmlSerializer _xml;
         private IXmlConverter _tomlConverter;
-        private IConfigFileSystem _fileSystem;
+        private IConfigFileSystem _fileSystem = new FakeFileSystem();
         private IConfigLayoutMigrator _layoutMigrator;
 
         [SetUp]
@@ -30,7 +28,6 @@ namespace NewTemplateMod.Tests.ReloadBehaviorTests
 
             _xml = new TestXmlSerializer();          // your existing test serializer
             _tomlConverter = new TomlXmlConverter(); // your TOML<->XML converter
-            _fileSystem = new FakeFileSystem();
             _layoutMigrator = new ConfigLayoutMigrator();
 
             ConfigStorage.Debug = new Debug();
@@ -107,6 +104,7 @@ SomeText = ""Edited text""";
         {
             // 1) First load
             var cfg1 = LoadConfig<IntermediateConfig>();
+            
             Assert.That(cfg1.IsEnabled, Is.True);
             Assert.That(cfg1.OptionalValue, Is.Null);
             Assert.That(cfg1.CurrentMode, Is.EqualTo(IntermediateConfig.Mode.Basic));
@@ -114,7 +112,6 @@ SomeText = ""Edited text""";
             var fileName = GetFileNameFor<IntermediateConfig>();
             Assert.That(_fileSystem.Exists(ConfigLocationType.World, fileName), Is.True);
 
-            var firstValidContent = GetFileContent<IntermediateConfig>();
 
             // 2) Corrupt in a way that should be considered invalid
             // - invalid bool ("maybe")
@@ -381,18 +378,18 @@ ConfigVersion = ""1.0.0""
 
 [KeybindConfig.Keybinds.Select]
 Modifier = ""LeftAlt""
-Action   = ""LeftButton""
-Toggle   = true
+Action = ""LeftButton""
+Toggle = true
 
 [KeybindConfig.Keybinds.Throw]
 Modifier = null
-Action   = ""RightButton""
-Toggle   = false
+Action = ""RightButton""
+Toggle = false
 
 [KeybindConfig.Keybinds.OpenMenu]
 Modifier = ""Control""
-Action   = ""LeftButton""
-Toggle   = false";
+Action = ""LeftButton""
+Toggle = false";
 
             SetFileContent<KeybindConfig>(validEdited);
 

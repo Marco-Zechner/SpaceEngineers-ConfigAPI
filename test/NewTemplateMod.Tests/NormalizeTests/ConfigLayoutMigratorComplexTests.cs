@@ -132,6 +132,9 @@ namespace NewTemplateMod.Tests.NormalizeTests
                 Assert.That(result.NormalizedXml, Does.Contain("<Description>NewDesc</Description>"));
             });
 
+            Logger.Log("Normalized Defaults XML:\n" + result.NormalizedDefaultsXml);
+            Logger.Log("xmlCurrentDefaults:\n" + xmlCurrentDefaults);
+            
             Assert.That(result.NormalizedDefaultsXml, Is.EqualTo(xmlCurrentDefaults));
         }
 

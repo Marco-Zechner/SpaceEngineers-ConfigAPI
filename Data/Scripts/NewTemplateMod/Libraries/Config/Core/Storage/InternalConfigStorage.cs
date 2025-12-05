@@ -215,10 +215,14 @@ namespace mz.Config.Core.Storage
 
                 var defaultInstance = def.CreateDefaultInstance();
                 var defaultXml = XmlSerializer.SerializeToXml(defaultInstance);
-
+                ConfigStorage.Debug?.Log("defaultXML:\n" + defaultXml,
+                    "InternalConfigStorage.Load");
+                
                 // Convert to external format
                 var externalDefault = XmlConverter.ToExternal(def, defaultXml);
-
+                ConfigStorage.Debug?.Log("externalDefault:\n" + externalDefault,
+                    "InternalConfigStorage.Load");
+                
                 // Write main + defaults (identical on first creation)
                 FileSystem.WriteFile(location, fullName, externalDefault);
                 FileSystem.WriteFile(location, fullDefaultsName, externalDefault);

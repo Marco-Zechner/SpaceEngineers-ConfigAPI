@@ -7,7 +7,7 @@ namespace mz.NewTemplateMod
     {
         public override SemanticVersion ConfigVersion => "0.1.0";
 
-        public int SomeValue = 42;
+        public int SomeValue { get; set; } = 42;
         public string SomeText { get; set; } = "Default text";
     }
 
