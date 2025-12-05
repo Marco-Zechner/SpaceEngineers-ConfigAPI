@@ -290,7 +290,7 @@ ConfigVersion = ""0.5.0""
 Width = 1280
 Height = 720
 Theme = ""Light""
-Dpi = 96.0
+Dpi = 96
 
 [AdvancedConfig.Settings.Network]
 Host = ""example.com""

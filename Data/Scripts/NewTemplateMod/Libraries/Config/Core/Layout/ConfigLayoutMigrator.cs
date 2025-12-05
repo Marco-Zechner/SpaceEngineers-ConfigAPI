@@ -18,120 +18,176 @@ namespace mz.Config.Core.Layout
     public sealed class ConfigLayoutMigrator : IConfigLayoutMigrator
     {
         public ConfigLayoutResult Normalize(
-            IConfigDefinition definition,
-            string xmlCurrentFromFile,
-            string xmlOldDefaultsFromFile,
-            string xmlCurrentDefaults)
-        {
-            if (definition == null)
-                throw new ArgumentNullException(nameof(definition));
-
-            // Defensive: treat null as empty
-            if (xmlCurrentFromFile == null)
-                xmlCurrentFromFile = string.Empty;
-            if (xmlOldDefaultsFromFile == null)
-                xmlOldDefaultsFromFile = string.Empty;
-            if (xmlCurrentDefaults == null)
-                xmlCurrentDefaults = string.Empty;
-
-            var result = new ConfigLayoutResult();
-
-            try
+                IConfigDefinition definition,
+                string xmlCurrentFromFile,
+                string xmlOldDefaultsFromFile,
+                string xmlCurrentDefaults)
             {
-                // Parse three layouts into: rootName + map of childName -> full child XML
-                string rootCurrent;
-                var currentChildren = LayoutXml.ParseChildren(xmlCurrentFromFile, out rootCurrent);
+                if (definition == null)
+                    throw new ArgumentNullException(nameof(definition));
 
-                string rootOldDefaults;
-                var oldDefaultChildren = LayoutXml.ParseChildren(xmlOldDefaultsFromFile, out rootOldDefaults);
+                // Defensive: treat null as empty
+                if (xmlCurrentFromFile == null)
+                    xmlCurrentFromFile = string.Empty;
+                if (xmlOldDefaultsFromFile == null)
+                    xmlOldDefaultsFromFile = string.Empty;
+                if (xmlCurrentDefaults == null)
+                    xmlCurrentDefaults = string.Empty;
 
-                string rootNewDefaults;
-                var newDefaultChildren = LayoutXml.ParseChildren(xmlCurrentDefaults, out rootNewDefaults);
+                var result = new ConfigLayoutResult();
 
-                // Use the config's type name as canonical root name (matches serializer)
-                var rootName = definition.TypeName;
-
-                var normalizedCurrentChildren  = new Dictionary<string, string>();
-                var normalizedDefaultChildren  = new Dictionary<string, string>();
-                var requiresBackup             = false;
-
-                // ------------------------------------------------------------
-                // Canonical order: ALWAYS follow xmlCurrentDefaults order.
-                // newDefaultChildren comes from LayoutXml.ParseChildren(xmlCurrentDefaults),
-                // which reflects whatever order XmlSerializer uses for this type.
-                //
-                // For each key:
-                //   - if missing in current file  -> inject new default
-                //   - else if value == oldDefault and default changed -> upgrade
-                //   - else keep user value
-                // ------------------------------------------------------------
-                foreach (var kv in newDefaultChildren)
+                try
                 {
-                    var key             = kv.Key;
-                    var newDefaultElem  = kv.Value;
+                    // Parse three layouts into: rootName + map of childName -> full child XML
+                    string rootCurrent;
+                    var currentChildren = LayoutXml.ParseChildren(xmlCurrentFromFile, out rootCurrent);
 
-                    string currentElem;
-                    var hasCurrent      = currentChildren.TryGetValue(key, out currentElem);
+                    string rootOldDefaults;
+                    var oldDefaultChildren = LayoutXml.ParseChildren(xmlOldDefaultsFromFile, out rootOldDefaults);
 
-                    string oldDefaultElem;
-                    var hasOldDefault   = oldDefaultChildren.TryGetValue(key, out oldDefaultElem);
+                    string rootNewDefaults;
+                    var newDefaultChildren = LayoutXml.ParseChildren(xmlCurrentDefaults, out rootNewDefaults);
 
-                    string finalCurrentElem;
+                    // Use the config's type name as canonical root name (matches serializer)
+                    var rootName = definition.TypeName;
 
-                    if (!hasCurrent)
+                    var normalizedCurrentChildren = new Dictionary<string, string>();
+                    var normalizedDefaultChildren = new Dictionary<string, string>();
+                    var requiresBackup = false;
+
+                    // Work across keys present in the "current" default layout
+                    foreach (var kv in newDefaultChildren)
                     {
-                        // Missing key in user's file -> inject new default element
-                        finalCurrentElem = newDefaultElem;
-                    }
-                    else if (hasOldDefault &&
-                             currentElem == oldDefaultElem &&
-                             oldDefaultElem != newDefaultElem)
-                    {
-                        // User value is still exactly the old default element and the default changed:
-                        // treat as unchanged-by-user and upgrade to the new default.
-                        finalCurrentElem = newDefaultElem;
-                    }
-                    else
-                    {
-                        // Keep whatever the user currently has (nil / number / nested block / etc.)
-                        finalCurrentElem = currentElem;
+                        var key = kv.Key;
+                        var newDefaultElement = kv.Value;
+
+                        string currentElement;
+                        var hasCurrent = currentChildren.TryGetValue(key, out currentElement);
+
+                        string oldDefaultElement;
+                        var hasOldDefault = oldDefaultChildren.TryGetValue(key, out oldDefaultElement);
+
+                        // Detect structural corruption:
+                        // If the default element has complex nested children (e.g. Settings.Display.Width/Height/...)
+                        // but the current element has those complex children collapsed to scalars or missing, 
+                        // we treat it as a corrupted layout that should be reset to defaults and backed up.
+                        var structuralCorruption = hasCurrent &&
+                                                   HasBrokenComplexChildren(newDefaultElement, currentElement);
+
+                        string finalCurrentElement;
+
+                        if (!hasCurrent)
+                        {
+                            // Missing key in user's file -> inject new default element
+                            finalCurrentElement = newDefaultElement;
+                        }
+                        else if (structuralCorruption)
+                        {
+                            // Complex nested object was flattened / corrupted -> restore default subtree and flag backup
+                            finalCurrentElement = newDefaultElement;
+                            requiresBackup = true;
+                        }
+                        else if (hasOldDefault &&
+                                 currentElement == oldDefaultElement &&
+                                 oldDefaultElement != newDefaultElement)
+                        {
+                            // User value is still exactly the old default element and the default changed:
+                            // treat as unchanged by user and upgrade to the new default element.
+                            finalCurrentElement = newDefaultElement;
+                        }
+                        else
+                        {
+                            // Keep whatever the user currently has (could be nil/number/nested block/etc.)
+                            finalCurrentElement = currentElement;
+                        }
+
+                        normalizedCurrentChildren[key] = finalCurrentElement;
+                        normalizedDefaultChildren[key] = newDefaultElement;
                     }
 
-                    normalizedCurrentChildren[key] = finalCurrentElem;
-                    normalizedDefaultChildren[key] = newDefaultElem;
+                    // Detect extra keys in current file that no longer exist in current layout
+                    foreach (var kv in currentChildren)
+                    {
+                        if (!newDefaultChildren.ContainsKey(kv.Key))
+                        {
+                            requiresBackup = true;
+                            break;
+                        }
+                    }
+
+                    // Rebuild normalized XML using a canonical header + namespaces for all configs
+                    var normalizedCurrentXml = LayoutXml.Build(rootName, normalizedCurrentChildren);
+                    var normalizedDefaultsXml = LayoutXml.Build(rootName, normalizedDefaultChildren);
+
+                    result.NormalizedXml = normalizedCurrentXml;
+                    result.NormalizedDefaultsXml = normalizedDefaultsXml;
+                    result.RequiresBackup = requiresBackup;
+
+                    return result;
+                }
+                catch
+                {
+                    // On any error, fall back to original "current" XML and no backup recommendation.
+                    result.NormalizedXml = xmlCurrentFromFile;
+                    result.NormalizedDefaultsXml = xmlCurrentDefaults;
+                    result.RequiresBackup = false;
+                    return result;
+                }
+            }
+
+            /// <summary>
+            /// Detects structural corruption for a single element:
+            /// If in the default element a direct child is a complex object (it has its own children),
+            /// but in the current element that same child is missing or has no children (flattened to scalar),
+            /// we treat this as a corrupted layout.
+            /// 
+            /// This is generic and works for things like:
+            /// - Settings.Display (complex in defaults) -> turned into scalar text in current
+            /// - NamedValues (dictionary) -> turned into scalar text in current
+            /// </summary>
+            private static bool HasBrokenComplexChildren(string defaultElement, string currentElement)
+            {
+                if (string.IsNullOrEmpty(defaultElement) || string.IsNullOrEmpty(currentElement))
+                    return false;
+
+                string defaultRootName;
+                var defaultChildren = LayoutXml.ParseChildren(defaultElement, out defaultRootName);
+                if (defaultChildren.Count == 0)
+                    return false; // no expectations about nested structure
+
+                string currentRootName;
+                var currentChildren = LayoutXml.ParseChildren(currentElement, out currentRootName);
+
+                foreach (var kv in defaultChildren)
+                {
+                    var childName = kv.Key;
+                    var defaultChildBlock = kv.Value;
+
+                    // Look at the default child's children to see if it's complex
+                    string dummy;
+                    var defaultGrandChildren = LayoutXml.ParseChildren(defaultChildBlock, out dummy);
+
+                    // Only care about children that are complex in defaults
+                    if (defaultGrandChildren.Count == 0)
+                        continue;
+
+                    // In current: if the complex child is missing or has been flattened, that's corruption
+                    string currentChildBlock;
+                    if (!currentChildren.TryGetValue(childName, out currentChildBlock))
+                    {
+                        // Complex child missing entirely
+                        return true;
+                    }
+
+                    var currentGrandChildren = LayoutXml.ParseChildren(currentChildBlock, out dummy);
+                    if (currentGrandChildren.Count == 0)
+                    {
+                        // Child exists but has no children -> likely scalar or empty, not complex as required
+                        return true;
+                    }
                 }
 
-                // ------------------------------------------------------------
-                // Detect extra keys in current file that no longer exist
-                // in the current layout -> require backup.
-                // ------------------------------------------------------------
-                foreach (var kv in currentChildren)
-                {
-                    if (!newDefaultChildren.ContainsKey(kv.Key))
-                    {
-                        requiresBackup = true;
-                        break;
-                    }
-                }
-
-                // Rebuild normalized XML using canonical header + namespaces
-                var normalizedCurrentXml  = LayoutXml.Build(rootName, normalizedCurrentChildren);
-                var normalizedDefaultsXml = LayoutXml.Build(rootName, normalizedDefaultChildren);
-
-                result.NormalizedXml        = normalizedCurrentXml;
-                result.NormalizedDefaultsXml = normalizedDefaultsXml;
-                result.RequiresBackup       = requiresBackup;
-
-                return result;
+                return false;
             }
-            catch
-            {
-                // On any error, fall back to original "current" XML and no backup recommendation.
-                result.NormalizedXml        = xmlCurrentFromFile;
-                result.NormalizedDefaultsXml = xmlCurrentDefaults;
-                result.RequiresBackup       = false;
-                return result;
-            }
-        }
     }
 }
