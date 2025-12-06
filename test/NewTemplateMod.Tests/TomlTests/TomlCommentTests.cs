@@ -53,7 +53,7 @@ namespace NewTemplateMod.Tests.TomlTests
             _migrator = new ConfigLayoutMigrator();
             _converter = new TomlXmlConverter(_xml);
             _definition = new ConfigDefinition<CommentConfig>();
-            InternalConfigStorage.Initialize(_fileSystem, _xml, _migrator, _converter);
+            InternalConfigStorage.Initialize(_fileSystem, _xml, _migrator, _converter, null);
         }
 
         [Test]

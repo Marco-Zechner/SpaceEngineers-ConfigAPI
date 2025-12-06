@@ -21,7 +21,7 @@ namespace NewTemplateMod.Tests.ConfigStorageTests
             var layout = new ConfigLayoutMigrator();
             var converter = new IdentityXmlConverter();
 
-            InternalConfigStorage.Initialize(_fileSystem, _serializer, layout, converter);
+            InternalConfigStorage.Initialize(_fileSystem, _serializer, layout, converter, null);
             InternalConfigStorage.Register<TestConfig>(ConfigLocationType.Local);
         }
 

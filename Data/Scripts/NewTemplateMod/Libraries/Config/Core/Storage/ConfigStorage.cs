@@ -15,6 +15,7 @@ namespace mz.Config.Core
     {
         private static bool Initialized => InternalConfigStorage.IsInitialized;
         public static IDebug Debug { get; set; }
+        private static string StoragePrefix { get; set; } = "no_mod_context";
 
         public static void CustomInitialize(
             IConfigLayoutMigrator layoutMigrator,
@@ -26,12 +27,18 @@ namespace mz.Config.Core
             IConfigFileSystem fileSystem = new ConfigFileSystem();
             IConfigXmlSerializer xmlSerializer = new ConfigXmlSerializer();
             
-            InternalConfigStorage.Initialize(fileSystem, xmlSerializer, layoutMigrator, xmlConverter);
+            InternalConfigStorage.Initialize(fileSystem, xmlSerializer, layoutMigrator, xmlConverter, StoragePrefix);
         }
+
+        public static void InitModContext(string storagePrefix) => StoragePrefix = storagePrefix;
 
         private static void EnsureInitialized()
         {
             if (Initialized) return;
+            
+            if (StoragePrefix == "no_mod_context")
+                Debug.Log("Please call ConfigStorage.InitModContext before using ConfigStorage.", "ConfigStorage.EnsureInitialized");
+            
             var layout = new ConfigLayoutMigrator();
             var converter = new TomlXmlConverter();
             CustomInitialize(layout, converter);
@@ -76,28 +83,6 @@ namespace mz.Config.Core
             var currentFile = InternalConfigStorage.GetCurrentFileName(location, typeName);
             Debug?.Log("Using file name: " + (fileName ?? currentFile), "ConfigStorage.Save");
             InternalConfigStorage.Save(location, typeName, fileName ?? currentFile);
-        }
-
-        public static T GetOrCreate<T>(ConfigLocationType location)
-            where T : ConfigBase, new()
-        {
-            EnsureInitialized();
-            InternalConfigStorage.Register<T>(location, null);
-            return InternalConfigStorage.GetOrCreate<T>(location);
-        }
-
-        public static string GetConfigAsText<T>(ConfigLocationType location)
-            where T : ConfigBase, new()
-        {
-            EnsureInitialized();
-            InternalConfigStorage.Register<T>(location, null);
-            return InternalConfigStorage.GetConfigAsText(location, typeof(T).Name);
-        }
-
-        public static string GetFileAsText(ConfigLocationType location, string fileName)
-        {
-            EnsureInitialized();
-            return InternalConfigStorage.GetFileAsText(location, fileName);
         }
     }
 }

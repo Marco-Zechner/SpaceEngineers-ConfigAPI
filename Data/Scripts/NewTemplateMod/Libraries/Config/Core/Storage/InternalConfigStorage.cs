@@ -55,8 +55,18 @@ namespace mz.Config.Core.Storage
                 return _xmlConverter;
             }
         }
-        public static bool IsInitialized => _initialized;
 
+        public static string StoragePrefix 
+        {
+            get
+            {
+                if (!_initialized)
+                    throw new InvalidOperationException("ConfigStorage was not initialized");
+                return _storagePrefix;
+            }
+        }
+        public static bool IsInitialized => _initialized;
+        
         // TypeName -> definition (for metadata + default instance)
         private static readonly Dictionary<string, IConfigDefinition> _definitions =
             new Dictionary<string, IConfigDefinition>();
@@ -70,6 +80,7 @@ namespace mz.Config.Core.Storage
         private static IConfigXmlSerializer _xmlSerializer;
         private static IConfigLayoutMigrator _layoutMigrator;
         private static IXmlConverter _xmlConverter;
+        private static string _storagePrefix;
 
         /// <summary>
         /// Full initialization: caller must provide all dependencies.
@@ -79,7 +90,8 @@ namespace mz.Config.Core.Storage
             IConfigFileSystem fileSystem,
             IConfigXmlSerializer xmlSerializer,
             IConfigLayoutMigrator layoutMigrator,
-            IXmlConverter xmlConverter)
+            IXmlConverter xmlConverter,
+            string storagePrefix)
         {
             if (fileSystem == null) throw new ArgumentNullException(nameof(fileSystem));
             if (xmlSerializer == null) throw new ArgumentNullException(nameof(xmlSerializer));
@@ -90,6 +102,7 @@ namespace mz.Config.Core.Storage
             _xmlSerializer = xmlSerializer;
             _layoutMigrator = layoutMigrator;
             _xmlConverter = xmlConverter;
+            _storagePrefix = storagePrefix;
 
             _definitions.Clear();
             _slots.Clear();
@@ -159,7 +172,6 @@ namespace mz.Config.Core.Storage
             if (string.IsNullOrEmpty(typeName))
                 throw new ArgumentNullException(nameof(typeName));
 
-            var def = GetDefinitionByTypeName(typeName);
             var slot = GetOrCreateSlot(location, typeName, null);
 
             return slot.CurrentFileName;
@@ -177,7 +189,6 @@ namespace mz.Config.Core.Storage
             if (fileName.EndsWith(XmlConverter.GetExtension))
                 fileName = fileName.Remove(fileName.Length - XmlConverter.GetExtension.Length);
             
-            var def = GetDefinitionByTypeName(typeName);
             var slot = GetOrCreateSlot(location, typeName, null);
             slot.CurrentFileName = fileName + XmlConverter.GetExtension;
         }

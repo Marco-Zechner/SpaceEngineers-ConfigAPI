@@ -21,7 +21,7 @@ namespace NewTemplateMod.Tests.ConfigStorageTests
             LayoutMigrator = new ConfigLayoutMigrator();
             Converter = new TomlXmlConverter();
 
-            InternalConfigStorage.Initialize(FileSystem, XmlSerializer, LayoutMigrator, Converter);
+            InternalConfigStorage.Initialize(FileSystem, XmlSerializer, LayoutMigrator, Converter, null);
             InternalConfigStorage.Register<TestConfig>(ConfigLocationType.Local);
         }
     }

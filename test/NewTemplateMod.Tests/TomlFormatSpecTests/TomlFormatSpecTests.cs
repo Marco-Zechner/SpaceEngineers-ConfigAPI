@@ -46,7 +46,7 @@ namespace NewTemplateMod.Tests.TomlFormatSpecTests
             var fs = new FakeFileSystem();
             var migrator = new ConfigLayoutMigrator();
             var identity = new IdentityXmlConverter();
-            InternalConfigStorage.Initialize(fs, _xml, migrator, identity);
+            InternalConfigStorage.Initialize(fs, _xml, migrator, identity, null);
         }
 
         // --------------------------------------------------------------------

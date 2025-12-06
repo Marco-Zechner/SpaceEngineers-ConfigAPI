@@ -30,7 +30,7 @@ namespace NewTemplateMod.Tests.ReloadBehaviorTests
             ConfigStorage.Debug = new Debug();
 
             // Force fake filesystem into the core storage
-            InternalConfigStorage.Initialize(_fileSystem, _xml, _layoutMigrator, _tomlConverter);
+            InternalConfigStorage.Initialize(_fileSystem, _xml, _layoutMigrator, _tomlConverter, null);
         }
 
         // --------------------------------------------------------------------

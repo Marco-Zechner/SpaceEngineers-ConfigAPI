@@ -13,7 +13,7 @@ namespace NewTemplateMod.Tests.ConfigStorageTests
         public void Initialize_NullFileSystem_Throws()
         {
             Assert.That(
-                () => InternalConfigStorage.Initialize(null, XmlSerializer, LayoutMigrator, Converter),
+                () => InternalConfigStorage.Initialize(null, XmlSerializer, LayoutMigrator, Converter, null),
                 Throws.TypeOf<ArgumentNullException>());
         }
 
@@ -21,7 +21,7 @@ namespace NewTemplateMod.Tests.ConfigStorageTests
         public void Initialize_NullXmlSerializer_Throws()
         {
             Assert.That(
-                () => InternalConfigStorage.Initialize(FileSystem, null, LayoutMigrator, Converter),
+                () => InternalConfigStorage.Initialize(FileSystem, null, LayoutMigrator, Converter, null),
                 Throws.TypeOf<ArgumentNullException>());
         }
 
@@ -29,7 +29,7 @@ namespace NewTemplateMod.Tests.ConfigStorageTests
         public void Initialize_NullLayoutMigrator_Throws()
         {
             Assert.That(
-                () => InternalConfigStorage.Initialize(FileSystem, XmlSerializer, null, Converter),
+                () => InternalConfigStorage.Initialize(FileSystem, XmlSerializer, null, Converter, null),
                 Throws.TypeOf<ArgumentNullException>());
         }
 
@@ -37,7 +37,7 @@ namespace NewTemplateMod.Tests.ConfigStorageTests
         public void Initialize_NullConverter_Throws()
         {
             Assert.That(
-                () => InternalConfigStorage.Initialize(FileSystem, XmlSerializer, LayoutMigrator, null),
+                () => InternalConfigStorage.Initialize(FileSystem, XmlSerializer, LayoutMigrator, null, null),
                 Throws.TypeOf<ArgumentNullException>());
         }
 
@@ -45,7 +45,7 @@ namespace NewTemplateMod.Tests.ConfigStorageTests
         public void GetOrCreate_NoDefinitionForType_ThrowsInvalidOperationException()
         {
             // Re-init without registering OtherConfig
-            InternalConfigStorage.Initialize(FileSystem, XmlSerializer, LayoutMigrator, Converter);
+            InternalConfigStorage.Initialize(FileSystem, XmlSerializer, LayoutMigrator, Converter, null);
 
             Assert.That(
                 () => InternalConfigStorage.GetOrCreate<OtherConfig>(ConfigLocationType.Local),

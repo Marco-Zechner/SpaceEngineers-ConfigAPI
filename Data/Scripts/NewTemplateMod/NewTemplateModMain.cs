@@ -11,7 +11,7 @@ using VRage.Game.Components;
 namespace mz.NewTemplateMod
 {
     [MySessionComponentDescriptor(MyUpdateOrder.AfterSimulation)]  
-    public partial class NewTemplateModMain : MySessionComponentBase
+    public class NewTemplateModMain : MySessionComponentBase
     {
         private static readonly List<ConfigBase> _configs = new List<ConfigBase>();
         
@@ -32,10 +32,10 @@ namespace mz.NewTemplateMod
              * Implement Multiplayer support (client-server config sync)
              * qol Remember which files the user loaded as custom configs, so we can load them again next time by default.
              * qol Auto save configs on change?
-             * nullable fields in toml
              * qol deserialize old xml and save as toml?
              */
             
+            ConfigStorage.InitModContext(ModContext.ModId + "." + ModContext.ModName);
             _simpleConfig       = ConfigStorage.Load<SimpleConfig>(ConfigLocationType.Local, "CoolName");
             _intermediateConfig = ConfigStorage.Load<IntermediateConfig>(ConfigLocationType.Local);
             _collectionConfig   = ConfigStorage.Load<CollectionConfig>(ConfigLocationType.Local);

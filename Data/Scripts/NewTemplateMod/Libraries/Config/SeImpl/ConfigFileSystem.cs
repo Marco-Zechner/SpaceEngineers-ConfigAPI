@@ -16,9 +16,7 @@ namespace mz.Config.SeImpl
             {
                 default:
                 case ConfigLocationType.World:
-                    if (!utils.FileExistsInWorldStorage(fileName, typeof(ConfigFileSystem))) return false;
-                    reader = utils.ReadFileInWorldStorage(fileName, typeof(ConfigFileSystem));
-                    break;
+                    return ConfigMultiplayerFileSystem.TryReadWorldFile(fileName, out content);
                 case ConfigLocationType.Global:
                     if (!utils.FileExistsInGlobalStorage(fileName)) return false;
                     reader = utils.ReadFileInGlobalStorage(fileName);
@@ -42,8 +40,8 @@ namespace mz.Config.SeImpl
             {
                 default:
                 case ConfigLocationType.World:
-                    writer = utils.WriteFileInWorldStorage(fileName, typeof(ConfigFileSystem));
-                    break;
+                    ConfigMultiplayerFileSystem.WriteWorldFile(fileName, content);
+                    return;
                 case ConfigLocationType.Global:
                     writer = utils.WriteFileInGlobalStorage(fileName);
                     break;
@@ -63,7 +61,7 @@ namespace mz.Config.SeImpl
             {
                 default:
                 case ConfigLocationType.World:
-                    return utils.FileExistsInWorldStorage(fileName, typeof(ConfigFileSystem));
+                    return ConfigMultiplayerFileSystem.ExistsWorldFile(fileName);
                 case ConfigLocationType.Global:
                     return utils.FileExistsInGlobalStorage(fileName);
                 case ConfigLocationType.Local:

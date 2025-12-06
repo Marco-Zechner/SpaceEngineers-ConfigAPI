@@ -36,7 +36,7 @@ namespace NewTemplateMod.Tests.CollectionIntegrationTests
             _migrator = new ConfigLayoutMigrator();
             _converter = new IdentityXmlConverter();
 
-            InternalConfigStorage.Initialize(_fileSystem, _xml, _migrator, _converter);
+            InternalConfigStorage.Initialize(_fileSystem, _xml, _migrator, _converter, null);
 
             // Register CollectionConfig exactly like the mod does
             InternalConfigStorage.Register<CollectionConfig>(ConfigLocationType.Local);
