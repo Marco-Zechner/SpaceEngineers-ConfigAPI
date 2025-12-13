@@ -3,7 +3,7 @@ using mz.Config.Domain;
 using mz.SemanticVersioning;
 using VRage.Serialization;
 
-namespace mz.NewTemplateMod
+namespace NewTemplateMod.Tests
 {
     public class CollectionConfig : ConfigBase
     {

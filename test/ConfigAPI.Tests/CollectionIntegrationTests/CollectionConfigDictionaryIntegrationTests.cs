@@ -5,7 +5,6 @@ using mz.Config.Core.Converter;
 using mz.Config.Core.Layout;
 using mz.Config.Core.Storage;
 using mz.Config.Domain;
-using mz.NewTemplateMod;
 using NUnit.Framework;
 
 namespace NewTemplateMod.Tests.CollectionIntegrationTests

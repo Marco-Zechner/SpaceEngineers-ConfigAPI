@@ -3,11 +3,11 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NewTemplateMod", "Data\NewTemplateMod.csproj", "{8C388B10-D993-4CD4-BD4C-D379E3798AA1}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ConfigAPI", "Data\ConfigAPI.csproj", "{8C388B10-D993-4CD4-BD4C-D379E3798AA1}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "test", "test", "{67A7E593-B290-4978-AF2D-5773C2EAE40F}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NewTemplateMod.Tests", "test\NewTemplateMod.Tests\NewTemplateMod.Tests.csproj", "{292EEC5C-245D-4B70-909A-EFEC7D608749}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ConfigAPI.Tests", "test\ConfigAPI.Tests\ConfigAPI.Tests.csproj", "{292EEC5C-245D-4B70-909A-EFEC7D608749}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
