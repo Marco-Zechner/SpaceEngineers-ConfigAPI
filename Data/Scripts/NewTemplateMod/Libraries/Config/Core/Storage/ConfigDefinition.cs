@@ -15,24 +15,12 @@ namespace mz.Config.Core.Storage
         /// <summary>
         /// Uses typeof(T).Name as section name.
         /// </summary>
-        public ConfigDefinition() : this(typeof(T).Name)
+        public ConfigDefinition()
         {
         }
 
-        /// <summary>
-        /// Explicit section name. This is currently not used by the core,
-        /// but kept for future flexibility.
-        /// </summary>
-        public ConfigDefinition(string sectionName)
-        {
-            if (string.IsNullOrEmpty(sectionName))
-                throw new ArgumentNullException(nameof(sectionName));
-            SectionName = sectionName;
-        }
 
         public string TypeName => typeof(T).Name;
-
-        public string SectionName { get; private set; }
 
         public Type ConfigType => typeof(T);
 

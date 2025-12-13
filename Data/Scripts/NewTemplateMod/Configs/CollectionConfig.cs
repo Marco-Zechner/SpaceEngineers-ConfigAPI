@@ -10,16 +10,9 @@ namespace mz.NewTemplateMod
         public override SemanticVersion ConfigVersion => "0.3.0";
 
         public List<string> Tags { get; set; }
-
         public SerializableDictionary<string, int> NamedValues { get; set; }
+        public SubConfig Nested { get; set; }
 
-        public SubConfig Nested { get; set; } = new SubConfig();
-
-        public class SubConfig
-        {
-            public float Threshold { get; set; } = 0.75f;
-            public bool Allowed { get; set; } = true;
-        }
 
         public override void ApplyDefaults()
         {
@@ -32,6 +25,18 @@ namespace mz.NewTemplateMod
                     { "end", 10 }
                 }
             };
+            Nested = new SubConfig()
+            {
+                Threshold = 0.85f,
+                Allowed = false
+            };
+        }
+        
+        
+        public class SubConfig
+        {
+            public float Threshold { get; set; }
+            public bool Allowed { get; set; }
         }
     }
 }
