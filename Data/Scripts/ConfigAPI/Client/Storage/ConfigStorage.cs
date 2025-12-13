@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using MarcoZechner.ConfigAPI.Client.Api;
 using MarcoZechner.ConfigAPI.Shared.Abstractions;
 using MarcoZechner.ConfigAPI.Shared.Domain;
 using VRage.Game.ModAPI;
@@ -29,14 +30,14 @@ namespace MarcoZechner.ConfigAPI.Client.Storage
 
         public static void CustomInit(string modId, string modName)
         {
-            ApiConsumer.Init(modId, modName);
+            ApiBridge.Init(ulong.Parse(modId), modName);
 
             // Wire instance-level Save/TryLoad into ConfigBase
             ConfigBase.ClientBackend = new ClientBackend(_api, _currentInstances, _instanceToKey);
         }
 
         public static void Unload() 
-            => ApiConsumer.Unload();
+            => ApiBridge.Unload();
 
         public static T Get<T>(FileLocation location)
             where T : ConfigBase, new()

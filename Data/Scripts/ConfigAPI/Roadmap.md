@@ -11,15 +11,34 @@
 ---
 
 ## Phase 0: Skeleton + smoke tests (1 evening)
-### 0.1 Create repo layout (in your SE “folder-as-library” style)
-- ConfigAPIMod/
-    - Shared/ (message structs, helpers, keys)
-    - Client/ (CfgSync client state, inbox, send logic)
-    - Server/ (world state, op handlers, permissions)
-- UserMod API folder (copied into consumer mods)
-    - ConfigStorage.cs (public surface)
-    - ConfigDefinition<T>.cs (serialize/deserialize/default factory)
-    - CallbackApi.cs (filesystem + (de)serialize + default)
+### 0.1 Create repo layout
+ConfigAPI/
+- **Main/**  
+  Provider implementation (runs when ConfigAPI mod is loaded)
+    - Same-machine API discovery + registration (UserMods → ConfigAPI)
+    - Routing tables (modId, typeKey)
+    - Network send/receive (client + server side, since it’s one mod)
+    - Server world state + request handling (permissions, iteration)
+    - Migrator/Converter integration glue
+    - Diagnostics / logging
+
+- **Client/**  
+  Consumer-side API that other mods include (copied into their mods)
+    - Public API surface: `ConfigManager`, `ConfigStorage`, `CfgSync<T>`, `CfgUpdate`
+    - Type registration: `ConfigDefinition<T>` (NewDefault, Serialize, Deserialize)
+    - Callback API implementation (filesystem + serializer delegates)
+    - The “bridge” that talks to Main via the same-machine delegate API
+
+  (This folder is “passive” inside ConfigAPI itself. If you don’t call it, it does nothing.
+  You copy **Shared + Client** into ConfigAPIExample to test as a consumer.)
+
+- **Shared/**  
+  Code shared by both Main and Client (copied into consumer mods too)
+    - Keys: `(modId, typeKey)` structs
+    - Message envelope structs (protobuf models)
+    - Enums: OpCode, LocationType
+    - Small utilities: size checks, string keys, safe helpers
+
 
 ### 0.2 Add “hello link” API discovery
 - Local channel for discovery (not the network channel).
