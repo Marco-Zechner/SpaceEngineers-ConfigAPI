@@ -20,14 +20,15 @@ namespace MarcoZechner.ConfigAPI.Client.Api
         {
             get
             {
-                if (ApiLoaded) return _api;
+                if (ApiLoaded) return _mainApi;
                 
                 Log.Error(ConfigApiTopics.Api, "API not yet loaded.");
                 return null;
             }
         }
 
-        private static MainApi _api;
+        private static SetupApi _setupApi;
+        private static MainApi _mainApi;
         private static CallbackApiProvider _callback;
 
         private static ulong _consumerModId;
@@ -76,10 +77,12 @@ namespace MarcoZechner.ConfigAPI.Client.Api
         {
             Log.Trace("ApiBridge.Unload");
             
-            MyAPIGateway.Utilities.UnregisterMessageHandler(ApiConstant.DISCOVERY_CH, OnProviderMessage);
             ApiLoaded = false;
-            _api = null;
+            _setupApi.Disconnect(_consumerModId);
+            _setupApi = null;
+            _mainApi = null;
             _callback = null;
+            MyAPIGateway.Utilities.UnregisterMessageHandler(ApiConstant.DISCOVERY_CH, OnProviderMessage);
         }
 
         private static void OnProviderMessage(object obj)
@@ -131,8 +134,19 @@ namespace MarcoZechner.ConfigAPI.Client.Api
 
             try
             {
-                _api = new MainApi(_providerDict);
-                _api.RegisterCallbacks(_consumerModId, _consumerModName, _callback.ConvertToDict());
+                // payload[2] is Setup API delegate dict
+                var setupDict = _providerDict;
+
+                _setupApi = new SetupApi(setupDict);
+
+                // Connect: register callbacks + receive bound Main API dict
+                var mainDict = _setupApi.Connect(
+                    _consumerModId,
+                    _consumerModName,
+                    _callback.ConvertToDict()
+                );
+
+                _mainApi = new MainApi(mainDict);
                 ApiLoaded = true;
 
                 Log.Info(ConfigApiTopics.Api, 0, "API loaded + callbacks registered");

@@ -4,8 +4,8 @@
     {
         public const string API_VERSION = "0.1.0";
         public const string PROVIDER_MOD_NAME = "ConfigAPI";
-        public const ulong PROVIDER_STEAM_ID = 1234567890123456;
-        public const long DISCOVERY_CH = 23456;
+        public const ulong PROVIDER_STEAM_ID = 1234567890123456; //TODO replace
+        public const long DISCOVERY_CH = 23456; //TODO replace
         
         // Header protocol
         public const string MAGIC = "MZ_CFGAPI";
