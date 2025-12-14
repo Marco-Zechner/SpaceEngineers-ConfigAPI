@@ -9,6 +9,6 @@ namespace MarcoZechner.ConfigAPI.Shared.Api
         // ConfigAPIMod stores these callbacks and uses them for routing.
         void RegisterCallbacks(ulong modId, string modName, Dictionary<string, Delegate> callbacks);
 
-        void Test();
+        void Test(ulong modId);
     }
 }

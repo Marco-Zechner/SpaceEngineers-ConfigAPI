@@ -7,12 +7,12 @@ namespace MarcoZechner.ConfigAPI.Client.Api
     public sealed class MainApi : IMainApi
     {
         private readonly Action<ulong, string, Dictionary<string, Delegate>> _registerCallbacks;
-        private readonly Action _test;
+        private readonly Action<ulong> _test;
 
         public MainApi(Dictionary<string, Delegate> dict)
         {
             _registerCallbacks = (Action<ulong, string, Dictionary<string, Delegate>>)dict["RegisterCallbacks"];
-            _test = (Action)dict["Test"];
+            _test = (Action<ulong>)dict["Test"];
         }
         
         /// <summary>
@@ -24,7 +24,7 @@ namespace MarcoZechner.ConfigAPI.Client.Api
         public void RegisterCallbacks(ulong modId, string modName, Dictionary<string, Delegate> callbacks) 
             => _registerCallbacks(modId, modName, callbacks);
 
-        public void Test() 
-            => _test();
+        public void Test(ulong modId) 
+            => _test(modId);
     }
 }

@@ -16,9 +16,10 @@ namespace MarcoZechner.ConfigAPI.Main.Api
             ApiProviderSession.Log.Info(ConfigApiTopics.Callbacks, 0, $"Registered callbacks: {modName} ({modId})");
         }
 
-        public void Test()
+        public void Test(ulong modId)
         {
             ApiProviderSession.Log.Trace($"{nameof(ApiProviderSession)}.{nameof(Test)}", $"{nameof(Test)}");
+            ApiProviderSession.CallbacksByMod[modId]?.TestCallback();
         }
 
         public Dictionary<string, Delegate> ConvertToDict()
@@ -27,7 +28,7 @@ namespace MarcoZechner.ConfigAPI.Main.Api
             return new Dictionary<string, Delegate>
             {
                 { "RegisterCallbacks", new Action<ulong, string, Dictionary<string, Delegate>>(RegisterCallbacks) },
-                { "Test", new Action(Test) },
+                { "Test", new Action<ulong>(Test) },
             };
         }
     }
