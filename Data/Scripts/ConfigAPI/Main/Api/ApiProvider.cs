@@ -21,6 +21,7 @@ namespace MarcoZechner.ConfigAPI.Main.Api
 
         public override void LoadData()
         {
+            Log.Trace($"{nameof(ApiProviderSession)}.{nameof(LoadData)}");
             _verify = VerifyApi;
             _mainApi = LinkMainApiEndpoints();
 
@@ -32,7 +33,7 @@ namespace MarcoZechner.ConfigAPI.Main.Api
 
         protected override void UnloadData()
         {
-            Log.Trace("Provider.Unload");
+            Log.Trace($"{nameof(ApiProviderSession)}.{nameof(UnloadData)}");
             
             MyAPIGateway.Utilities.UnregisterMessageHandler(ApiConstant.DISCOVERY_CH, OnDiscoveryMessage);
             _mainApi = null;
@@ -43,6 +44,7 @@ namespace MarcoZechner.ConfigAPI.Main.Api
 
         private void OnDiscoveryMessage(object obj)
         {
+            Log.Trace($"{nameof(ApiProviderSession)}.{nameof(OnDiscoveryMessage)}", $"{nameof(obj)}={obj}");
             object[] payload;
             if (!ApiCast.Try(obj, out payload) || payload.Length != 3)
                 return;
@@ -80,13 +82,13 @@ namespace MarcoZechner.ConfigAPI.Main.Api
             ApiCast.TryGet(header, ApiConstant.H_FROM_MOD_ID, out fromId);
             ApiCast.TryGet(header, ApiConstant.H_FROM_MOD_NAME, out fromName);
 
-            Log.Debug(ConfigApiTopics.Discovery, 0, $"Received API request from {(fromName ?? "?")} ({fromId})");
+            Log.Debug(ConfigApiTopics.Discovery, 0, $"Received API request from {fromName ?? "?"} ({fromId})");
             SendAnnounce(fromId, fromName ?? "Unknown");
         }
 
         private void SendAnnounce(ulong targetModId, string targetModName)
         {
-            Log.Trace("Provider.SendAnnounce", $"{nameof(targetModId)} {targetModId}, {nameof(targetModName)} {targetModName}");
+            Log.Trace($"{nameof(ApiProviderSession)}.{nameof(SendAnnounce)}", $"{nameof(targetModId)}={targetModId}, {nameof(targetModName)}={targetModName}");
             var header = new Dictionary<string, object>
             {
                 { ApiConstant.H_MAGIC, ApiConstant.MAGIC },
@@ -111,6 +113,7 @@ namespace MarcoZechner.ConfigAPI.Main.Api
 
         private Dictionary<string, Delegate> LinkMainApiEndpoints()
         {
+            Log.Trace($"{nameof(ApiProviderSession)}.{nameof(LinkMainApiEndpoints)}");
             return new Dictionary<string, Delegate>
             {
                 { "RegisterCallbacks", new Action<ulong, string, Dictionary<string, Delegate>>(RegisterCallbacks) },
@@ -119,6 +122,7 @@ namespace MarcoZechner.ConfigAPI.Main.Api
 
         private void RegisterCallbacks(ulong modId, string modName, Dictionary<string, Delegate> callbacks)
         {
+            Log.Trace($"{nameof(ApiProviderSession)}.{nameof(RegisterCallbacks)}", $"{nameof(modId)}={modId}, {nameof(modName)}={modName}, {nameof(callbacks)}={callbacks}");
             if (callbacks == null) return;
             _callbacksByMod[modId] = callbacks;
 
@@ -128,16 +132,14 @@ namespace MarcoZechner.ConfigAPI.Main.Api
 
         private static bool VerifyApi(string clientApiVersion, string clientModName, ulong clientModSteamId)
         {
+            Log.Trace($"{nameof(ApiProviderSession)}.{nameof(VerifyApi)}", $"\n\t{nameof(clientApiVersion)} = {clientApiVersion},\n\t{nameof(clientModName)} = {clientModName},\n\t{nameof(clientModSteamId)} = {clientModSteamId}\n");
             var client = (clientApiVersion ?? "").Split('.');
             var provider = ApiConstant.API_VERSION.Split('.');
 
             if (client.Length != 3 || provider.Length != 3)
                 return false;
 
-            if (client[0] != provider[0])
-                return false;
-
-            return true;
+            return client[0] == provider[0];
         }
     }
 }

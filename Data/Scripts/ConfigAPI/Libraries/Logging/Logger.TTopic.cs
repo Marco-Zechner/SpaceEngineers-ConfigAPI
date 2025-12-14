@@ -49,9 +49,9 @@ namespace MarcoZechner.Logging
 
             string line;
             if (Config.TraceArgumentsEnabled && !string.IsNullOrEmpty(args))
-                line = "Trace: " + methodCall + "(" + args + ")";
+                line = methodCall + "(" + args + ")";
             else
-                line = "Trace: " + methodCall + "()";
+                line = methodCall + "()";
 
             WriteTrace(line);
         }
@@ -91,7 +91,7 @@ namespace MarcoZechner.Logging
             if (output != LogOutput.File && output != LogOutput.FileAndChat)
                 return;
 
-            WriteFileNoTopic("TRACE", message);
+            WriteFileNoTopic("Trace", message);
 
             if (output == LogOutput.FileAndChat)
                 _chatQueue.Enqueue(new ChatEntry { Sender = _source, Message = message });
@@ -139,10 +139,7 @@ namespace MarcoZechner.Logging
         {
             if (_writer == null) return;
 
-            var now = DateTime.Now;
-            var prefix = $"[{now:HH:mm:ss.ffff}] ";
-            var head = $"{prefix}[{_source}/{topic}/{sev}{(hasDetail ? "/d" + detail : "")}] ";
-
+            var head = $"{Prefix}[{_source}/{topic}/{sev}{(hasDetail ? "/d" + detail : "")}] ";
             message = message.Replace("\r\n", "\n");
             var lines = message.Split('\n');
 
@@ -155,15 +152,11 @@ namespace MarcoZechner.Logging
             _writer.Flush();
         }
 
-        // For trace: no topic, fixed formatting.
         private void WriteFileNoTopic(string sevTag, string message)
         {
             if (_writer == null) return;
 
-            var now = DateTime.Now;
-            var prefix = $"[{now:HH:mm:ss.ffff}] ";
-            var head = $"{prefix}[{_source}/{sevTag}] ";
-
+            var head = $"{Prefix}[{_source}/{sevTag}] ";
             message = (message ?? "").Replace("\r\n", "\n");
             var lines = message.Split('\n');
 
@@ -175,5 +168,7 @@ namespace MarcoZechner.Logging
 
             _writer.Flush();
         }
+        
+        private static string Prefix => $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.ffff}] ";
     }
 }

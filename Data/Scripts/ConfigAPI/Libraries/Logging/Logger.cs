@@ -7,11 +7,11 @@ namespace MarcoZechner.Logging
 {
     public static class Logger
     {
-        private static string _dateSuffix;
+        private static readonly string _dateSuffix;
         static Logger()
         {
             var now = DateTime.Now;
-            _dateSuffix = $"{now:YYYYMMdd_HHmmssffff}";
+            _dateSuffix = now.ToString("yyyy-MM-dd__HH-mm-ss-ffff");
         }
         
         private static class Cache<TTopic> where TTopic : struct

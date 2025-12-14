@@ -18,7 +18,7 @@ namespace MarcoZechner.ConfigAPI.Shared.Logging
                     cfg.DefaultRule.Enabled = false;
 
                     // enable useful baseline logs
-                    cfg.SetRule(ConfigApiTopics.Api, enabled: true, maxDetail: 1, output: LogOutput.FileAndChat);
+                    cfg.SetRule(ConfigApiTopics.Api, enabled: true, maxDetail: 1, output: LogOutput.File);
                     cfg.SetRule(ConfigApiTopics.Discovery, enabled: true, maxDetail: 0, output: LogOutput.File);
 
                     // callbacks can be noisy; keep off unless debugging
