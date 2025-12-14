@@ -5,7 +5,7 @@ using MarcoZechner.ConfigAPI.Shared.Logging;
 
 namespace MarcoZechner.ConfigAPI.Client.Api
 {
-    internal sealed class CallbackApi : ICallbackApi, IApi
+    internal sealed class CallbackApiProvider : ICallbackApi, IApiProvider
     {
         public void TestCallback()
         {

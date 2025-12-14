@@ -28,7 +28,7 @@ namespace MarcoZechner.ConfigAPI.Client.Api
         }
 
         private static MainApi _api;
-        private static CallbackApi _callback;
+        private static CallbackApiProvider _callback;
 
         private static ulong _consumerModId;
         private static string _consumerModName;
@@ -39,7 +39,7 @@ namespace MarcoZechner.ConfigAPI.Client.Api
             _consumerModId = modId;
             _consumerModName = modName;
 
-            _callback = new CallbackApi();
+            _callback = new CallbackApiProvider();
 
             MyAPIGateway.Utilities.RegisterMessageHandler(ApiConstant.DISCOVERY_CH, OnProviderMessage);
 

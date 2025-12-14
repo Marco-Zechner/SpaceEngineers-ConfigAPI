@@ -15,7 +15,7 @@ namespace MarcoZechner.ConfigAPI.Main.Api
         
         private Func<string, string, ulong, bool> _verify;
 
-        private MainApi _mainApi;
+        private MainApiProvider _mainApiProvider;
         public static readonly Dictionary<ulong, CallbackApi> CallbacksByMod
             = new Dictionary<ulong, CallbackApi>();
 
@@ -23,7 +23,7 @@ namespace MarcoZechner.ConfigAPI.Main.Api
         {
             Log.Trace($"{nameof(ApiProviderSession)}.{nameof(LoadData)}");
             _verify = VerifyApi;
-            _mainApi = new MainApi();
+            _mainApiProvider = new MainApiProvider();
 
             MyAPIGateway.Utilities.RegisterMessageHandler(ApiConstant.DISCOVERY_CH, OnDiscoveryMessage);
 
@@ -36,7 +36,7 @@ namespace MarcoZechner.ConfigAPI.Main.Api
             Log.Trace($"{nameof(ApiProviderSession)}.{nameof(UnloadData)}");
             
             MyAPIGateway.Utilities.UnregisterMessageHandler(ApiConstant.DISCOVERY_CH, OnDiscoveryMessage);
-            _mainApi = null;
+            _mainApiProvider = null;
             _verify = null;
 
             Log.CloseWriter();
@@ -107,8 +107,7 @@ namespace MarcoZechner.ConfigAPI.Main.Api
                 { ApiConstant.H_TYPES,  "Dict<string,object>, Func<string,string,ulong,bool>, Dict<string,Delegate>" }
             };
 
-            object[] payload = { header, _verify, _mainApi.ConvertToDict() };
-            MyAPIGateway.Utilities.SendModMessage(ApiConstant.DISCOVERY_CH, payload);
+            ModMessage.Send(header, _verify, _mainApiProvider);
         }
 
         private static bool VerifyApi(string clientApiVersion, string clientModName, ulong clientModSteamId)

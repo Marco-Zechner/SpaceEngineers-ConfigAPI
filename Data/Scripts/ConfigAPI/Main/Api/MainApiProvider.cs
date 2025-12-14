@@ -5,7 +5,7 @@ using MarcoZechner.ConfigAPI.Shared.Logging;
 
 namespace MarcoZechner.ConfigAPI.Main.Api
 {
-    public class MainApi : IMainApi, IApi
+    public class MainApiProvider : IMainApi, IApiProvider
     {
         public void RegisterCallbacks(ulong modId, string modName, Dictionary<string, Delegate> callbacks)
         {
