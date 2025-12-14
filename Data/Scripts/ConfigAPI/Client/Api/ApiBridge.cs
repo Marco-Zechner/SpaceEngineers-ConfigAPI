@@ -9,25 +9,37 @@ namespace MarcoZechner.ConfigAPI.Client.Api
 {
     public static class ApiBridge
     {
-        private static Logger<ConfigApiTopics> Log => CfgLog.Logger;
+        public static Logger<ConfigApiTopics> Log => CfgLog.Logger;
         
         public static bool ApiLoaded { get; private set; }
 
         private static Func<string, string, ulong, bool> _verify;
         private static Dictionary<string, Delegate> _providerDict;
 
+        public static MainApi Api
+        {
+            get
+            {
+                if (ApiLoaded) return _api;
+                
+                Log.Error(ConfigApiTopics.Api, "API not yet loaded.");
+                return null;
+            }
+        }
+
         private static MainApi _api;
-        private static Dictionary<string, Delegate> _callbackDict;
+        private static CallbackApi _callback;
 
         private static ulong _consumerModId;
         private static string _consumerModName;
 
         public static void Init(ulong modId, string modName)
         {
+            Log.Trace("ApiBridge.Init", $"{nameof(modId)} {modId}, {nameof(modName)} {modName}");
             _consumerModId = modId;
             _consumerModName = modName;
 
-            _callbackDict = BuildCallbackEndpoints();
+            _callback = new CallbackApi();
 
             MyAPIGateway.Utilities.RegisterMessageHandler(ApiConstant.DISCOVERY_CH, OnProviderMessage);
 
@@ -67,7 +79,7 @@ namespace MarcoZechner.ConfigAPI.Client.Api
             MyAPIGateway.Utilities.UnregisterMessageHandler(ApiConstant.DISCOVERY_CH, OnProviderMessage);
             ApiLoaded = false;
             _api = null;
-            _callbackDict = null;
+            _callback = null;
         }
 
         private static void OnProviderMessage(object obj)
@@ -120,7 +132,7 @@ namespace MarcoZechner.ConfigAPI.Client.Api
             try
             {
                 _api = new MainApi(_providerDict);
-                _api.RegisterCallbacks(_consumerModId, _consumerModName, _callbackDict);
+                _api.RegisterCallbacks(_consumerModId, _consumerModName, _callback.ConvertToDict());
                 ApiLoaded = true;
 
                 Log.Info(ConfigApiTopics.Api, 0, "API loaded + callbacks registered");
@@ -129,14 +141,6 @@ namespace MarcoZechner.ConfigAPI.Client.Api
             {
                 Log.Error(ConfigApiTopics.Api, "API load error: " + e.Message);
             }
-        }
-
-        private static Dictionary<string, Delegate> BuildCallbackEndpoints()
-        {
-            return new Dictionary<string, Delegate>
-            {
-                { "Ping", new Func<string>(() => "pong") }
-            };
         }
     }
 }

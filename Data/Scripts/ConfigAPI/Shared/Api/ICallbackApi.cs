@@ -7,5 +7,7 @@
     {
         // Phase 0.2 only needs registration; you can keep this empty for now.
         // Later you add filesystem + serialize/deserialize delegates here.
+        
+        void TestCallback();
     }
 }

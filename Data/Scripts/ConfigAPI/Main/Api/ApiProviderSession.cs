@@ -11,19 +11,19 @@ namespace MarcoZechner.ConfigAPI.Main.Api
     [MySessionComponentDescriptor(MyUpdateOrder.NoUpdate)]
     public sealed class ApiProviderSession : MySessionComponentBase
     {
-        private static Logger<ConfigApiTopics> Log => CfgLog.Logger;
+        public static Logger<ConfigApiTopics> Log => CfgLog.Logger;
         
-        private Dictionary<string, Delegate> _mainApi;
         private Func<string, string, ulong, bool> _verify;
 
-        private readonly Dictionary<ulong, Dictionary<string, Delegate>> _callbacksByMod
-            = new Dictionary<ulong, Dictionary<string, Delegate>>();
+        private MainApi _mainApi;
+        public static readonly Dictionary<ulong, CallbackApi> CallbacksByMod
+            = new Dictionary<ulong, CallbackApi>();
 
         public override void LoadData()
         {
             Log.Trace($"{nameof(ApiProviderSession)}.{nameof(LoadData)}");
             _verify = VerifyApi;
-            _mainApi = LinkMainApiEndpoints();
+            _mainApi = new MainApi();
 
             MyAPIGateway.Utilities.RegisterMessageHandler(ApiConstant.DISCOVERY_CH, OnDiscoveryMessage);
 
@@ -107,27 +107,8 @@ namespace MarcoZechner.ConfigAPI.Main.Api
                 { ApiConstant.H_TYPES,  "Dict<string,object>, Func<string,string,ulong,bool>, Dict<string,Delegate>" }
             };
 
-            object[] payload = { header, _verify, _mainApi };
+            object[] payload = { header, _verify, _mainApi.ConvertToDict() };
             MyAPIGateway.Utilities.SendModMessage(ApiConstant.DISCOVERY_CH, payload);
-        }
-
-        private Dictionary<string, Delegate> LinkMainApiEndpoints()
-        {
-            Log.Trace($"{nameof(ApiProviderSession)}.{nameof(LinkMainApiEndpoints)}");
-            return new Dictionary<string, Delegate>
-            {
-                { "RegisterCallbacks", new Action<ulong, string, Dictionary<string, Delegate>>(RegisterCallbacks) },
-            };
-        }
-
-        private void RegisterCallbacks(ulong modId, string modName, Dictionary<string, Delegate> callbacks)
-        {
-            Log.Trace($"{nameof(ApiProviderSession)}.{nameof(RegisterCallbacks)}", $"{nameof(modId)}={modId}, {nameof(modName)}={modName}, {nameof(callbacks)}={callbacks}");
-            if (callbacks == null) return;
-            _callbacksByMod[modId] = callbacks;
-
-            Log.Info(ConfigApiTopics.Callbacks, 0, $"Registered callbacks: {modName} ({modId})");
-
         }
 
         private static bool VerifyApi(string clientApiVersion, string clientModName, ulong clientModSteamId)
