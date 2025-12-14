@@ -1,77 +1,142 @@
-﻿using MarcoZechner.ConfigAPI.Shared.Api;
-using mz.Logging;
+﻿using System;
+using System.Collections.Generic;
+using MarcoZechner.ConfigAPI.Shared.Api;
+using MarcoZechner.ConfigAPI.Shared.Logging;
+using MarcoZechner.Logging;
 using Sandbox.ModAPI;
 
 namespace MarcoZechner.ConfigAPI.Client.Api
 {
     public static class ApiBridge
     {
-        private const long DISCOVERY_CH = ApiConstant.DISCOVERY_CHANNEL_ID;
+        private static Logger<ConfigApiTopics> Log => CfgLog.Logger;
+        
+        public static bool ApiLoaded { get; private set; }
 
-        private static IMainApi _mainApi;
+        private static Func<string, string, ulong, bool> _verify;
+        private static Dictionary<string, Delegate> _providerDict;
 
-        // Store these for retry if provider announces before we know our identity.
-        private static ulong _modId;
-        private static string _modName;
-        private static ICallbackApi _callbackApi;
+        private static MainApi _api;
+        private static Dictionary<string, Delegate> _callbackDict;
 
-        public static bool IsReady => _mainApi != null;
+        private static ulong _consumerModId;
+        private static string _consumerModName;
 
         public static void Init(ulong modId, string modName)
         {
-            _modId = modId;
-            _modName = modName;
-            _callbackApi = new CallbackApi();
+            _consumerModId = modId;
+            _consumerModName = modName;
 
-            MyAPIGateway.Utilities.RegisterMessageHandler(DISCOVERY_CH, OnDiscoveryMessage);
+            _callbackDict = BuildCallbackEndpoints();
 
-            // Ping once (provider will reply with announce).
-            var ping = new DiscoveryMessage
+            MyAPIGateway.Utilities.RegisterMessageHandler(ApiConstant.DISCOVERY_CH, OnProviderMessage);
+
+            Log.Info(ConfigApiTopics.Api, 1, "ApiBridge.Init -> sending API request");
+
+            SendRequest();
+        }
+
+        private static void SendRequest()
+        {
+            var header = new Dictionary<string, object>
             {
-                ProtocolVersion = DiscoveryMessage.PROTOCOL_VERSION,
-                Kind = DiscoveryKind.PING,
-                FromModId = modId,
-                FromModName = modName,
-                Api = null
+                { ApiConstant.H_MAGIC, ApiConstant.MAGIC },
+                { ApiConstant.H_PROTOCOL, ApiConstant.PROTOCOL },
+                { ApiConstant.H_SCHEMA, ApiConstant.SCHEMA_MAIN_REQUEST },
+                { ApiConstant.H_INTENT, ApiConstant.INTENT_REQUEST },
+                { ApiConstant.H_API_VERSION, ApiConstant.API_VERSION },
+
+                { ApiConstant.H_FROM_MOD_ID, _consumerModId },
+                { ApiConstant.H_FROM_MOD_NAME, _consumerModName },
+
+                { ApiConstant.H_TARGET_MOD_ID, ApiConstant.PROVIDER_STEAM_ID },
+                { ApiConstant.H_TARGET_MOD_NAME, ApiConstant.PROVIDER_MOD_NAME },
+
+                { ApiConstant.H_LAYOUT, "Header, Verify, Data" },
+                { ApiConstant.H_TYPES,  "Dict<string,object>, null, null" }
             };
-            MyAPIGateway.Utilities.SendModMessage(DISCOVERY_CH, ping);
+
+            object[] payload = { header, null, null };
+            MyAPIGateway.Utilities.SendModMessage(ApiConstant.DISCOVERY_CH, payload);
         }
 
         public static void Unload()
         {
-            MyAPIGateway.Utilities.UnregisterMessageHandler(DISCOVERY_CH, OnDiscoveryMessage);
-            _mainApi = null;
-            _callbackApi = null;
-        }
-
-        private static void OnDiscoveryMessage(object obj)
-        {
-            Chat.TryLine("ApiBridge: OnDiscoveryMessage", "Client");
+            Log.Trace(ConfigApiTopics.Api, "ApiBridge.Unload");
             
-            var msg = obj as DiscoveryMessage;
-            if (msg == null) return;
-
-            if (msg.ProtocolVersion != DiscoveryMessage.PROTOCOL_VERSION) return;
-            if (msg.Kind != DiscoveryKind.ANNOUNCE) return;
-
-            var api = msg.Api as IMainApi;
-            if (api == null) return;
-
-            _mainApi = api;
-
-            // Phase B: register callback API (one-way, idempotent).
-            _mainApi.AddCallbackApi(_modId, _modName, _callbackApi);
+            MyAPIGateway.Utilities.UnregisterMessageHandler(ApiConstant.DISCOVERY_CH, OnProviderMessage);
+            ApiLoaded = false;
+            _api = null;
+            _callbackDict = null;
         }
 
-        public static IMainApi MainApi
+        private static void OnProviderMessage(object obj)
         {
-            get
+            object[] payload;
+            if (!ApiCast.Try(obj, out payload) || payload.Length != 3)
+                return;
+
+            Dictionary<string, object> header;
+            if (!ApiCast.Try(payload[0], out header))
+                return;
+
+            string magic;
+            int protocol;
+            string intent;
+            string schema;
+
+            if (!ApiCast.TryGet(header, ApiConstant.H_MAGIC, out magic) || magic != ApiConstant.MAGIC)
+                return;
+
+            if (!ApiCast.TryGet(header, ApiConstant.H_PROTOCOL, out protocol) || protocol != ApiConstant.PROTOCOL)
+                return;
+
+            if (!ApiCast.TryGet(header, ApiConstant.H_INTENT, out intent) || intent != ApiConstant.INTENT_ANNOUNCE)
+                return;
+
+            if (!ApiCast.TryGet(header, ApiConstant.H_SCHEMA, out schema) || schema != ApiConstant.SCHEMA_MAIN_ANNOUNCE)
+                return;
+
+            // Respect target id: 0 means broadcast/any; otherwise must match us.
+            ulong targetId;
+            if (ApiCast.TryGet(header, ApiConstant.H_TARGET_MOD_ID, out targetId))
             {
-                if (_mainApi == null) throw new System.Exception("ConfigAPI Main API not available yet.");
-                return _mainApi;
+                if (targetId != 0UL && targetId != _consumerModId)
+                    return;
+            }
+
+            if (!ApiCast.Try(payload[1], out _verify))
+                return;
+
+            if (!ApiCast.Try(payload[2], out _providerDict))
+                return;
+
+            if (!_verify(ApiConstant.API_VERSION, _consumerModName, _consumerModId))
+            {
+                Log.Warning(ConfigApiTopics.Api, "Verify failed, ignoring provider API");
+                return;
+            }
+
+            try
+            {
+                _api = new MainApi(_providerDict);
+                _api.RegisterCallbacks(_consumerModId, _consumerModName, _callbackDict);
+                ApiLoaded = true;
+
+                Log.Info(ConfigApiTopics.Api, 0, "API loaded + callbacks registered");
+            }
+            catch (Exception e)
+            {
+                Log.Error(ConfigApiTopics.Api, "API load error: " + e.Message);
             }
         }
-        
-        public static ICallbackApi CallbackApi => _callbackApi;
+
+        private static Dictionary<string, Delegate> BuildCallbackEndpoints()
+        {
+            return new Dictionary<string, Delegate>
+            {
+                { "Ping", new Func<string>(() => "pong") }
+            };
+        }
     }
 }

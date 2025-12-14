@@ -1,12 +1,13 @@
-﻿namespace MarcoZechner.ConfigAPI.Shared.Api
+﻿using System;
+using System.Collections.Generic;
+
+namespace MarcoZechner.ConfigAPI.Shared.Api
 {
     public interface IMainApi
     {
         // Consumer mods call this once after they obtained the main API.
         // ConfigAPIMod stores these callbacks and uses them for routing.
-        void AddCallbackApi(ulong modId, string modName, object callbackApi);
+        void RegisterCallbacks(ulong modId, string modName, Dictionary<string, Delegate> callbacks);
 
-        // Optional: for debugging
-        bool IsCallbackRegistered(ulong modId);
     }
 }

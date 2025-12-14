@@ -2,7 +2,6 @@
 using System.IO;
 using mz.Config.Abstractions;
 using mz.Config.Core;
-using mz.Logging;
 using Sandbox.ModAPI;
 using VRage.Game.Components;
 
@@ -55,7 +54,6 @@ namespace mz.Config.SeImpl
                 else
                     writer.WriteLine(prefixEmpty + lines[i]);
             }
-            Chat.TryLine(message, source);
         }
         
         private static string GetPrefix()
