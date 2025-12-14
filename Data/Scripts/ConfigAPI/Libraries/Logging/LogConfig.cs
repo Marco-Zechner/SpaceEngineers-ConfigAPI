@@ -8,11 +8,15 @@ namespace MarcoZechner.Logging
         public LogOutput WarningOutput = LogOutput.File;
         public LogOutput ErrorOutput = LogOutput.FileAndChat;
 
+        // NEW: Trace routing + args toggle
+        public LogOutput TraceOutput = LogOutput.File;      // set to FileAndChat if you really want spam in chat
+        public bool TraceArgumentsEnabled = true;
+
         // If true, warnings/errors bypass topic enablement (recommended)
         public bool AlwaysLogWarnings = true;
         public bool AlwaysLogErrors = true;
 
-        // Default rule for Trace/Debug/Info if topic not configured
+        // Default rule for Debug/Info if topic not configured
         public TopicRule DefaultRule = new TopicRule(
             enabled: false,
             maxDetail: 0,

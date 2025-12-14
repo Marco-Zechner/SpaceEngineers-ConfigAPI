@@ -3,19 +3,18 @@ using VRage.Game.Components;
 
 namespace MarcoZechner.ConfigAPI.Shared.Logging
 {
-    [MySessionComponentDescriptor(MyUpdateOrder.AfterSimulation)]
+    [MySessionComponentDescriptor(MyUpdateOrder.NoUpdate)]
     public sealed class CfgLogFlushSession : MySessionComponentBase
     {
-        private bool _usedUtilities = false;
-        public override void UpdateAfterSimulation()
+        private bool _flushed = false;
+        public override void BeforeStart()
         {
-            if (_usedUtilities) return;
+            if (_flushed) return;
             if (MyAPIGateway.Utilities == null) return;
             
-            // Replace with your real readiness flag if you have it:
-            // CfgLog.LOG.FlushChatIfReady(ModSession.IsClientLoaded);
+            _flushed = true;
             CfgLog.Logger.FlushChatIfReady(true);
-            _usedUtilities = true;
+            MyAPIGateway.Utilities.ShowMessage(CfgLog.Logger.Source, "ExampleLogFlushSession: Flushed log to chat.");
         }
     }
 }

@@ -15,44 +15,58 @@ namespace MarcoZechner.Logging
 
         private readonly Queue<ChatEntry> _chatQueue = new Queue<ChatEntry>();
 
+        public string Source => _source;
         private readonly string _source;
-        private readonly TextWriter _writer;
-        private readonly LogConfig<TTopic> _config;
+        private TextWriter _writer;
 
         internal Logger(string source, TextWriter writer, LogConfig<TTopic> config)
         {
             _source = source ?? "Log";
             _writer = writer;
-            _config = config ?? new LogConfig<TTopic>();
+            Config = config ?? new LogConfig<TTopic>();
         }
-
-        public LogConfig<TTopic> Config { get { return _config; } }
-
-        // Trace: no detail; intended for “entered method X”
-        public void Trace(TTopic topic, string message)
+        
+        public void CloseWriter()
         {
-            Write(LogSeverity.Trace, topic, 0, message, hasDetail: false);
+            _writer?.Close();
+            _writer = null;
         }
 
-        public void Debug(TTopic topic, int detail, string message)
+        public LogConfig<TTopic> Config { get; }
+
+        /// <summary>
+        /// Trace method entry without any topic.
+        /// Put this as the first line of a method.
+        /// Produces:
+        ///   Trace: Foo()
+        /// or:
+        ///   Trace: Foo(a=1,b=2)
+        /// </summary>
+        public void Trace(string methodCall, string args = null)
         {
-            Write(LogSeverity.Debug, topic, detail, message, hasDetail: true);
+            if (string.IsNullOrEmpty(methodCall))
+                methodCall = "?";
+
+            string line;
+            if (Config.TraceArgumentsEnabled && !string.IsNullOrEmpty(args))
+                line = "Trace: " + methodCall + "(" + args + ")";
+            else
+                line = "Trace: " + methodCall + "()";
+
+            WriteTrace(line);
         }
 
-        public void Info(TTopic topic, int detail, string message)
-        {
-            Write(LogSeverity.Info, topic, detail, message, hasDetail: true);
-        }
+        public void Debug(TTopic topic, int detail, string message) 
+            => Write(LogSeverity.Debug, topic, detail, message, hasDetail: true);
 
-        public void Warning(TTopic topic, string message)
-        {
-            Write(LogSeverity.Warning, topic, 0, message, hasDetail: false);
-        }
+        public void Info(TTopic topic, int detail, string message) 
+            => Write(LogSeverity.Info, topic, detail, message, hasDetail: true);
 
-        public void Error(TTopic topic, string message)
-        {
-            Write(LogSeverity.Error, topic, 0, message, hasDetail: false);
-        }
+        public void Warning(TTopic topic, string message) 
+            => Write(LogSeverity.Warning, topic, 0, message, hasDetail: false);
+
+        public void Error(TTopic topic, string message) 
+            => Write(LogSeverity.Error, topic, 0, message, hasDetail: false);
 
         /// <summary>
         /// Flush queued chat messages once the game/client is ready.
@@ -70,6 +84,19 @@ namespace MarcoZechner.Logging
             }
         }
 
+        private void WriteTrace(string message)
+        {
+            // Route trace by its own policy (no topic rules involved)
+            var output = Config.TraceOutput;
+            if (output != LogOutput.File && output != LogOutput.FileAndChat)
+                return;
+
+            WriteFileNoTopic("TRACE", message);
+
+            if (output == LogOutput.FileAndChat)
+                _chatQueue.Enqueue(new ChatEntry { Sender = _source, Message = message });
+        }
+
         private void Write(LogSeverity sev, TTopic topic, int detail, string message, bool hasDetail)
         {
             if (message == null) message = "";
@@ -77,21 +104,23 @@ namespace MarcoZechner.Logging
             LogOutput output;
             bool shouldLog;
 
-            if (sev == LogSeverity.Error)
+            switch (sev)
             {
-                output = _config.ErrorOutput;
-                shouldLog = _config.AlwaysLogErrors || _config.GetRule(topic).Enabled;
-            }
-            else if (sev == LogSeverity.Warning)
-            {
-                output = _config.WarningOutput;
-                shouldLog = _config.AlwaysLogWarnings || _config.GetRule(topic).Enabled;
-            }
-            else
-            {
-                var rule = _config.GetRule(topic);
-                shouldLog = rule.Enabled && (!hasDetail || detail <= rule.MaxDetail);
-                output = rule.Output;
+                case LogSeverity.Error:
+                    output = Config.ErrorOutput;
+                    shouldLog = Config.AlwaysLogErrors || Config.GetRule(topic).Enabled;
+                    break;
+                case LogSeverity.Warning:
+                    output = Config.WarningOutput;
+                    shouldLog = Config.AlwaysLogWarnings || Config.GetRule(topic).Enabled;
+                    break;
+                case LogSeverity.Debug:
+                case LogSeverity.Info:
+                default:
+                    var rule = Config.GetRule(topic);
+                    shouldLog = rule.Enabled && (!hasDetail || detail <= rule.MaxDetail);
+                    output = rule.Output;
+                    break;
             }
 
             if (!shouldLog) return;
@@ -101,7 +130,7 @@ namespace MarcoZechner.Logging
             // Policy:
             // - Errors always FileAndChat (by config)
             // - Warnings file-only (by config)
-            // - Trace/Debug/Info chat only if topic rule Output == FileAndChat
+            // - Debug/Info chat only if topic rule Output == FileAndChat
             if (output == LogOutput.FileAndChat && sev != LogSeverity.Warning)
                 _chatQueue.Enqueue(new ChatEntry { Sender = _source, Message = message });
         }
@@ -111,18 +140,34 @@ namespace MarcoZechner.Logging
             if (_writer == null) return;
 
             var now = DateTime.Now;
-            var prefix = "[" + now.ToString("HH:mm:ss.ffff") + "] ";
-            var head = prefix
-                       + "[" + _source
-                       + "/" + topic
-                       + "/" + sev
-                       + (hasDetail ? ("/d" + detail) : "")
-                       + "] ";
+            var prefix = $"[{now:HH:mm:ss.ffff}] ";
+            var head = $"{prefix}[{_source}/{topic}/{sev}{(hasDetail ? "/d" + detail : "")}] ";
 
             message = message.Replace("\r\n", "\n");
             var lines = message.Split('\n');
 
-            for (int i = 0; i < lines.Length; i++)
+            for (var i = 0; i < lines.Length; i++)
+            {
+                if (i == 0) _writer.WriteLine(head + lines[i]);
+                else _writer.WriteLine(new string(' ', head.Length) + lines[i]);
+            }
+
+            _writer.Flush();
+        }
+
+        // For trace: no topic, fixed formatting.
+        private void WriteFileNoTopic(string sevTag, string message)
+        {
+            if (_writer == null) return;
+
+            var now = DateTime.Now;
+            var prefix = $"[{now:HH:mm:ss.ffff}] ";
+            var head = $"{prefix}[{_source}/{sevTag}] ";
+
+            message = (message ?? "").Replace("\r\n", "\n");
+            var lines = message.Split('\n');
+
+            for (var i = 0; i < lines.Length; i++)
             {
                 if (i == 0) _writer.WriteLine(head + lines[i]);
                 else _writer.WriteLine(new string(' ', head.Length) + lines[i]);

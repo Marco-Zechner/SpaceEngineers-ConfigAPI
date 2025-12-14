@@ -62,7 +62,7 @@ namespace MarcoZechner.ConfigAPI.Client.Api
 
         public static void Unload()
         {
-            Log.Trace(ConfigApiTopics.Api, "ApiBridge.Unload");
+            Log.Trace("ApiBridge.Unload");
             
             MyAPIGateway.Utilities.UnregisterMessageHandler(ApiConstant.DISCOVERY_CH, OnProviderMessage);
             ApiLoaded = false;

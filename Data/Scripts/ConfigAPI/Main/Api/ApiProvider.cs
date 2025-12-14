@@ -32,11 +32,13 @@ namespace MarcoZechner.ConfigAPI.Main.Api
 
         protected override void UnloadData()
         {
-            Log.Trace(ConfigApiTopics.Api, "Provider.Unload");
+            Log.Trace("Provider.Unload");
             
             MyAPIGateway.Utilities.UnregisterMessageHandler(ApiConstant.DISCOVERY_CH, OnDiscoveryMessage);
             _mainApi = null;
             _verify = null;
+
+            Log.CloseWriter();
         }
 
         private void OnDiscoveryMessage(object obj)
@@ -84,6 +86,7 @@ namespace MarcoZechner.ConfigAPI.Main.Api
 
         private void SendAnnounce(ulong targetModId, string targetModName)
         {
+            Log.Trace("Provider.SendAnnounce", $"{nameof(targetModId)} {targetModId}, {nameof(targetModName)} {targetModName}");
             var header = new Dictionary<string, object>
             {
                 { ApiConstant.H_MAGIC, ApiConstant.MAGIC },

@@ -7,6 +7,13 @@ namespace MarcoZechner.Logging
 {
     public static class Logger
     {
+        private static string _dateSuffix;
+        static Logger()
+        {
+            var now = DateTime.Now;
+            _dateSuffix = $"{now:YYYYMMdd_HHmmssffff}";
+        }
+        
         private static class Cache<TTopic> where TTopic : struct
         {
             internal static readonly Dictionary<string, Logger<TTopic>> ByFile
@@ -27,11 +34,14 @@ namespace MarcoZechner.Logging
         {
             if (string.IsNullOrEmpty(chatName)) chatName = "Log";
             if (string.IsNullOrEmpty(fileName)) fileName = "Log.log";
-
+            
+            var ext = Path.GetExtension(fileName);
+            fileName = $"{Path.GetFileNameWithoutExtension(fileName)}_{_dateSuffix}{ext}";
+            
             Logger<TTopic> existing;
             if (Cache<TTopic>.ByFile.TryGetValue(fileName, out existing))
                 return existing;
-
+            
             TextWriter writer = null;
             try
             {
