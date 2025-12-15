@@ -8,12 +8,12 @@ namespace MarcoZechner.ConfigAPI.Client.Api
 {
     internal sealed class ConfigCallbackApiImpl : IConfigCallbackApi, IApiProvider
     {
-        public void TestCallback()
+        public object NewDefault(string typeKey)
         {
-            // ApiBridge.Log.Info(ConfigApiTopics.Callbacks, 0, "TestCallback invoked");
+            throw new Exception("Not implemented");
         }
 
-        public object NewDefault(string typeKey)
+        public bool IsInstanceOf(string typeKey, object instance)
         {
             throw new Exception("Not Implemented");
         }
@@ -52,14 +52,14 @@ namespace MarcoZechner.ConfigAPI.Client.Api
         {
             return new Dictionary<string, Delegate>
             {
-                { nameof(TestCallback), new Action(TestCallback) },
                 { nameof(NewDefault), new Func<string, object>(NewDefault) },
+                { nameof(IsInstanceOf), new Func<string, object, bool>(IsInstanceOf) },
                 { nameof(SerializeToInternalXml), new Func<string, object, bool, string>(SerializeToInternalXml) },
                 { nameof(DeserializeFromInternalXml), new Func<string, string, object>(DeserializeFromInternalXml) },
                 { nameof(GetVariableDescriptions), new Func<string, IReadOnlyDictionary<string, string>>(GetVariableDescriptions) },
-                { nameof(LoadFile), new Func<int, string, string>(LoadFile) },
-                { nameof(SaveFile), new Action<int, string, string>(SaveFile) },
-                { nameof(BackupFile), new Action<int, string>(BackupFile) },
+                { nameof(LoadFile), new Func<int, string, string>(LoadFileInternal) },
+                { nameof(SaveFile), new Action<int, string, string>(SaveFileInternal) },
+                { nameof(BackupFile), new Action<int, string>(BackupFileInternal) },
             };
         }
         
@@ -67,13 +67,14 @@ namespace MarcoZechner.ConfigAPI.Client.Api
         // Internal conversion methods for delegate to custom types
         // ===============================================================
         
-        private string LoadFile(int locationTypeEnum, string filename) 
+        private string LoadFileInternal(int locationTypeEnum, string filename) 
             => LoadFile((LocationType)locationTypeEnum, filename);
         
-        private void SaveFile(int locationTypeEnum, string filename, string content) 
+        private void SaveFileInternal(int locationTypeEnum, string filename, string content) 
             => SaveFile((LocationType)locationTypeEnum, filename, content);
         
-        private void BackupFile(int locationTypeEnum, string filename) 
+        private void BackupFileInternal(int locationTypeEnum, string filename) 
             => BackupFile((LocationType)locationTypeEnum, filename);
+        
     }
 }

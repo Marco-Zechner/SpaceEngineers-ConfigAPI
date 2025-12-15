@@ -91,8 +91,8 @@ public class MySession // (in SE this would be MySessionComponentBase)
     private CfgSync<IntermediateConfig> _worldIntermediate;
 
     // Local/Global configs are accessed via properties so they can be replaced by the framework.
-    private CollectionConfig LocalCollections => ConfigStorage.Get<CollectionConfig>(LocationType.Local);
-    private IntermediateConfig GlobalIntermediate => ConfigStorage.Get<IntermediateConfig>(LocationType.Global);
+    private CollectionConfig LocalCollections => ConfigStorage.Get<CollectionConfig>(LocationType.Local, "optionalName");
+    private IntermediateConfig GlobalIntermediate => ConfigStorage.Get<IntermediateConfig>(LocationType.Global, "optionalName");
 
     public void LoadData()
     {
@@ -106,8 +106,8 @@ public class MySession // (in SE this would be MySessionComponentBase)
         ConfigManager.Init(_ctx);
 
         // World handles (defaults immediately, real values arrive via sync)
-        _worldCollections = ConfigStorage.World<CollectionConfig>();
-        _worldIntermediate = ConfigStorage.World<IntermediateConfig>();
+        _worldCollections = ConfigStorage.World<CollectionConfig>("optionalName");
+        _worldIntermediate = ConfigStorage.World<IntermediateConfig>("optionalName");
 
         // Optional: start Draft from current Auth so admin UI is synced initially
         _worldCollections.ResetDraft();
@@ -117,8 +117,8 @@ public class MySession // (in SE this would be MySessionComponentBase)
     public void UpdateLoop()
     {
         // 1) Start of tick: optionally observe updates/errors (you can ignore this entirely)
-        ConsumeUpdate(_worldCollections, "CollectionConfig");
-        ConsumeUpdate(_worldIntermediate, "IntermediateConfig");
+        ConsumeUpdate(_worldCollections);
+        ConsumeUpdate(_worldIntermediate);
 
         // 2) Use local config (client-only)
         if (LocalCollections.Nested.Allowed)
@@ -131,6 +131,14 @@ public class MySession // (in SE this would be MySessionComponentBase)
         {
             // ...
         }
+        
+        GlobalIntermediate.Save();
+        GlobalIntermediate.SaveAndSwitch("Name");
+        GlobalIntermediate.Load("Name");
+        GlobalIntermediate.Export("Name");
+        
+        var cfg = GlobalIntermediate;
+        cfg = cfg.SaveAndSwitch("Name"); // this works too if you don't use the global Get<> but is not recommended
 
         // 4) Use world authoritative config (server state)
         var worldA = _worldCollections.Auth;
@@ -172,7 +180,7 @@ public class MySession // (in SE this would be MySessionComponentBase)
         }
     }
 
-    private void ConsumeUpdate<T>(CfgSync<T> sync, string name) where T : ConfigBase, new()
+    private void ConsumeUpdate<T>(CfgSync<T> sync) where T : ConfigBase, new()
     {
         var upd = sync.GetUpdate();
         if (upd == null) return;
@@ -185,9 +193,9 @@ public class MySession // (in SE this would be MySessionComponentBase)
 
         // Optional informational log:
         if (upd.TriggeredBy == _ctx.MyPlayerId)
-            Logger(name + " request applied. Iteration=" + upd.ServerIteration);
+            Logger(sync.Auth.TypeName + " request applied. Iteration=" + upd.ServerIteration);
         else
-            Logger(name + " changed by another admin. Iteration=" + upd.ServerIteration);
+            Logger(sync.Auth.TypeName + " changed by another admin. Iteration=" + upd.ServerIteration);
     }
 
     // ---------------------------------------------------------

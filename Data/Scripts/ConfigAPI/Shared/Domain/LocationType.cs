@@ -4,6 +4,6 @@
     {
         Local = 0,
         Global = 1,
-        World = 2
+        // World = 2 // world is handled via a separate system
     }
 }

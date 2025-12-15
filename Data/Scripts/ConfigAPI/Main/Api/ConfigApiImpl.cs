@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using MarcoZechner.ApiLib;
 using MarcoZechner.ConfigAPI.Scripts.ConfigAPI.Shared.Domain;
 using MarcoZechner.ConfigAPI.Shared.Api;
-using Sandbox.ModAPI;
 
 namespace MarcoZechner.ConfigAPI.Main.Api
 {
@@ -24,73 +23,76 @@ namespace MarcoZechner.ConfigAPI.Main.Api
             _configCallbackApi = configCallbackApi;
         }
 
-        public void Test()
-        {
-            MyAPIGateway.Utilities.ShowMessage("ConfigAPI-host", "Test invoked");
-            _configCallbackApi.TestCallback();
-        }
-
-        public object GetConfig(string typeKey, int locationType, string filename)
+        // Client-side APIs
+        
+        public object ClientConfigGet(string typeKey, LocationType locationType, string filename)
         {
             throw new Exception("Not Implemented");
         }
 
-        public object LoadConfig(string typeKey, int locationType, string filename)
+        public object ClientConfigLoadAndSwitch(string typeKey, LocationType locationType, string filename)
         {
             throw new Exception("Not Implemented");
         }
 
-        public bool SaveConfig(string typeKey, int locationType, string filename)
+        public bool ClientConfigSave(string typeKey, LocationType locationType)
         {
             throw new Exception("Not Implemented");
         }
 
-        public bool WorldOpen(string typeKey, string defaultFile)
+        public object ClientConfigSaveAndSwitch(string typeKey, LocationType locationType, string filename)
         {
             throw new Exception("Not Implemented");
         }
 
-        public CfgUpdate WorldGetUpdate(string typeKey)
+        public bool ClientConfigExport(string typeKey, LocationType locationType, string filename, bool overwrite)
         {
             throw new Exception("Not Implemented");
         }
 
-        public object WorldGetAuth(string typeKey)
+        // Server-side APIs
+        
+        public object ServerConfigInit(string typeKey, string defaultFile)
         {
             throw new Exception("Not Implemented");
         }
 
-        public object WorldGetDraft(string typeKey)
+        public CfgUpdate ServerConfigGetUpdate(string typeKey)
         {
             throw new Exception("Not Implemented");
         }
 
-        public void WorldResetDraft(string typeKey)
+        public object ServerConfigGetAuth(string typeKey)
         {
             throw new Exception("Not Implemented");
         }
 
-        public bool WorldLoadAndSwitch(string typeKey, string file, ulong baseIteration)
+        public object ServerConfigGetDraft(string typeKey)
         {
             throw new Exception("Not Implemented");
         }
 
-        public bool WorldSave(string typeKey, ulong baseIteration)
+        public void ServerConfigResetDraft(string typeKey)
         {
             throw new Exception("Not Implemented");
         }
 
-        public bool WorldSaveAndSwitch(string typeKey, string file, ulong baseIteration)
+        public bool ServerConfigLoadAndSwitch(string typeKey, string file, ulong baseIteration)
         {
             throw new Exception("Not Implemented");
         }
 
-        public bool WorldExport(string typeKey, string file, ulong baseIteration)
+        public bool ServerConfigSave(string typeKey, ulong baseIteration)
         {
             throw new Exception("Not Implemented");
         }
 
-        public WorldMeta WorldGetMeta(string typeKey)
+        public bool ServerConfigSaveAndSwitch(string typeKey, string file, ulong baseIteration)
+        {
+            throw new Exception("Not Implemented");
+        }
+
+        public bool ServerConfigExport(string typeKey, string file, bool overwrite)
         {
             throw new Exception("Not Implemented");
         }
@@ -99,26 +101,37 @@ namespace MarcoZechner.ConfigAPI.Main.Api
         {
             return new Dictionary<string, Delegate>
             {
-                { nameof(Test), new Action(Test) },
-                { nameof(GetConfig), new Func<string, int, string, object>(GetConfig) },
-                { nameof(LoadConfig), new Func<string, int, string, object>(LoadConfig) },
-                { nameof(SaveConfig), new Func<string, int, string, bool>(SaveConfig) },
-                { nameof(WorldOpen), new Func<string, string, bool>(WorldOpen) },
-                { nameof(WorldGetUpdate), new WorldTryDequeueUpdateDelegate(WorldTryDequeueUpdate) },
-                { nameof(WorldGetAuth), new Func<string, object>(WorldGetAuth) },
-                { nameof(WorldGetDraft), new Func<string, object>(WorldGetDraft) },
-                { nameof(WorldResetDraft), new Action<string>(WorldResetDraft) },
-                { nameof(WorldLoadAndSwitch), new Func<string, string, ulong, bool>(WorldLoadAndSwitch) },
-                { nameof(WorldSave), new Func<string, ulong, bool>(WorldSave) },
-                { nameof(WorldSaveAndSwitch), new Func<string, string, ulong, bool>(WorldSaveAndSwitch) },
-                { nameof(WorldExport), new Func<string, string, ulong, bool>(WorldExport) },
-                { nameof(WorldGetMeta), new WorldTryGetMetaDelegate(WorldTryGetMeta) },
+                { nameof(ClientConfigGet), new Func<string, int, string, object>(ClientConfigGetInternal) },
+                { nameof(ClientConfigLoadAndSwitch), new Func<string, int, string, object>(ClientConfigLoadAndSwitchInternal) },
+                { nameof(ClientConfigSave), new Func<string, int, bool>(ClientConfigSaveInternal) },
+                { nameof(ClientConfigSaveAndSwitch), new Func<string, int, string, object>(ClientConfigSaveAndSwitchInternal) },
+                { nameof(ClientConfigExport), new Func<string, int, string, bool, bool>(ClientConfigExportInternal) },
+                { nameof(ServerConfigInit), new Func<string, string, object>(ServerConfigInit) },
+                { nameof(ServerConfigGetUpdate), new WorldTryDequeueUpdateDelegate(WorldTryDequeueUpdate) },
+                { nameof(ServerConfigGetAuth), new Func<string, object>(ServerConfigGetAuth) },
+                { nameof(ServerConfigGetDraft), new Func<string, object>(ServerConfigGetDraft) },
+                { nameof(ServerConfigResetDraft), new Action<string>(ServerConfigResetDraft) },
+                { nameof(ServerConfigLoadAndSwitch), new Func<string, string, ulong, bool>(ServerConfigLoadAndSwitch) },
+                { nameof(ServerConfigSave), new Func<string, ulong, bool>(ServerConfigSave) },
+                { nameof(ServerConfigSaveAndSwitch), new Func<string, string, ulong, bool>(ServerConfigSaveAndSwitch) },
+                { nameof(ServerConfigExport), new Func<string, string, bool, bool>(ServerConfigExport) },
             };
         }
         
         // ===============================================================
         // Internal conversion methods for delegate to custom types
         // ===============================================================
+        
+        private object ClientConfigGetInternal(string typeKey, int locationTypeEnum, string filename) 
+            => ClientConfigGet(typeKey, (LocationType)locationTypeEnum, filename);
+        private object ClientConfigLoadAndSwitchInternal(string typeKey, int locationTypeEnum, string filename)
+            => ClientConfigLoadAndSwitch(typeKey, (LocationType)locationTypeEnum, filename);
+        private bool ClientConfigSaveInternal(string typeKey, int locationTypeEnum) 
+            => ClientConfigSave(typeKey, (LocationType)locationTypeEnum);
+        private object ClientConfigSaveAndSwitchInternal(string typeKey, int locationTypeEnum, string filename) 
+            => ClientConfigSaveAndSwitch(typeKey, (LocationType)locationTypeEnum, filename);
+        private bool ClientConfigExportInternal(string typeKey, int locationTypeEnum, string filename, bool overwrite) 
+            => ClientConfigExport(typeKey, (LocationType)locationTypeEnum, filename, overwrite);
         
         private bool WorldTryDequeueUpdate(
             string typeKey,
@@ -128,7 +141,7 @@ namespace MarcoZechner.ConfigAPI.Main.Api
             out ulong serverIteration,
             out string currentFile)
         {
-            var cfgUpdate = WorldGetUpdate(typeKey);
+            var cfgUpdate = ServerConfigGetUpdate(typeKey);
             if (cfgUpdate == null)
             {
                 worldOpKindEnum = 0;
@@ -144,27 +157,6 @@ namespace MarcoZechner.ConfigAPI.Main.Api
             triggeredBy = cfgUpdate.TriggeredBy;
             serverIteration = cfgUpdate.ServerIteration;
             currentFile = cfgUpdate.CurrentFile;
-            return true;
-        }
-
-        private bool WorldTryGetMeta(
-            string typeKey,
-            out ulong serverIteration,
-            out string currentFile,
-            out bool requestInFlight)
-        {
-            var worldMeta = WorldGetMeta(typeKey);
-            if (worldMeta == null)
-            {
-                serverIteration = 0;
-                currentFile = null;
-                requestInFlight = false;
-                return false;
-            }
-
-            serverIteration = worldMeta.ServerIteration;
-            currentFile = worldMeta.CurrentFile;
-            requestInFlight = worldMeta.RequestInFlight;
             return true;
         }
     }

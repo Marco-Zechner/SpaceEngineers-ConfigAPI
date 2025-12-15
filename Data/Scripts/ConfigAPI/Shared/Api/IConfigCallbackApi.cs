@@ -3,7 +3,7 @@ using MarcoZechner.ConfigAPI.Scripts.ConfigAPI.Shared.Domain;
 
 namespace MarcoZechner.ConfigAPI.Shared.Api
 {
-/// <summary>
+    /// <summary>
     /// Callback API implemented by each UserMod (consumer),
     /// called by ConfigAPIMod to do mod-specific work:
     /// - file IO in the mod's folder
@@ -16,11 +16,6 @@ namespace MarcoZechner.ConfigAPI.Shared.Api
     public interface IConfigCallbackApi
     {
         // -------------------------
-        // Diagnostics
-        // -------------------------
-        void TestCallback();
-
-        // -------------------------
         // Type system
         // -------------------------
 
@@ -29,6 +24,11 @@ namespace MarcoZechner.ConfigAPI.Shared.Api
         /// Must call ApplyDefaults() internally for collection defaults.
         /// </summary>
         object NewDefault(string typeKey);
+        
+        /// <summary>
+        /// Check if the given instance matches the typeKey.
+        /// </summary>
+        bool IsInstanceOf(string typeKey, object instance);
 
         /// <summary>
         /// Serialize an instance to INTERNAL CANONICAL XML (not TOML).
