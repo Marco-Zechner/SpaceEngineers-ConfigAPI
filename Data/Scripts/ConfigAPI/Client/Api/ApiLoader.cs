@@ -8,9 +8,9 @@ namespace MarcoZechner.ConfigAPI.Client.Api
         public static bool ApiLoaded => _bridge != null && _bridge.ApiLoaded;
 
         private static ApiConsumerBridge _bridge;
-        private static MainApi _api;
+        private static ConfigApi _api;
 
-        public static MainApi Api => ApiLoaded ? _api : null;
+        public static ConfigApi Api => ApiLoaded ? _api : null;
 
         public static void Init(ulong modId, string modName)
         {
@@ -18,7 +18,7 @@ namespace MarcoZechner.ConfigAPI.Client.Api
                 modId,
                 modName,
                 new ConfigApiBootstrap(),
-                new CallbackApiImpl(), 
+                new ConfigCallbackApiImpl(), 
                 SetMainApi
             );
             
@@ -36,6 +36,6 @@ namespace MarcoZechner.ConfigAPI.Client.Api
             _api = null;
         }
         
-        private static void SetMainApi(IApiProvider mainApi) => _api = new MainApi(mainApi);
+        private static void SetMainApi(IApiProvider mainApi) => _api = new ConfigApi(mainApi);
     }
 }
