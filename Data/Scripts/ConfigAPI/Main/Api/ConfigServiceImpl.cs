@@ -1,6 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
 using MarcoZechner.ApiLib;
+using MarcoZechner.ConfigAPI.Main.Core;
+using MarcoZechner.ConfigAPI.Main.Core.Migrator;
+using MarcoZechner.ConfigAPI.Main.Core.XmlConverter;
 using MarcoZechner.ConfigAPI.Shared.Domain;
 using MarcoZechner.ConfigAPI.Shared.Api;
 
@@ -15,40 +18,36 @@ namespace MarcoZechner.ConfigAPI.Main.Api
         private readonly ulong _consumerModId;
         private readonly string _consumerModName;
         private readonly ConfigUserHooks _configUserHooks;
+        private ClientConfigService _clientConfigService;
 
         public ConfigServiceImpl(ulong modId, string modName, ConfigUserHooks configUserHooks)
         {
             _consumerModId = modId;
             _consumerModName = modName;
             _configUserHooks = configUserHooks;
+            _clientConfigService = new ClientConfigService(
+                _configUserHooks,
+                new TomlXmlConverter(),
+                new ConfigLayoutMigrator()
+            );
         }
 
         // Client-side APIs
         
-        public object ClientConfigGet(string typeKey, LocationType locationType, string filename)
-        {
-            throw new Exception("Not Implemented");
-        }
+        public object ClientConfigGet(string typeKey, LocationType locationType, string filename) 
+            => _clientConfigService.ClientConfigGet(typeKey, locationType, filename);
 
         public object ClientConfigLoadAndSwitch(string typeKey, LocationType locationType, string filename)
-        {
-            throw new Exception("Not Implemented");
-        }
+            => _clientConfigService.ClientConfigLoadAndSwitch(typeKey, locationType, filename);
 
         public bool ClientConfigSave(string typeKey, LocationType locationType)
-        {
-            throw new Exception("Not Implemented");
-        }
+            => _clientConfigService.ClientConfigSave(typeKey, locationType);
 
         public object ClientConfigSaveAndSwitch(string typeKey, LocationType locationType, string filename)
-        {
-            throw new Exception("Not Implemented");
-        }
+            => _clientConfigService.ClientConfigSaveAndSwitch(typeKey, locationType, filename);
 
         public bool ClientConfigExport(string typeKey, LocationType locationType, string filename, bool overwrite)
-        {
-            throw new Exception("Not Implemented");
-        }
+            => _clientConfigService.ClientConfigExport(typeKey, locationType, filename, overwrite);
 
         // Server-side APIs
         

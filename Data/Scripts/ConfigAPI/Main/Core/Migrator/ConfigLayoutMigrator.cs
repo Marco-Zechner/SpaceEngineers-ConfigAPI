@@ -1,9 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
-using mz.Config.Abstractions;
-using mz.Config.Abstractions.Layout;
+using MarcoZechner.ConfigAPI.Main.Domain;
 
-namespace mz.Config.Core.Layout
+namespace MarcoZechner.ConfigAPI.Main.Core.Migrator
 {
     /// <summary>
     /// Normalizes a config's XML layout against the current code layout:
