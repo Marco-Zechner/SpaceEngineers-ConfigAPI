@@ -1,6 +1,6 @@
 ﻿using System.Collections.Generic;
 
-namespace MarcoZechner.ConfigAPI.Shared.Api
+namespace MarcoZechner.ApiLib
 {
     public static class ApiCast
     {
@@ -14,7 +14,7 @@ namespace MarcoZechner.ConfigAPI.Shared.Api
             result = default(T);
             return false;
         }
-        
+
         public static bool TryGet<T>(Dictionary<string, object> dict, string key, out T value)
         {
             object o;

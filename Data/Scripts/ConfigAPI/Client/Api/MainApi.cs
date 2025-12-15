@@ -1,5 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
+using MarcoZechner.ApiLib;
 using MarcoZechner.ConfigAPI.Shared.Api;
 
 namespace MarcoZechner.ConfigAPI.Client.Api
@@ -8,8 +8,9 @@ namespace MarcoZechner.ConfigAPI.Client.Api
     {
         private readonly Action _test;
 
-        public MainApi(Dictionary<string, Delegate> dict)
+        public MainApi(IApiProvider mainApi)
         {
+            var dict = mainApi.ConvertToDict();
             _test = (Action)dict["Test"];
         }
 

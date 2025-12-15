@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
-using MarcoZechner.ConfigAPI.Shared.Api;
+using MarcoZechner.ApiLib;
+using Sandbox.ModAPI;
 
 namespace MarcoZechner.ConfigAPI.Main.Api
 {
@@ -8,13 +9,13 @@ namespace MarcoZechner.ConfigAPI.Main.Api
     /// Main API bound to a single consumer mod.
     /// No modId needs to be passed on calls anymore.
     /// </summary>
-    public sealed class MainApiBoundProvider : IApiProvider
+    public sealed class MainApiImpl : IApiProvider
     {
         private readonly ulong _consumerModId;
         private readonly string _consumerModName;
         private readonly CallbackApi _callbackApi;
 
-        public MainApiBoundProvider(ulong modId, string modName, CallbackApi callbackApi)
+        public MainApiImpl(ulong modId, string modName, CallbackApi callbackApi)
         {
             _consumerModId = modId;
             _consumerModName = modName;
@@ -23,6 +24,7 @@ namespace MarcoZechner.ConfigAPI.Main.Api
 
         public void Test()
         {
+            MyAPIGateway.Utilities.ShowMessage("ConfigAPI-host", "Test invoked");
             _callbackApi.TestCallback();
         }
 

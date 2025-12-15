@@ -8,7 +8,7 @@
         <GenerateNeutralResourcesLanguageAttribute>false</GenerateNeutralResourcesLanguageAttribute>
         <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute> 
         <IsPublishable>false</IsPublishable>
-        <RootNamespace>NewTemplateMod</RootNamespace>
+        <RootNamespace>MarcoZechner.ConfigAPI</RootNamespace>
     </PropertyGroup>
 
     <ItemGroup>

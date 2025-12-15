@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 
-namespace MarcoZechner.ConfigAPI.Shared.Api
+namespace MarcoZechner.ApiLib
 {
     public interface IApiProvider
     {

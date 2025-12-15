@@ -1,15 +1,15 @@
 ﻿using System;
 using System.Collections.Generic;
+using MarcoZechner.ApiLib;
 using MarcoZechner.ConfigAPI.Shared.Api;
-using MarcoZechner.ConfigAPI.Shared.Logging;
 
 namespace MarcoZechner.ConfigAPI.Client.Api
 {
-    internal sealed class CallbackApiProvider : ICallbackApi, IApiProvider
+    internal sealed class CallbackApiImpl : ICallbackApi, IApiProvider
     {
         public void TestCallback()
         {
-            ApiBridge.Log.Info(ConfigApiTopics.Callbacks, 0, "TestCallback invoked");
+            // ApiBridge.Log.Info(ConfigApiTopics.Callbacks, 0, "TestCallback invoked");
         }
         // Phase 0.2: empty
         // Later phases:

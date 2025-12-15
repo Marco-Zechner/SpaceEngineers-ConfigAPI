@@ -1,9 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
+using MarcoZechner.ApiLib;
 using MarcoZechner.ConfigAPI.Shared.Api;
-using MarcoZechner.ConfigAPI.Shared.Logging;
-using MarcoZechner.Logging;
-using Sandbox.ModAPI;
 using VRage.Game.Components;
 
 namespace MarcoZechner.ConfigAPI.Main.Api
@@ -11,115 +8,46 @@ namespace MarcoZechner.ConfigAPI.Main.Api
     [MySessionComponentDescriptor(MyUpdateOrder.NoUpdate)]
     public sealed class ApiProviderSession : MySessionComponentBase
     {
-        public static Logger<ConfigApiTopics> Log => CfgLog.Logger;
-        
-        private Func<string, string, ulong, bool> _verify;
-
-        private SetupApiProvider _setupApiProvider;
+        // Stored callback APIs per consumer mod
         public static readonly Dictionary<ulong, CallbackApi> CallbacksByMod
             = new Dictionary<ulong, CallbackApi>();
 
+        private ApiProviderHost _host;
+
         public override void LoadData()
         {
-            Log.Trace($"{nameof(ApiProviderSession)}.{nameof(LoadData)}");
-            _verify = VerifyApi;
-            _setupApiProvider = new SetupApiProvider();
-
-            MyAPIGateway.Utilities.RegisterMessageHandler(ApiConstant.DISCOVERY_CH, OnDiscoveryMessage);
-
-            Log.Info(ConfigApiTopics.Api, 0, "Provider loaded, announcing API");
-            SendAnnounce(0UL, "Any"); // broadcast
+            _host = new ApiProviderHost(new ConfigApiBootstrap(), Connect, Disconnect);
+            _host.Load();
         }
 
         protected override void UnloadData()
         {
-            Log.Trace($"{nameof(ApiProviderSession)}.{nameof(UnloadData)}");
+            if (_host == null) return;
             
-            MyAPIGateway.Utilities.UnregisterMessageHandler(ApiConstant.DISCOVERY_CH, OnDiscoveryMessage);
-            _setupApiProvider = null;
-            _verify = null;
-
-            Log.CloseWriter();
+            _host.Unload();
+            _host = null;
         }
 
-        private void OnDiscoveryMessage(object obj)
+        // Called by ApiLib when a consumer connects
+        private static IApiProvider Connect(
+            ulong consumerModId,
+            string consumerModName,
+            IApiProvider yourCallbackApi
+        )
         {
-            Log.Trace($"{nameof(ApiProviderSession)}.{nameof(OnDiscoveryMessage)}", $"{nameof(obj)}={obj}");
-            object[] payload;
-            if (!ApiCast.Try(obj, out payload) || payload.Length != 3)
-                return;
+            // store callbacks for provider -> consumer calls
+            CallbacksByMod[consumerModId] = new CallbackApi(yourCallbackApi);
 
-            Dictionary<string, object> header;
-            if (!ApiCast.Try(payload[0], out header))
-                return;
-
-            string magic;
-            int protocol;
-            string intent;
-            string schema;
-
-            if (!ApiCast.TryGet(header, ApiConstant.H_MAGIC, out magic) || magic != ApiConstant.MAGIC)
-                return;
-
-            if (!ApiCast.TryGet(header, ApiConstant.H_PROTOCOL, out protocol) || protocol != ApiConstant.PROTOCOL)
-                return;
-
-            if (!ApiCast.TryGet(header, ApiConstant.H_INTENT, out intent) || intent != ApiConstant.INTENT_REQUEST)
-                return;
-
-            if (!ApiCast.TryGet(header, ApiConstant.H_SCHEMA, out schema) || schema != ApiConstant.SCHEMA_MAIN_REQUEST)
-                return;
-
-            ulong targetId;
-            if (ApiCast.TryGet(header, ApiConstant.H_TARGET_MOD_ID, out targetId))
-            {
-                if (targetId != 0UL && targetId != ApiConstant.PROVIDER_STEAM_ID)
-                    return;
-            }
-
-            ulong fromId;
-            string fromName;
-            ApiCast.TryGet(header, ApiConstant.H_FROM_MOD_ID, out fromId);
-            ApiCast.TryGet(header, ApiConstant.H_FROM_MOD_NAME, out fromName);
-
-            Log.Debug(ConfigApiTopics.Discovery, 0, $"Received API request from {fromName ?? "?"} ({fromId})");
-            SendAnnounce(fromId, fromName ?? "Unknown");
+            // return bound main api dict for this consumer
+            return new MainApiImpl(consumerModId, consumerModName, CallbacksByMod[consumerModId]);
         }
 
-        private void SendAnnounce(ulong targetModId, string targetModName)
+        // Called by ApiLib when a consumer disconnects, which means another mod on the same machine is probably unloading.
+        // That normally only happens when the world unloads so we don't really need to do anything special here.
+        // but it's here if you want to do some cleanup per mod.
+        private static void Disconnect(ulong consumerModId)
         {
-            Log.Trace($"{nameof(ApiProviderSession)}.{nameof(SendAnnounce)}", $"{nameof(targetModId)}={targetModId}, {nameof(targetModName)}={targetModName}");
-            var header = new Dictionary<string, object>
-            {
-                { ApiConstant.H_MAGIC, ApiConstant.MAGIC },
-                { ApiConstant.H_PROTOCOL, ApiConstant.PROTOCOL },
-                { ApiConstant.H_SCHEMA, ApiConstant.SCHEMA_MAIN_ANNOUNCE },
-                { ApiConstant.H_INTENT, ApiConstant.INTENT_ANNOUNCE },
-                { ApiConstant.H_API_VERSION, ApiConstant.API_VERSION },
-
-                { ApiConstant.H_FROM_MOD_ID, ApiConstant.PROVIDER_STEAM_ID },
-                { ApiConstant.H_FROM_MOD_NAME, ApiConstant.PROVIDER_MOD_NAME },
-
-                { ApiConstant.H_TARGET_MOD_ID, targetModId }, // 0 = broadcast
-                { ApiConstant.H_TARGET_MOD_NAME, targetModName ?? "Any" },
-
-                { ApiConstant.H_LAYOUT, "Header, Verify, Data" },
-                { ApiConstant.H_TYPES,  "Dict<string,object>, Func<string,string,ulong,bool>, Dict<string,Delegate>" }
-            };
-
-            ModMessage.Send(header, _verify, _setupApiProvider);
-        }
-
-        private static bool VerifyApi(string clientApiVersion, string clientModName, ulong clientModSteamId)
-        {
-            Log.Trace($"{nameof(ApiProviderSession)}.{nameof(VerifyApi)}", $"\n\t{nameof(clientApiVersion)} = {clientApiVersion},\n\t{nameof(clientModName)} = {clientModName},\n\t{nameof(clientModSteamId)} = {clientModSteamId}\n");
-            var client = (clientApiVersion ?? "").Split('.');
-            var provider = ApiConstant.API_VERSION.Split('.');
-
-            if (client.Length != 3 || provider.Length != 3)
-                return false;
-
-            return client[0] == provider[0];
+            CallbacksByMod.Remove(consumerModId);
         }
     }
 }

@@ -1,18 +1,21 @@
 ﻿using System;
-using System.Collections.Generic;
+using MarcoZechner.ApiLib;
 using MarcoZechner.ConfigAPI.Shared.Api;
 
 namespace MarcoZechner.ConfigAPI.Main.Api
 {
     public class CallbackApi : ICallbackApi
     {
-        private readonly Action _testCallback;
-        public CallbackApi(Dictionary<string, Delegate> dict)
+        private readonly Action _testCallback = null;
+        
+        public CallbackApi(IApiProvider callbackApi)
         {
-            _testCallback = (Action)dict["TestCallback"];
+            var dict = callbackApi.ConvertToDict();
+            Delegate d;
+            if (dict != null && dict.TryGetValue("TestCallback", out d))
+                _testCallback = (Action)d;
         }
 
-        public void TestCallback()
-            => _testCallback();
+        public void TestCallback() => _testCallback?.Invoke();
     }
 }
