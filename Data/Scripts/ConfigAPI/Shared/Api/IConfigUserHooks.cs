@@ -1,5 +1,5 @@
 ﻿using System.Collections.Generic;
-using MarcoZechner.ConfigAPI.Scripts.ConfigAPI.Shared.Domain;
+using MarcoZechner.ConfigAPI.Shared.Domain;
 
 namespace MarcoZechner.ConfigAPI.Shared.Api
 {
@@ -13,7 +13,7 @@ namespace MarcoZechner.ConfigAPI.Shared.Api
     /// IMPORTANT: use object at the boundary to avoid cross-assembly type issues.
     /// Inside UserMod, cast object to the real config type.
     /// </summary>
-    public interface IConfigCallbackApi
+    public interface IConfigUserHooks
     {
         // -------------------------
         // Type system
@@ -32,12 +32,9 @@ namespace MarcoZechner.ConfigAPI.Shared.Api
 
         /// <summary>
         /// Serialize an instance to INTERNAL CANONICAL XML (not TOML).
-        /// includeComments:
-        /// - false for network payloads
-        /// - true for disk externalization step (if you choose to add them here)
         /// If you keep comments as a post-process in ConfigAPIMod, you can ignore this flag.
         /// </summary>
-        string SerializeToInternalXml(string typeKey, object instance, bool includeComments);
+        string SerializeToInternalXml(string typeKey, object instance);
 
         /// <summary>
         /// Deserialize from INTERNAL CANONICAL XML to a new instance.

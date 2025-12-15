@@ -1,24 +1,24 @@
 ﻿using System;
 using System.Collections.Generic;
 using MarcoZechner.ApiLib;
-using MarcoZechner.ConfigAPI.Scripts.ConfigAPI.Shared.Domain;
+using MarcoZechner.ConfigAPI.Shared.Domain;
 using MarcoZechner.ConfigAPI.Shared.Api;
 
 namespace MarcoZechner.ConfigAPI.Main.Api
 {
-    public class ConfigCallbackApi : IConfigCallbackApi
+    public class ConfigUserHooks : IConfigUserHooks
     {
         private Action _testCallback;
         private Func<string, object> _newDefault;
         private Func<string, object, bool> _isInstanceOf;
-        private Func<string, object, bool, string> _serializeToInternalXml;
+        private Func<string, object, string> _serializeToInternalXml;
         private Func<string, string, object> _deserializeFromInternalXml;
         private Func<string, IReadOnlyDictionary<string, string>> _getVariableDescriptions;
         private Func<int, string, string> _loadFile;
         private Action<int, string, string> _saveFile;
         private Action<int, string> _backupFile;
         
-        public ConfigCallbackApi(IApiProvider callbackApi)
+        public ConfigUserHooks(IApiProvider callbackApi)
         {
             var source = callbackApi.ConvertToDict();
             if (source == null)
@@ -29,7 +29,7 @@ namespace MarcoZechner.ConfigAPI.Main.Api
                 [nameof(TestCallback)] = d => _testCallback = (Action)d,
                 [nameof(NewDefault)] = d => _newDefault = (Func<string, object>)d,
                 [nameof(IsInstanceOf)] = d => _isInstanceOf = (Func<string, object, bool>)d,
-                [nameof(SerializeToInternalXml)] = d => _serializeToInternalXml = (Func<string, object, bool, string>)d,
+                [nameof(SerializeToInternalXml)] = d => _serializeToInternalXml = (Func<string, object, string>)d,
                 [nameof(DeserializeFromInternalXml)] = d => _deserializeFromInternalXml = (Func<string, string, object>)d,
                 [nameof(GetVariableDescriptions)] = d => _getVariableDescriptions = (Func<string, IReadOnlyDictionary<string, string>>)d,
                 [nameof(LoadFile)] = d => _loadFile = (Func<int, string, string>)d,
@@ -59,8 +59,8 @@ namespace MarcoZechner.ConfigAPI.Main.Api
         public bool IsInstanceOf(string typeKey, object instance)
             => _isInstanceOf?.Invoke(typeKey, instance) ?? false;
 
-        public string SerializeToInternalXml(string typeKey, object instance, bool includeComments)
-            => _serializeToInternalXml?.Invoke(typeKey, instance, includeComments);
+        public string SerializeToInternalXml(string typeKey, object instance)
+            => _serializeToInternalXml?.Invoke(typeKey, instance);
 
         public object DeserializeFromInternalXml(string typeKey, string internalXml)
             => _deserializeFromInternalXml?.Invoke(typeKey, internalXml);

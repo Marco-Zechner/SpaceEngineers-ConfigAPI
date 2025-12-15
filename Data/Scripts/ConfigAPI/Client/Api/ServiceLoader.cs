@@ -3,14 +3,14 @@ using MarcoZechner.ConfigAPI.Shared.Api;
 
 namespace MarcoZechner.ConfigAPI.Client.Api
 {
-    public static class ApiLoader
+    public static class ServiceLoader
     {
         public static bool ApiLoaded => _bridge != null && _bridge.ApiLoaded;
 
         private static ApiConsumerBridge _bridge;
-        private static ConfigApi _api;
+        private static ConfigService _service;
 
-        public static ConfigApi Api => ApiLoaded ? _api : null;
+        public static ConfigService Service => ApiLoaded ? _service : null;
 
         public static void Init(ulong modId, string modName)
         {
@@ -18,7 +18,7 @@ namespace MarcoZechner.ConfigAPI.Client.Api
                 modId,
                 modName,
                 new ConfigApiBootstrap(),
-                new ConfigCallbackApiImpl(), 
+                new ConfigUserHooksImpl(), 
                 SetMainApi
             );
             
@@ -33,9 +33,9 @@ namespace MarcoZechner.ConfigAPI.Client.Api
                 _bridge = null;
             }
 
-            _api = null;
+            _service = null;
         }
         
-        private static void SetMainApi(IApiProvider mainApi) => _api = new ConfigApi(mainApi);
+        private static void SetMainApi(IApiProvider mainApi) => _service = new ConfigService(mainApi);
     }
 }

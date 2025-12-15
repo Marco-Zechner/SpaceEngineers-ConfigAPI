@@ -1,4 +1,4 @@
-﻿namespace MarcoZechner.ConfigAPI.Scripts.ConfigAPI.Shared.Domain
+﻿namespace MarcoZechner.ConfigAPI.Shared.Domain
 {
     /// <summary>
     /// Update info returned to user mods.

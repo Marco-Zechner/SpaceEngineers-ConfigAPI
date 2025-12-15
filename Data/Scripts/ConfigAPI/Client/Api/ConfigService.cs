@@ -1,12 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
 using MarcoZechner.ApiLib;
-using MarcoZechner.ConfigAPI.Scripts.ConfigAPI.Shared.Domain;
+using MarcoZechner.ConfigAPI.Shared.Domain;
 using MarcoZechner.ConfigAPI.Shared.Api;
 
 namespace MarcoZechner.ConfigAPI.Client.Api
 {
-    public sealed class ConfigApi : IConfigApi
+    public sealed class ConfigService : IConfigService
     {
         private Func<string, int, string, object> _clientConfigGet;
         private Func<string, int, string, object> _clientConfigLoadAndSwitch;
@@ -24,7 +24,7 @@ namespace MarcoZechner.ConfigAPI.Client.Api
         private Func<string, string, bool, bool> _worldExport;
         
         
-        public ConfigApi(IApiProvider mainApi)
+        public ConfigService(IApiProvider mainApi)
         {
             var source = mainApi.ConvertToDict();
             if (source == null)

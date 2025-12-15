@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using MarcoZechner.ApiLib;
-using MarcoZechner.ConfigAPI.Scripts.ConfigAPI.Shared.Domain;
+using MarcoZechner.ConfigAPI.Shared.Domain;
 using MarcoZechner.ConfigAPI.Shared.Api;
 
 namespace MarcoZechner.ConfigAPI.Main.Api
@@ -10,17 +10,17 @@ namespace MarcoZechner.ConfigAPI.Main.Api
     /// Main API bound to a single consumer mod.
     /// No modId needs to be passed on calls anymore.
     /// </summary>
-    public sealed class ConfigApiImpl : IConfigApi, IApiProvider
+    public sealed class ConfigServiceImpl : IConfigService, IApiProvider
     {
         private readonly ulong _consumerModId;
         private readonly string _consumerModName;
-        private readonly ConfigCallbackApi _configCallbackApi;
+        private readonly ConfigUserHooks _configUserHooks;
 
-        public ConfigApiImpl(ulong modId, string modName, ConfigCallbackApi configCallbackApi)
+        public ConfigServiceImpl(ulong modId, string modName, ConfigUserHooks configUserHooks)
         {
             _consumerModId = modId;
             _consumerModName = modName;
-            _configCallbackApi = configCallbackApi;
+            _configUserHooks = configUserHooks;
         }
 
         // Client-side APIs

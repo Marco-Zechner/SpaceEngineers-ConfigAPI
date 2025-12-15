@@ -1,4 +1,4 @@
-﻿using MarcoZechner.ConfigAPI.Scripts.ConfigAPI.Shared.Domain;
+﻿using MarcoZechner.ConfigAPI.Shared.Domain;
 
 namespace MarcoZechner.ConfigAPI.Shared.Api
 {
@@ -6,7 +6,7 @@ namespace MarcoZechner.ConfigAPI.Shared.Api
     /// Main API exposed by ConfigAPIMod. UserMods call this.
     /// Keep this interface stable; add methods carefully.
     /// </summary>
-    public interface IConfigApi
+    public interface IConfigService
     {
         // -------------------------
         // Local/Global config: (no networking, just local file storage)

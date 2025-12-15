@@ -1,7 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.Xml.Serialization;
 
-namespace MarcoZechner.ConfigAPI.Scripts.ConfigAPI.Shared.Domain
+namespace MarcoZechner.ConfigAPI.Client.Core
 {
     /// <summary>
     /// Variables in your config should either be ALL public properties with getters and setters, or ALL public fields.

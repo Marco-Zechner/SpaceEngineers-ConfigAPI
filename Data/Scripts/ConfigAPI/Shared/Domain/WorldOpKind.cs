@@ -1,4 +1,4 @@
-﻿namespace MarcoZechner.ConfigAPI.Scripts.ConfigAPI.Shared.Domain
+﻿namespace MarcoZechner.ConfigAPI.Shared.Domain
 {
     public enum WorldOpKind
     {

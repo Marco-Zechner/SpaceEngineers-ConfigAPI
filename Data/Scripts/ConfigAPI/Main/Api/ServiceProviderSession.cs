@@ -6,11 +6,11 @@ using VRage.Game.Components;
 namespace MarcoZechner.ConfigAPI.Main.Api
 {
     [MySessionComponentDescriptor(MyUpdateOrder.NoUpdate)]
-    public sealed class ApiProviderSession : MySessionComponentBase
+    public sealed class ServiceProviderSession : MySessionComponentBase
     {
         // Stored callback APIs per consumer mod
-        public static readonly Dictionary<ulong, ConfigCallbackApi> CallbacksByMod
-            = new Dictionary<ulong, ConfigCallbackApi>();
+        public static readonly Dictionary<ulong, ConfigUserHooks> CallbacksByMod
+            = new Dictionary<ulong, ConfigUserHooks>();
 
         private ApiProviderHost _host;
 
@@ -36,10 +36,10 @@ namespace MarcoZechner.ConfigAPI.Main.Api
         )
         {
             // store callbacks for provider -> consumer calls
-            CallbacksByMod[consumerModId] = new ConfigCallbackApi(yourCallbackApi);
+            CallbacksByMod[consumerModId] = new ConfigUserHooks(yourCallbackApi);
 
             // return bound main api dict for this consumer
-            return new ConfigApiImpl(consumerModId, consumerModName, CallbacksByMod[consumerModId]);
+            return new ConfigServiceImpl(consumerModId, consumerModName, CallbacksByMod[consumerModId]);
         }
 
         // Called by ApiLib when a consumer disconnects, which means another mod on the same machine is probably unloading.
