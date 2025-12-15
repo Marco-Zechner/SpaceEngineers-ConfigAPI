@@ -135,7 +135,7 @@ namespace MarcoZechner.ConfigAPI.Main.Core
         }
         
         // -------------------------
-        // Helpers (temporary v0 behavior)
+        // Helpers
         // -------------------------
 
         private object TryLoadClient(string typeKey, LocationType locationType, string filename)
