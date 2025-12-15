@@ -28,7 +28,7 @@ namespace MarcoZechner.ConfigAPI.Client.Api
         {
             var source = mainApi.ConvertToDict();
             if (source == null)
-                return;
+                throw new Exception("ConfigApi: ConfigService provider returned null dictionary");
 
             var assignments = new Dictionary<string, Action<Delegate>>
             {
@@ -55,11 +55,12 @@ namespace MarcoZechner.ConfigAPI.Client.Api
                 var endpointName = assignment.Key;
                 var endpointFunc = assignment.Value;
                 Delegate del;
-                if (source.TryGetValue(endpointName, out del))
-                    endpointFunc(del);
-
+                if (!source.TryGetValue(endpointName, out del))
+                    throw new Exception($"ConfigApi: Missing key for '{endpointName}'");
                 if (del == null)
                     throw new Exception($"ConfigApi: Missing implementation for '{endpointName}'");
+                
+                endpointFunc(del);
             }
         }
 

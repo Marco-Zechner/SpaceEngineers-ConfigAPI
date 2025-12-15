@@ -8,7 +8,6 @@ namespace MarcoZechner.ConfigAPI.Main.Api
 {
     public class ConfigUserHooks : IConfigUserHooks
     {
-        private Action _testCallback;
         private Func<string, object> _newDefault;
         private Func<string, object, bool> _isInstanceOf;
         private Func<string, object, string> _serializeToInternalXml;
@@ -22,11 +21,10 @@ namespace MarcoZechner.ConfigAPI.Main.Api
         {
             var source = callbackApi.ConvertToDict();
             if (source == null)
-                return;
+                throw new Exception("ConfigCallbackApi: ConfigUserHooks provider returned null dictionary");
 
             var assignments = new Dictionary<string, Action<Delegate>>
             {
-                [nameof(TestCallback)] = d => _testCallback = (Action)d,
                 [nameof(NewDefault)] = d => _newDefault = (Func<string, object>)d,
                 [nameof(IsInstanceOf)] = d => _isInstanceOf = (Func<string, object, bool>)d,
                 [nameof(SerializeToInternalXml)] = d => _serializeToInternalXml = (Func<string, object, string>)d,
@@ -42,16 +40,14 @@ namespace MarcoZechner.ConfigAPI.Main.Api
                 var endpointName = assignment.Key;
                 var endpointFunc = assignment.Value;
                 Delegate del;
-                if (source.TryGetValue(endpointName, out del))
-                    endpointFunc(del);
-                
+                if (!source.TryGetValue(endpointName, out del))
+                    throw new Exception($"ConfigCallbackApi: Missing callback key for '{endpointName}'");
                 if (del == null)
                     throw new Exception($"ConfigCallbackApi: Missing callback implementation for '{endpointName}'");
+                
+                endpointFunc(del);
             }
         }
-
-        public void TestCallback() 
-            => _testCallback?.Invoke();
         
         public object NewDefault(string typeKey) 
             => _newDefault?.Invoke(typeKey);

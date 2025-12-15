@@ -32,11 +32,11 @@ namespace MarcoZechner.ConfigAPI.Main.Api
         private static IApiProvider Connect(
             ulong consumerModId,
             string consumerModName,
-            IApiProvider yourCallbackApi
+            IApiProvider configUserHooks
         )
         {
             // store callbacks for provider -> consumer calls
-            CallbacksByMod[consumerModId] = new ConfigUserHooks(yourCallbackApi);
+            CallbacksByMod[consumerModId] = new ConfigUserHooks(configUserHooks);
 
             // return bound main api dict for this consumer
             return new ConfigServiceImpl(consumerModId, consumerModName, CallbacksByMod[consumerModId]);

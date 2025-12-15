@@ -145,7 +145,7 @@ namespace MarcoZechner.ConfigAPI.Main.Api
             if (cfgUpdate == null)
             {
                 worldOpKindEnum = 0;
-                error = "No update available";
+                error = null;
                 triggeredBy = 0;
                 serverIteration = 0;
                 currentFile = null;

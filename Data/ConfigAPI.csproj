@@ -16,4 +16,8 @@
         <PackageReference Include="Mal.Mdk2.References" Version="*" />
     </ItemGroup>
 
+    <ItemGroup>
+      <Folder Include="Scripts\ConfigAPI\Main\Core\" />
+    </ItemGroup>
+
 </Project>
