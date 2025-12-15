@@ -30,6 +30,21 @@ namespace MarcoZechner.ConfigAPI.Main.Api
             _configCallbackApi.TestCallback();
         }
 
+        public object GetConfig(string typeKey, int locationType, string filename)
+        {
+            throw new Exception("Not Implemented");
+        }
+
+        public object LoadConfig(string typeKey, int locationType, string filename)
+        {
+            throw new Exception("Not Implemented");
+        }
+
+        public bool SaveConfig(string typeKey, int locationType, string filename)
+        {
+            throw new Exception("Not Implemented");
+        }
+
         public bool WorldOpen(string typeKey, string defaultFile)
         {
             throw new Exception("Not Implemented");
@@ -84,19 +99,26 @@ namespace MarcoZechner.ConfigAPI.Main.Api
         {
             return new Dictionary<string, Delegate>
             {
-                { "Test", new Action(Test) },
-                { "WorldOpen", new Func<string, string, bool>(WorldOpen) },
-                { "WorldGetUpdate_Extended", new WorldTryDequeueUpdateDelegate(WorldTryDequeueUpdate) },
-                { "WorldGetAuth", new Func<string, object>(WorldGetAuth) },
-                { "WorldGetDraft", new Func<string, object>(WorldGetDraft) },
-                { "WorldResetDraft", new Action<string>(WorldResetDraft) },
-                { "WorldLoadAndSwitch", new Func<string, string, ulong, bool>(WorldLoadAndSwitch) },
-                { "WorldSave", new Func<string, ulong, bool>(WorldSave) },
-                { "WorldSaveAndSwitch", new Func<string, string, ulong, bool>(WorldSaveAndSwitch) },
-                { "WorldExport", new Func<string, string, ulong, bool>(WorldExport) },
-                { "WorldGetMeta_Extended", new WorldTryGetMetaDelegate(WorldTryGetMeta) },
+                { nameof(Test), new Action(Test) },
+                { nameof(GetConfig), new Func<string, int, string, object>(GetConfig) },
+                { nameof(LoadConfig), new Func<string, int, string, object>(LoadConfig) },
+                { nameof(SaveConfig), new Func<string, int, string, bool>(SaveConfig) },
+                { nameof(WorldOpen), new Func<string, string, bool>(WorldOpen) },
+                { nameof(WorldGetUpdate), new WorldTryDequeueUpdateDelegate(WorldTryDequeueUpdate) },
+                { nameof(WorldGetAuth), new Func<string, object>(WorldGetAuth) },
+                { nameof(WorldGetDraft), new Func<string, object>(WorldGetDraft) },
+                { nameof(WorldResetDraft), new Action<string>(WorldResetDraft) },
+                { nameof(WorldLoadAndSwitch), new Func<string, string, ulong, bool>(WorldLoadAndSwitch) },
+                { nameof(WorldSave), new Func<string, ulong, bool>(WorldSave) },
+                { nameof(WorldSaveAndSwitch), new Func<string, string, ulong, bool>(WorldSaveAndSwitch) },
+                { nameof(WorldExport), new Func<string, string, ulong, bool>(WorldExport) },
+                { nameof(WorldGetMeta), new WorldTryGetMetaDelegate(WorldTryGetMeta) },
             };
         }
+        
+        // ===============================================================
+        // Internal conversion methods for delegate to custom types
+        // ===============================================================
         
         private bool WorldTryDequeueUpdate(
             string typeKey,

@@ -9,6 +9,9 @@ namespace MarcoZechner.ConfigAPI.Client.Api
     public sealed class ConfigApi : IConfigApi
     {
         private Action _test;
+        private Func<string, int, string, object> _getConfig;
+        private Func<string, int, string, object> _loadConfig;
+        private Func<string, int, string, bool> _saveConfig;
         private Func<string, string, bool> _worldOpen;
         private WorldTryDequeueUpdateDelegate _worldTryDequeueUpdate;
         private Func<string, object> _worldGetAuth;
@@ -28,17 +31,20 @@ namespace MarcoZechner.ConfigAPI.Client.Api
 
             var assignments = new Dictionary<string, Action<Delegate>>
             {
-                ["Test"] = d => _test = (Action)d,
-                ["WorldOpen"] = d => _worldOpen = (Func<string, string, bool>)d,
-                ["WorldTryDequeueUpdate"] = d => _worldTryDequeueUpdate = (WorldTryDequeueUpdateDelegate)d,
-                ["WorldGetAuth"] = d => _worldGetAuth = (Func<string, object>)d,
-                ["WorldGetDraft"] = d => _worldGetDraft = (Func<string, object>)d,
-                ["WorldResetDraft"] = d => _worldResetDraft = (Action<string>)d,
-                ["WorldLoadAndSwitch"] = d => _worldLoadAndSwitch = (Func<string, string, ulong, bool>)d,
-                ["WorldSave"] = d => _worldSave = (Func<string, ulong, bool>)d,
-                ["WorldSaveAndSwitch"] = d => _worldSaveAndSwitch = (Func<string, string, ulong, bool>)d,
-                ["WorldExport"] = d => _worldExport = (Func<string, string, ulong, bool>)d,
-                ["WorldTryGetMeta"] = d => _worldTryGetMeta = (WorldTryGetMetaDelegate)d,
+                [nameof(Test)] = d => _test = (Action)d,
+                [nameof(GetConfig)] = d => _getConfig = (Func<string, int, string, object>)d,
+                [nameof(LoadConfig)] = d => _loadConfig = (Func<string, int, string, object>)d,
+                [nameof(SaveConfig)] = d => _saveConfig = (Func<string, int, string, bool>)d,
+                [nameof(WorldOpen)] = d => _worldOpen = (Func<string, string, bool>)d,
+                [nameof(WorldGetUpdate)] = d => _worldTryDequeueUpdate = (WorldTryDequeueUpdateDelegate)d,
+                [nameof(WorldGetAuth)] = d => _worldGetAuth = (Func<string, object>)d,
+                [nameof(WorldGetDraft)] = d => _worldGetDraft = (Func<string, object>)d,
+                [nameof(WorldResetDraft)] = d => _worldResetDraft = (Action<string>)d,
+                [nameof(WorldLoadAndSwitch)] = d => _worldLoadAndSwitch = (Func<string, string, ulong, bool>)d,
+                [nameof(WorldSave)] = d => _worldSave = (Func<string, ulong, bool>)d,
+                [nameof(WorldSaveAndSwitch)] = d => _worldSaveAndSwitch = (Func<string, string, ulong, bool>)d,
+                [nameof(WorldExport)] = d => _worldExport = (Func<string, string, ulong, bool>)d,
+                [nameof(WorldGetMeta)] = d => _worldTryGetMeta = (WorldTryGetMetaDelegate)d,
             };
             
             foreach (var assignment in assignments)
@@ -48,11 +54,23 @@ namespace MarcoZechner.ConfigAPI.Client.Api
                 Delegate del;
                 if (source.TryGetValue(endpointName, out del))
                     endpointFunc(del);
+
+                if (del == null)
+                    throw new Exception($"ConfigApi: Missing implementation for '{endpointName}'");
             }
         }
 
         public void Test() 
             => _test?.Invoke();
+
+        public object GetConfig(string typeKey, int locationType, string filename)
+            => _getConfig?.Invoke(typeKey, locationType, filename);
+
+        public object LoadConfig(string typeKey, int locationType, string filename)
+            => _loadConfig?.Invoke(typeKey, locationType, filename);
+
+        public bool SaveConfig(string typeKey, int locationType, string filename)
+            => _saveConfig?.Invoke(typeKey, locationType, filename) ?? false;
 
         public bool WorldOpen(string typeKey, string defaultFile)
             => _worldOpen?.Invoke(typeKey, defaultFile) ?? false;

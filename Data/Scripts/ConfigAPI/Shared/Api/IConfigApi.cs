@@ -14,6 +14,30 @@ namespace MarcoZechner.ConfigAPI.Shared.Api
         void Test();
 
         // -------------------------
+        // Local/Global config: (no networking, just local file storage)
+        // -------------------------
+        
+        /// <summary>
+        /// Get (create/load/migrate) a Local/Global config instance.
+        /// If filename is null/empty, use a default derived from typeKey (e.g. typeKey + ".toml").
+        /// Returns an opaque object; UserMod casts to its config type.
+        /// </summary>
+        object GetConfig(string typeKey, int locationType, string filename);
+
+        /// <summary>
+        /// Force load config from disk and replace the in-memory instance.
+        /// Returns null if load failed; otherwise returns the new instance.
+        /// </summary>
+        object LoadConfig(string typeKey, int locationType, string filename);
+
+        /// <summary>
+        /// Save the current in-memory instance to disk.
+        /// If filename is null/empty, save to the instance's CurrentFile (or default).
+        /// Returns false if instance doesn't exist yet or save failed.
+        /// </summary>
+        bool SaveConfig(string typeKey, int locationType, string filename);
+        
+        // -------------------------
         // World config: client-side sync surface
         //
         // Key: (modId, typeKey)

@@ -25,14 +25,14 @@ namespace MarcoZechner.ConfigAPI.Main.Api
 
             var assignments = new Dictionary<string, Action<Delegate>>
             {
-                ["TestCallback"] = d => _testCallback = (Action)d,
-                ["NewDefault"] = d => _newDefault = (Func<string, object>)d,
-                ["SerializeToInternalXml"] = d => _serializeToInternalXml = (Func<string, object, bool, string>)d,
-                ["DeserializeFromInternalXml"] = d => _deserializeFromInternalXml = (Func<string, string, object>)d,
-                ["GetVariableDescriptions"] = d => _getVariableDescriptions = (Func<string, IReadOnlyDictionary<string, string>>)d,
-                ["LoadFile"] = d => _loadFile = (Func<int, string, string>)d,
-                ["SaveFile"] = d => _saveFile = (Action<int, string, string>)d,
-                ["BackupFile"] = d => _backupFile = (Action<int, string>)d,
+                [nameof(TestCallback)] = d => _testCallback = (Action)d,
+                [nameof(NewDefault)] = d => _newDefault = (Func<string, object>)d,
+                [nameof(SerializeToInternalXml)] = d => _serializeToInternalXml = (Func<string, object, bool, string>)d,
+                [nameof(DeserializeFromInternalXml)] = d => _deserializeFromInternalXml = (Func<string, string, object>)d,
+                [nameof(GetVariableDescriptions)] = d => _getVariableDescriptions = (Func<string, IReadOnlyDictionary<string, string>>)d,
+                [nameof(LoadFile)] = d => _loadFile = (Func<int, string, string>)d,
+                [nameof(SaveFile)] = d => _saveFile = (Action<int, string, string>)d,
+                [nameof(BackupFile)] = d => _backupFile = (Action<int, string>)d,
             };
             
             foreach (var assignment in assignments)
@@ -42,6 +42,9 @@ namespace MarcoZechner.ConfigAPI.Main.Api
                 Delegate del;
                 if (source.TryGetValue(endpointName, out del))
                     endpointFunc(del);
+                
+                if (del == null)
+                    throw new Exception($"ConfigCallbackApi: Missing callback implementation for '{endpointName}'");
             }
         }
 

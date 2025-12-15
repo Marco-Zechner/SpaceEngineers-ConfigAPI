@@ -52,15 +52,28 @@ namespace MarcoZechner.ConfigAPI.Client.Api
         {
             return new Dictionary<string, Delegate>
             {
-                { "TestCallback", new Action(TestCallback) },
-                { "NewDefault", new Func<string, object>(NewDefault) },
-                { "SerializeToInternalXml", new Func<string, object, bool, string>(SerializeToInternalXml) },
-                { "DeserializeFromInternalXml", new Func<string, string, object>(DeserializeFromInternalXml) },
-                { "GetVariableDescriptions", new Func<string, IReadOnlyDictionary<string, string>>(GetVariableDescriptions) },
-                { "LoadFile", new Func<int, string, string>((i, f) => LoadFile((LocationType)i, f)) },
-                { "SaveFile", new Action<int, string, string>((i, f, c) => SaveFile((LocationType)i, f, c)) },
-                { "BackupFile", new Action<int, string>((i, f) => BackupFile((LocationType)i, f)) },
+                { nameof(TestCallback), new Action(TestCallback) },
+                { nameof(NewDefault), new Func<string, object>(NewDefault) },
+                { nameof(SerializeToInternalXml), new Func<string, object, bool, string>(SerializeToInternalXml) },
+                { nameof(DeserializeFromInternalXml), new Func<string, string, object>(DeserializeFromInternalXml) },
+                { nameof(GetVariableDescriptions), new Func<string, IReadOnlyDictionary<string, string>>(GetVariableDescriptions) },
+                { nameof(LoadFile), new Func<int, string, string>(LoadFile) },
+                { nameof(SaveFile), new Action<int, string, string>(SaveFile) },
+                { nameof(BackupFile), new Action<int, string>(BackupFile) },
             };
         }
+        
+        // ===============================================================
+        // Internal conversion methods for delegate to custom types
+        // ===============================================================
+        
+        private string LoadFile(int locationTypeEnum, string filename) 
+            => LoadFile((LocationType)locationTypeEnum, filename);
+        
+        private void SaveFile(int locationTypeEnum, string filename, string content) 
+            => SaveFile((LocationType)locationTypeEnum, filename, content);
+        
+        private void BackupFile(int locationTypeEnum, string filename) 
+            => BackupFile((LocationType)locationTypeEnum, filename);
     }
 }
