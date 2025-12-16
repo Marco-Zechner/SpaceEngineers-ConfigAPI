@@ -72,13 +72,13 @@ namespace MarcoZechner.ConfigAPI.Shared.Api
         /// Get current authoritative snapshot (opaque object).
         /// UserMod casts this to its config type.
         /// </summary>
-        object ServerConfigGetAuth(string typeKey);
+        object ServerConfigGetAuth(string typeKey); //TODO: implement NOT over Network
 
         /// <summary>
         /// Get current draft snapshot (opaque object).
         /// UserMod casts this to its config type and edits it locally.
         /// </summary>
-        object ServerConfigGetDraft(string typeKey);
+        object ServerConfigGetDraft(string typeKey); //TODO: implement NOT over Network
 
         /// <summary>
         /// Replace Draft with a deep copy of Auth (provider uses callback serialize/deserialize).

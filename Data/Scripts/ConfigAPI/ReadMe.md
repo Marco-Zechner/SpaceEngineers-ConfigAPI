@@ -84,8 +84,6 @@ public class IntermediateConfig : ConfigBase
 // ---------------------------------------------------------
 public class MySession // (in SE this would be MySessionComponentBase)
 {
-    private ModContext _ctx;
-
     // World configs (networked)
     private CfgSync<CollectionConfig> _worldCollections;
     private CfgSync<IntermediateConfig> _worldIntermediate;
@@ -96,14 +94,7 @@ public class MySession // (in SE this would be MySessionComponentBase)
 
     public void LoadData()
     {
-        _ctx = new ModContext
-        {
-            ModId = 123,              // provided by SE / your wrapper
-            ModName = "MyUserMod",
-            MyPlayerId = 42
-        };
-
-        ConfigManager.Init(_ctx);
+        ConfigStorage.Init(ModContext);
 
         // World handles (defaults immediately, real values arrive via sync)
         _worldCollections = ConfigStorage.World<CollectionConfig>("optionalName");
@@ -112,6 +103,11 @@ public class MySession // (in SE this would be MySessionComponentBase)
         // Optional: start Draft from current Auth so admin UI is synced initially
         _worldCollections.ResetDraft();
         _worldIntermediate.ResetDraft();
+    }
+    
+    public void UnloadData() 
+    {
+        ConfigStorage.Unload();
     }
 
     public void UpdateLoop()

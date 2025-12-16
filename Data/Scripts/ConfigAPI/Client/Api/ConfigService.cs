@@ -14,7 +14,7 @@ namespace MarcoZechner.ConfigAPI.Client.Api
         private Func<string, int, string, object> _clientConfigSaveAndSwitch;
         private Func<string, int, string, bool, bool> _clientConfigExport;
         private Func<string, string, object> _serverConfigInit;
-        private WorldTryDequeueUpdateDelegate _worldTryDequeueUpdate;
+        private Func<string, object[]> _serverConfigGetUpdate;
         private Func<string, object> _worldGetAuth;
         private Func<string, object> _worldGetDraft;
         private Action<string> _worldResetDraft;
@@ -38,7 +38,7 @@ namespace MarcoZechner.ConfigAPI.Client.Api
                 [nameof(ClientConfigSaveAndSwitch)] = d => _clientConfigSaveAndSwitch = (Func<string, int, string, object>)d,
                 [nameof(ClientConfigExport)] = d => _clientConfigExport = (Func<string, int, string, bool, bool>)d,
                 [nameof(ServerConfigInit)] = d => _serverConfigInit = (Func<string, string, object>)d,
-                [nameof(ServerConfigGetUpdate)] = d => _worldTryDequeueUpdate = (WorldTryDequeueUpdateDelegate)d,
+                [nameof(ServerConfigGetUpdate)] = d => _serverConfigGetUpdate = (Func<string, object[]>)d,
                 [nameof(ServerConfigGetAuth)] = d => _worldGetAuth = (Func<string, object>)d,
                 [nameof(ServerConfigGetDraft)] = d => _worldGetDraft = (Func<string, object>)d,
                 [nameof(ServerConfigResetDraft)] = d => _worldResetDraft = (Action<string>)d,
@@ -90,35 +90,19 @@ namespace MarcoZechner.ConfigAPI.Client.Api
         
         public CfgUpdate ServerConfigGetUpdate(string typeKey)
         {
-            var del = _worldTryDequeueUpdate;
-            if (del == null)
-                return null;
+            var del = _serverConfigGetUpdate;
 
-            int kindInt;
-            string error;
-            long triggeredBy;
-            ulong serverIteration;
-            string currentFile;
-
-            var has = del(
-                typeKey,
-                out kindInt,
-                out error,
-                out triggeredBy,
-                out serverIteration,
-                out currentFile
-            );
-
-            if (!has)
+            var objArr = del?.Invoke(typeKey);
+            if (objArr == null || objArr.Length != 5)
                 return null;
 
             return new CfgUpdate
             {
-                WorldOpKind = (WorldOpKind)kindInt,
-                Error = error,
-                TriggeredBy = triggeredBy,
-                ServerIteration = serverIteration,
-                CurrentFile = currentFile
+                WorldOpKind = (WorldOpKind)objArr[0],
+                Error = (string)objArr[1],
+                TriggeredBy = (long)objArr[2],
+                ServerIteration = (ulong)objArr[3],
+                CurrentFile = (string)objArr[4]
             };
         }
 

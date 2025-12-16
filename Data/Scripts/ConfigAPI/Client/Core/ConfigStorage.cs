@@ -1,19 +1,73 @@
-﻿using MarcoZechner.ConfigAPI.Shared.Domain;
+﻿using System;
+using System.Collections.Generic;
+using MarcoZechner.ConfigAPI.Client.Api;
+using MarcoZechner.ConfigAPI.Shared.Domain;
+using VRage.Game.ModAPI;
 
 namespace MarcoZechner.ConfigAPI.Client.Core
 {
-    public class ConfigStorage
+    public static class ConfigStorage
     {
-        public static T Get<T>(LocationType location, string name = null)
+        // Keep ONLY world handles cached (they hold state like iteration/currentFile/draft)
+        private static readonly Dictionary<string, object> _worldCache
+            = new Dictionary<string, object>(StringComparer.Ordinal);
+
+        private static string TypeKey<T>() where T : ConfigBase => typeof(T).FullName;
+
+        private static void EnsureApiLoaded()
+        {
+            if (!ServiceLoader.ApiLoaded || ServiceLoader.Service == null)
+                throw new InvalidOperationException(
+                    "ConfigStorage: ConfigAPI is not loaded. Call ConfigStorage.Init(modContext) first.");
+        }
+
+        public static void Init(IMyModContext modContext)
+        {
+            ServiceLoader.Init(modContext.ModItem.PublishedFileId, modContext.ModName);
+        }
+
+        public static void Unload()
+        {
+            _worldCache.Clear();
+            ServiceLoader.Unload();
+        }
+
+        /// <summary>
+        /// Local/Global: always delegate to provider (provider owns caching and can swap instances).
+        /// </summary>
+        public static T Get<T>(LocationType location, string name = null) //TODO: maybe move into ConfigBase? to hide __Bind?
             where T : ConfigBase, new()
         {
-            return null;
+            EnsureApiLoaded();
+
+            var typeKey = TypeKey<T>();
+
+            var obj = ServiceLoader.Service.ClientConfigGet(typeKey, location, name);
+            if (obj == null)
+                throw new Exception("ConfigStorage.Get: ClientConfigGet returned null for " + typeKey);
+
+            var cfg = (T)obj;
+
+            // Bind runtime so cfg.Save()/LoadAndSwitch()/Export() works.
+            cfg.__Bind(typeKey, location);
+
+            return cfg;
         }
 
         public static CfgSync<T> World<T>(string defaultFile = null)
             where T : ConfigBase, new()
         {
-            return null;
+            EnsureApiLoaded();
+
+            var typeKey = TypeKey<T>();
+
+            object existing;
+            if (_worldCache.TryGetValue(typeKey, out existing))
+                return (CfgSync<T>)existing;
+
+            var sync = new CfgSync<T>(defaultFile);
+            _worldCache[typeKey] = sync;
+            return sync;
         }
     }
 }

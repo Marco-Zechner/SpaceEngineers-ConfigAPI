@@ -1,6 +1,8 @@
 ﻿using System.Collections.Generic;
 using MarcoZechner.ApiLib;
 using MarcoZechner.ConfigAPI.Shared.Api;
+using MarcoZechner.ConfigAPI.Shared.Logging;
+using MarcoZechner.Logging;
 using VRage.Game.Components;
 
 namespace MarcoZechner.ConfigAPI.Main.Api
@@ -8,6 +10,8 @@ namespace MarcoZechner.ConfigAPI.Main.Api
     [MySessionComponentDescriptor(MyUpdateOrder.NoUpdate)]
     public sealed class ServiceProviderSession : MySessionComponentBase
     {
+        public static Logger<ConfigApiTopics> Log = CfgLog.Logger;
+        
         // Stored callback APIs per consumer mod
         public static readonly Dictionary<ulong, ConfigUserHooks> CallbacksByMod
             = new Dictionary<ulong, ConfigUserHooks>();
@@ -16,12 +20,14 @@ namespace MarcoZechner.ConfigAPI.Main.Api
 
         public override void LoadData()
         {
+            Log.Trace($"{nameof(ServiceProviderSession)}.{nameof(LoadData)}");
             _host = new ApiProviderHost(new ConfigApiBootstrap(), Connect, Disconnect);
             _host.Load();
         }
 
         protected override void UnloadData()
         {
+            Log.Trace($"{nameof(ServiceProviderSession)}.{nameof(UnloadData)}");
             if (_host == null) return;
             
             _host.Unload();
@@ -35,6 +41,7 @@ namespace MarcoZechner.ConfigAPI.Main.Api
             IApiProvider configUserHooks
         )
         {
+            Log.Trace($"{nameof(ServiceProviderSession)}.{nameof(Connect)}", $"{nameof(consumerModId)}={consumerModId}, {nameof(consumerModName)}={consumerModName}, {nameof(configUserHooks)} is not null: {configUserHooks != null}");
             // store callbacks for provider -> consumer calls
             CallbacksByMod[consumerModId] = new ConfigUserHooks(configUserHooks);
 
@@ -47,6 +54,7 @@ namespace MarcoZechner.ConfigAPI.Main.Api
         // but it's here if you want to do some cleanup per mod.
         private static void Disconnect(ulong consumerModId)
         {
+            Log.Trace($"{nameof(ServiceProviderSession)}.{nameof(Disconnect)}", $"{nameof(consumerModId)}={consumerModId}");
             CallbacksByMod.Remove(consumerModId);
         }
     }

@@ -1,5 +1,8 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Xml.Serialization;
+using MarcoZechner.ConfigAPI.Client.Api;
+using MarcoZechner.ConfigAPI.Shared.Domain;
 
 namespace MarcoZechner.ConfigAPI.Client.Core
 {
@@ -34,9 +37,89 @@ namespace MarcoZechner.ConfigAPI.Client.Core
         /// Simple types like int, bool, string can be initialized inline, but Collections cause issues with XML serialization.
         /// So these should be initialized here. (Simple types can also be initialized here if desired.)
         /// </summary>
-        public virtual void ApplyDefaults()
+        public virtual void ApplyDefaults() { }
+        
+        // ==========================================================
+        // Runtime binding (UserMod-side only)
+        // ==========================================================
+
+        [XmlIgnore]
+        private string _typeKey;
+
+        [XmlIgnore]
+        private LocationType _location;
+
+        internal void __Bind(string typeKey, LocationType location) //TODO: :/ __Bind???
         {
-            
+            _typeKey = typeKey;
+            _location = location;
+        }
+
+        private void EnsureBound()
+        {
+            if (string.IsNullOrEmpty(_typeKey))
+                throw new InvalidOperationException(
+                    "ConfigBase: This instance is not bound. Obtain it via ConfigStorage.Get<T>(...).");
+        }
+
+        private static ConfigService Service
+        {
+            get
+            {
+                var svc = ServiceLoader.Service;
+                if (svc == null)
+                    throw new InvalidOperationException("ConfigBase: ConfigAPI service not available.");
+                return svc;
+            }
+        }
+
+        // ==========================================================
+        // User-facing helpers (Local/Global only)
+        // ==========================================================
+
+        /// <summary>
+        /// Save to the current file on the provider side.
+        /// </summary>
+        public bool Save()
+        {
+            EnsureBound();
+            return Service.ClientConfigSave(_typeKey, _location);
+        }
+
+        /// <summary>
+        /// Force reload from disk and replace the provider instance.
+        /// Returns the new instance (bound), or null if load failed.
+        /// </summary>
+        public T LoadAndSwitch<T>(string filename) where T : ConfigBase, new()
+        {
+            EnsureBound();
+            var obj = Service.ClientConfigLoadAndSwitch(_typeKey, _location, filename);
+            if (obj == null) return null;
+
+            var cfg = (T)obj;
+            cfg.__Bind(_typeKey, _location);
+            return cfg;
+        }
+
+        /// <summary>
+        /// Save to filename and switch current file.
+        /// Returns the new instance (bound), or null if save failed.
+        /// </summary>
+        public T SaveAndSwitch<T>(string filename) where T : ConfigBase, new()
+        {
+            EnsureBound();
+            var obj = Service.ClientConfigSaveAndSwitch(_typeKey, _location, filename);
+            if (obj == null) return null;
+
+            var cfg = (T)obj;
+            cfg.__Bind(_typeKey, _location);
+            return cfg;
+        }
+
+        public bool Export(string filename, bool overwrite = false)
+        {
+            EnsureBound();
+            return Service.ClientConfigExport(_typeKey, _location, filename, overwrite);
         }
     }
 }

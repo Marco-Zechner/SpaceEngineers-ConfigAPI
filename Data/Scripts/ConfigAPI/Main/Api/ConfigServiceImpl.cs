@@ -106,7 +106,7 @@ namespace MarcoZechner.ConfigAPI.Main.Api
                 { nameof(ClientConfigSaveAndSwitch), new Func<string, int, string, object>(ClientConfigSaveAndSwitchInternal) },
                 { nameof(ClientConfigExport), new Func<string, int, string, bool, bool>(ClientConfigExportInternal) },
                 { nameof(ServerConfigInit), new Func<string, string, object>(ServerConfigInit) },
-                { nameof(ServerConfigGetUpdate), new WorldTryDequeueUpdateDelegate(WorldTryDequeueUpdate) },
+                { nameof(ServerConfigGetUpdate), new Func<string, object[]>(ServerConfigGetUpdateInternal) },
                 { nameof(ServerConfigGetAuth), new Func<string, object>(ServerConfigGetAuth) },
                 { nameof(ServerConfigGetDraft), new Func<string, object>(ServerConfigGetDraft) },
                 { nameof(ServerConfigResetDraft), new Action<string>(ServerConfigResetDraft) },
@@ -132,31 +132,21 @@ namespace MarcoZechner.ConfigAPI.Main.Api
         private bool ClientConfigExportInternal(string typeKey, int locationTypeEnum, string filename, bool overwrite) 
             => ClientConfigExport(typeKey, (LocationType)locationTypeEnum, filename, overwrite);
         
-        private bool WorldTryDequeueUpdate(
-            string typeKey,
-            out int worldOpKindEnum,
-            out string error,
-            out long triggeredBy,
-            out ulong serverIteration,
-            out string currentFile)
+        private object[] ServerConfigGetUpdateInternal(string typeKey)
         {
+            var results = new object[5];
             var cfgUpdate = ServerConfigGetUpdate(typeKey);
             if (cfgUpdate == null)
             {
-                worldOpKindEnum = 0;
-                error = null;
-                triggeredBy = 0;
-                serverIteration = 0;
-                currentFile = null;
-                return false;
+                return null;
             }
             
-            worldOpKindEnum = (int)cfgUpdate.WorldOpKind;
-            error = cfgUpdate.Error;
-            triggeredBy = cfgUpdate.TriggeredBy;
-            serverIteration = cfgUpdate.ServerIteration;
-            currentFile = cfgUpdate.CurrentFile;
-            return true;
+            results[0] = (int)cfgUpdate.WorldOpKind;
+            results[1] = cfgUpdate.Error;
+            results[2] = cfgUpdate.TriggeredBy;
+            results[3] = cfgUpdate.ServerIteration;
+            results[4] = cfgUpdate.CurrentFile;
+            return results;
         }
     }
 }

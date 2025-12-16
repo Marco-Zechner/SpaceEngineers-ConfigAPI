@@ -118,7 +118,7 @@ namespace MarcoZechner.Logging
                 case LogSeverity.Info:
                 default:
                     var rule = Config.GetRule(topic);
-                    shouldLog = rule.Enabled && (!hasDetail || detail <= rule.MaxDetail);
+                    shouldLog = rule.Enabled && (!hasDetail || detail <= rule.MaxDetail || detail == -1 || rule.MaxDetail == -1);
                     output = rule.Output;
                     break;
             }
