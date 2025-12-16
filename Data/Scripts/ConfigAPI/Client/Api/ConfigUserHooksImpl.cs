@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.IO;
 using MarcoZechner.ApiLib;
 using MarcoZechner.ConfigAPI.Client.Core;
 using MarcoZechner.ConfigAPI.Shared.Domain;
@@ -24,9 +23,6 @@ namespace MarcoZechner.ConfigAPI.Client.Api
         // typeKey -> definition (new default + xml serializer + descriptions)
         private static readonly Dictionary<string, IConfigDefinition> _defs
             = new Dictionary<string, IConfigDefinition>();
-
-        // Optional: allow the usermod to override where files go (subfolder)
-        private const string ROOT_DIR = "ConfigAPI"; // change to your desired root
 
         // --------------------------------------------------------------------
         // Registration API (call from your boilerplate when the mod loads)
@@ -95,7 +91,7 @@ namespace MarcoZechner.ConfigAPI.Client.Api
             if (string.IsNullOrEmpty(filename))
                 return null;
 
-            var path = BuildPath(filename);
+            var path = filename;
             if (locationType == LocationType.Local)
             {
                 if (!MyAPIGateway.Utilities.FileExistsInLocalStorage(path, typeof(ConfigUserHooksImpl)))
@@ -118,7 +114,7 @@ namespace MarcoZechner.ConfigAPI.Client.Api
             if (string.IsNullOrEmpty(filename))
                 throw new Exception("SaveFile: filename is null/empty.");
 
-            var path = BuildPath(filename);
+            var path = filename;
             CfgLog.Logger.Debug(ConfigApiTopics.Callbacks, 0,$"{nameof(ConfigUserHooksImpl)}.{nameof(SaveFile)}: Writing to path: {path}");
 
             if (locationType == LocationType.Local)
@@ -137,8 +133,8 @@ namespace MarcoZechner.ConfigAPI.Client.Api
             CfgLog.Logger.Trace($"{nameof(ConfigUserHooksImpl)}.{nameof(BackupFile)}", $"{nameof(locationType)}={locationType}, {nameof(filename)}={filename}");
             if (string.IsNullOrEmpty(filename))
                 return;
-
-            var srcPath = BuildPath(filename);
+            
+            var srcPath = filename;
             if (locationType == LocationType.Local)
             {
                 if (!MyAPIGateway.Utilities.FileExistsInLocalStorage(srcPath, typeof(ConfigUserHooksImpl)))
@@ -151,7 +147,7 @@ namespace MarcoZechner.ConfigAPI.Client.Api
             }
 
 
-            var backupPath = BuildPath(filename + ".bak");
+            var backupPath = filename + ".bak";
 
             string data;
             if (locationType == LocationType.Local)
@@ -215,11 +211,6 @@ namespace MarcoZechner.ConfigAPI.Client.Api
                 return def;
 
             throw new Exception("ConfigUserHooksImpl: No config definition registered for typeKey: " + typeKey);
-        }
-
-        private static string BuildPath(string filename)
-        {
-            return Path.Combine(ROOT_DIR, filename);
         }
     }
 }

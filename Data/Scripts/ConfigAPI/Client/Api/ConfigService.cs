@@ -38,7 +38,7 @@ namespace MarcoZechner.ConfigAPI.Client.Api
                 [nameof(ClientConfigSaveAndSwitch)] = d => _clientConfigSaveAndSwitch = (Func<string, int, string, object>)d,
                 [nameof(ClientConfigExport)] = d => _clientConfigExport = (Func<string, int, string, bool, bool>)d,
                 [nameof(ServerConfigInit)] = d => _serverConfigInit = (Func<string, string, object>)d,
-                [nameof(ServerConfigGetUpdate)] = d => _serverConfigGetUpdate = (Func<string, object[]>)d,
+                [nameof(ServerConfigGetUpdate)] = d => _serverConfigGetUpdate = (Func<string, object[]>)d, //TODO Mytuple<>
                 [nameof(ServerConfigGetAuth)] = d => _worldGetAuth = (Func<string, object>)d,
                 [nameof(ServerConfigGetDraft)] = d => _worldGetDraft = (Func<string, object>)d,
                 [nameof(ServerConfigResetDraft)] = d => _worldResetDraft = (Action<string>)d,
