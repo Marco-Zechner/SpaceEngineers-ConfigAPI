@@ -159,7 +159,9 @@ namespace MarcoZechner.ConfigAPI.Main.Core
             // External TOML content
             var externalCurrent = _configUserHooks.LoadFile(locationType, filename);
             var externalDefaults = _configUserHooks.LoadFile(locationType, DefaultSidecar(filename));
-
+            Log.Debug(ConfigApiTopics.None, 0, $"{nameof(ClientConfigService)}.{nameof(TryLoadClient)}: Loaded externalCurrent length: \n\t{(externalCurrent != null ? externalCurrent.Length.ToString() : "null")},\n\texternalDefaults length: {(externalDefaults != null ? externalDefaults.Length.ToString() : "null")}");
+            
+            
             // If missing or unreadable: create defaults, write both files, return default instance.
             if (string.IsNullOrEmpty(externalCurrent))
             {

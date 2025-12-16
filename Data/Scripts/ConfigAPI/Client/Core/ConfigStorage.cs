@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using MarcoZechner.ConfigAPI.Client.Api;
 using MarcoZechner.ConfigAPI.Shared.Domain;
+using MarcoZechner.ConfigAPI.Shared.Logging;
 using VRage.Game.ModAPI;
 
 namespace MarcoZechner.ConfigAPI.Client.Core
@@ -20,14 +21,26 @@ namespace MarcoZechner.ConfigAPI.Client.Core
                 throw new InvalidOperationException(
                     "ConfigStorage: ConfigAPI is not loaded. Call ConfigStorage.Init(modContext) first.");
         }
+        
+        private static void EnsureRegistered<T>(string typeKey)
+            where T : ConfigBase, new()
+        {
+            // Location independent; only once per T per session.
+            if (ConfigUserHooksImpl.IsRegistered(typeKey))
+                return;
+
+            ConfigUserHooksImpl.Register<T>();
+        }
 
         public static void Init(IMyModContext modContext)
         {
+            CfgLog.Logger.Trace($"{nameof(ConfigStorage)}.{nameof(Init)}", $"ModId={modContext.ModItem.PublishedFileId}, ModName={modContext.ModName}");
             ServiceLoader.Init(modContext.ModItem.PublishedFileId, modContext.ModName);
         }
 
         public static void Unload()
         {
+            CfgLog.Logger.Trace($"{nameof(ConfigStorage)}.{nameof(Unload)}");
             _worldCache.Clear();
             ServiceLoader.Unload();
         }
@@ -38,10 +51,13 @@ namespace MarcoZechner.ConfigAPI.Client.Core
         public static T Get<T>(LocationType location, string name = null) //TODO: maybe move into ConfigBase? to hide __Bind?
             where T : ConfigBase, new()
         {
+            CfgLog.Logger.Trace($"{nameof(ConfigStorage)}.{nameof(Get)}", $"{nameof(location)}={location}, {nameof(name)}={name}");
             EnsureApiLoaded();
 
             var typeKey = TypeKey<T>();
 
+            EnsureRegistered<T>(typeKey);
+            
             var obj = ServiceLoader.Service.ClientConfigGet(typeKey, location, name);
             if (obj == null)
                 throw new Exception("ConfigStorage.Get: ClientConfigGet returned null for " + typeKey);

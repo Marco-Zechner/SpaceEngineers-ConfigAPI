@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using MarcoZechner.ConfigAPI.Main.Api;
+using MarcoZechner.ConfigAPI.Shared.Logging;
 
 namespace MarcoZechner.ConfigAPI.Main.Domain
 {
@@ -11,6 +12,7 @@ namespace MarcoZechner.ConfigAPI.Main.Domain
 
         public HooksDefinition(ConfigUserHooks hooks, string typeKey)
         {
+            CfgLog.Logger.Trace($"{nameof(HooksDefinition)}.{nameof(HooksDefinition)}", $"{nameof(hooks)} is not null={hooks != null}, {nameof(typeKey)}={typeKey}");
             _hooks = hooks;
             _typeKey = typeKey;
             TypeName = ExtractTypeName(typeKey);
@@ -21,6 +23,7 @@ namespace MarcoZechner.ConfigAPI.Main.Domain
 
         public string GetCurrentDefaultsInternalXml()
         {
+            CfgLog.Logger.Trace($"{nameof(HooksDefinition)}.{nameof(GetCurrentDefaultsInternalXml)}");
             var def = _hooks.NewDefault(_typeKey);
             if (def == null) throw new Exception("HooksDefinition: NewDefault returned null for " + _typeKey);
             return _hooks.SerializeToInternalXml(_typeKey, def);
