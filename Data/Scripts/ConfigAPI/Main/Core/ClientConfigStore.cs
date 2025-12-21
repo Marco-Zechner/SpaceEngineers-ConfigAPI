@@ -15,7 +15,6 @@ namespace MarcoZechner.ConfigAPI.Main.Core
         {
             CfgLog.Logger.Trace($"{nameof(ClientConfigStore)}.{nameof(TryGet)}", $"{nameof(typeKey)}={typeKey}, {nameof(loc)}={loc}");
             var res = _instances.TryGetValue(Key(typeKey, loc), out instance);
-            CfgLog.Logger.Debug(ConfigApiTopics.None,0,$"return={res}, instance={(instance != null ? instance.GetType().FullName : "null")}");
             return res;
         }
 
@@ -30,7 +29,6 @@ namespace MarcoZechner.ConfigAPI.Main.Core
         {
             CfgLog.Logger.Trace($"{nameof(ClientConfigStore)}.{nameof(TryGetCurrentFile)}", $"{nameof(typeKey)}={typeKey}, {nameof(loc)}={loc}");
             var res = _currentFiles.TryGetValue(Key(typeKey, loc), out file);
-            CfgLog.Logger.Debug(ConfigApiTopics.None, 0, $"return={res}, file.Length={file?.Length}");
             return res;
         }
     }

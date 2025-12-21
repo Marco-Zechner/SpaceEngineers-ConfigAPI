@@ -14,6 +14,8 @@ namespace MarcoZechner.ConfigAPI.Shared.Logging
                     cfg.ErrorOutput = LogOutput.FileAndChat;
                     cfg.WarningOutput = LogOutput.FileAndChat;
 
+                    cfg.TraceOutput = LogOutput.FileAndChat;
+                    cfg.TraceArgumentsEnabled = true;
                     
                     // default: quiet unless enabled
                     cfg.DefaultRule.Enabled = false;

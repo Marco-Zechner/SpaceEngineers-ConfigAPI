@@ -84,6 +84,14 @@ namespace MarcoZechner.Logging
             }
         }
 
+        private void TryWriteChat(ChatEntry msg)
+        {
+            if (MyAPIGateway.Utilities == null)
+                _chatQueue.Enqueue(msg);
+            else
+                MyAPIGateway.Utilities.ShowMessage(msg.Sender, msg.Message);
+        }
+
         private void WriteTrace(string message)
         {
             // Route trace by its own policy (no topic rules involved)
@@ -94,7 +102,7 @@ namespace MarcoZechner.Logging
             WriteFileNoTopic("Trace", message);
 
             if (output == LogOutput.FileAndChat)
-                _chatQueue.Enqueue(new ChatEntry { Sender = _source, Message = message });
+                TryWriteChat(new ChatEntry { Sender = _source, Message = message });
         }
 
         private void Write(LogSeverity sev, TTopic topic, int detail, string message, bool hasDetail)
@@ -129,10 +137,9 @@ namespace MarcoZechner.Logging
 
             // Policy:
             // - Errors always FileAndChat (by config)
-            // - Warnings file-only (by config)
             // - Debug/Info chat only if topic rule Output == FileAndChat
-            if (output == LogOutput.FileAndChat && sev != LogSeverity.Warning)
-                _chatQueue.Enqueue(new ChatEntry { Sender = _source, Message = message });
+            if (output == LogOutput.FileAndChat)
+                TryWriteChat(new ChatEntry { Sender = _source, Message = message });
         }
 
         private void WriteFile(LogSeverity sev, TTopic topic, int detail, string message, bool hasDetail)

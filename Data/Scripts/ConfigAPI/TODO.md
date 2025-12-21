@@ -1,0 +1,2 @@
+- save / load / export, handle file extensions for the user
+- check event unload, it doesn't work
