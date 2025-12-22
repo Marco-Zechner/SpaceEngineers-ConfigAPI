@@ -1,8 +1,7 @@
 ﻿using System.Collections.Generic;
 using MarcoZechner.ApiLib;
+using MarcoZechner.ConfigAPI.Scripts.ConfigAPI.Shared;
 using MarcoZechner.ConfigAPI.Shared.Api;
-using MarcoZechner.ConfigAPI.Shared.Logging;
-using MarcoZechner.Logging;
 using VRage.Game.Components;
 
 namespace MarcoZechner.ConfigAPI.Main.Api
@@ -10,24 +9,21 @@ namespace MarcoZechner.ConfigAPI.Main.Api
     [MySessionComponentDescriptor(MyUpdateOrder.NoUpdate)]
     public sealed class ServiceProviderSession : MySessionComponentBase
     {
-        public static Logger<ConfigApiTopics> Log = CfgLog.Logger;
-        
         // Stored callback APIs per consumer mod
-        public static readonly Dictionary<ulong, ConfigUserHooks> CallbacksByMod
+        private static readonly Dictionary<ulong, ConfigUserHooks> _callbacksByMod
             = new Dictionary<ulong, ConfigUserHooks>();
 
         private ApiProviderHost _host;
 
         public override void LoadData()
         {
-            Log.Trace($"{nameof(ServiceProviderSession)}.{nameof(LoadData)}");
             _host = new ApiProviderHost(new ConfigApiBootstrap(), Connect, Disconnect);
             _host.Load();
+            CfgLog.Info("ConfigAPI loaded");
         }
 
         protected override void UnloadData()
         {
-            Log.Trace($"{nameof(ServiceProviderSession)}.{nameof(UnloadData)}");
             if (_host == null) return;
             
             _host.Unload();
@@ -41,12 +37,13 @@ namespace MarcoZechner.ConfigAPI.Main.Api
             IApiProvider configUserHooks
         )
         {
-            Log.Trace($"{nameof(ServiceProviderSession)}.{nameof(Connect)}", $"{nameof(consumerModId)}={consumerModId}, {nameof(consumerModName)}={consumerModName}, {nameof(configUserHooks)} is not null: {configUserHooks != null}");
+            CfgLog.Info($"{consumerModId}:{consumerModName} connected to ConfigAPI");
+            
             // store callbacks for provider -> consumer calls
-            CallbacksByMod[consumerModId] = new ConfigUserHooks(configUserHooks);
+            _callbacksByMod[consumerModId] = new ConfigUserHooks(configUserHooks);
 
             // return bound main api dict for this consumer
-            return new ConfigServiceImpl(consumerModId, consumerModName, CallbacksByMod[consumerModId]);
+            return new ConfigServiceImpl(consumerModId, consumerModName, _callbacksByMod[consumerModId]);
         }
 
         // Called by ApiLib when a consumer disconnects, which means another mod on the same machine is probably unloading.
@@ -54,8 +51,8 @@ namespace MarcoZechner.ConfigAPI.Main.Api
         // but it's here if you want to do some cleanup per mod.
         private static void Disconnect(ulong consumerModId)
         {
-            Log.Trace($"{nameof(ServiceProviderSession)}.{nameof(Disconnect)}", $"{nameof(consumerModId)}={consumerModId}");
-            CallbacksByMod.Remove(consumerModId);
+            CfgLog.Info($"{consumerModId} disconnected from ConfigAPI");
+            _callbacksByMod.Remove(consumerModId);
         }
     }
 }

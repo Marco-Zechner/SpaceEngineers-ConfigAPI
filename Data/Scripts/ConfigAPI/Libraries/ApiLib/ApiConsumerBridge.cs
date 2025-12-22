@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using MarcoZechner.ConfigAPI.Scripts.ConfigAPI.Shared;
 using Sandbox.ModAPI;
 
 namespace MarcoZechner.ApiLib
@@ -37,7 +38,9 @@ namespace MarcoZechner.ApiLib
 
         public void Init()
         {
+            CfgLog.Info("ConfigAPI Consumer Bridge initializing.");
             MyAPIGateway.Utilities.RegisterMessageHandler(_cfg.DiscoveryChannel, OnProviderMessage);
+            CfgLog.Debug(() => $"Send Connect request to provider {_cfg.ApiProviderModId} on channel {_cfg.DiscoveryChannel}");
             SendRequest();
         }
 
@@ -64,7 +67,7 @@ namespace MarcoZechner.ApiLib
                 { ApiConstants.HEADER_FROM_MOD_ID_KEY, _consumerModId },
                 { ApiConstants.HEADER_FROM_MOD_NAME_KEY, _consumerModName },
 
-                { ApiConstants.HEADER_TARGET_MOD_ID_KEY, 0UL }, // let provider decide; caller may override externally if desired
+                { ApiConstants.HEADER_TARGET_MOD_ID_KEY, 0UL },
                 { ApiConstants.HEADER_TARGET_MOD_NAME_KEY, "Any" },
 
                 { ApiConstants.HEADER_LAYOUT_KEY, "Header, Verify, Data" },
@@ -103,7 +106,10 @@ namespace MarcoZechner.ApiLib
             if (ApiCast.TryGet(header, ApiConstants.HEADER_TARGET_MOD_ID_KEY, out targetId))
             {
                 if (targetId != 0UL && targetId != _consumerModId)
+                {
+                    CfgLog.Warning($"A message intended for mod id {targetId} was received by us, mod id {_consumerModId}, ignoring.");
                     return;
+                }
             }
 
             Dictionary<string, Delegate> setupDict;

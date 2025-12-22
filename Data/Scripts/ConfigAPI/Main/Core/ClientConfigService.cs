@@ -3,8 +3,6 @@ using MarcoZechner.ConfigAPI.Main.Api;
 using MarcoZechner.ConfigAPI.Main.Core.Migrator;
 using MarcoZechner.ConfigAPI.Main.Domain;
 using MarcoZechner.ConfigAPI.Shared.Domain;
-using MarcoZechner.ConfigAPI.Shared.Logging;
-using MarcoZechner.Logging;
 
 namespace MarcoZechner.ConfigAPI.Main.Core
 {
@@ -17,7 +15,6 @@ namespace MarcoZechner.ConfigAPI.Main.Core
     /// </summary>
     public sealed class ClientConfigService
     {
-        public static Logger<ConfigApiTopics> Log = CfgLog.Logger;
         
         private readonly ConfigUserHooks _configUserHooks;
         private readonly IXmlConverter _converter;
@@ -30,7 +27,6 @@ namespace MarcoZechner.ConfigAPI.Main.Core
             IXmlConverter converter,
             IConfigLayoutMigrator migrator)
         {
-            Log.Trace($"{nameof(ClientConfigService)}.{nameof(ClientConfigService)}", $"\n\t{nameof(configUserHooks)} is not null: {configUserHooks != null}, \n\t{nameof(converter)} is not null: {converter != null}, \n\t{nameof(migrator)} is not null: {migrator != null}\n");
             if (configUserHooks == null) throw new ArgumentNullException(nameof(configUserHooks));
             if (converter == null) throw new ArgumentNullException(nameof(converter));
             if (migrator == null) throw new ArgumentNullException(nameof(migrator));
@@ -42,7 +38,6 @@ namespace MarcoZechner.ConfigAPI.Main.Core
         
         private static string DefaultFile(string typeKey, string filename)
         {
-            Log.Trace($"{nameof(ClientConfigService)}.{nameof(DefaultFile)}", $"{nameof(typeKey)}={typeKey}, {nameof(filename)}={filename}");
             if (!string.IsNullOrEmpty(filename))
                 return filename;
 
@@ -54,7 +49,6 @@ namespace MarcoZechner.ConfigAPI.Main.Core
         
         public object ClientConfigGet(string typeKey, LocationType locationType, string filename)
         {
-            Log.Trace($"{nameof(ClientConfigService)}.{nameof(ClientConfigGet)}", $"{nameof(typeKey)}={typeKey}, {nameof(locationType)}={locationType}, {nameof(filename)}={filename}");
             filename = DefaultFile(typeKey, filename);
 
             object existing;
@@ -77,14 +71,12 @@ namespace MarcoZechner.ConfigAPI.Main.Core
 
         public object ClientConfigLoadAndSwitch(string typeKey, LocationType locationType, string filename)
         {
-            Log.Trace($"{nameof(ClientConfigService)}.{nameof(ClientConfigLoadAndSwitch)}", $"{nameof(typeKey)}={typeKey}, {nameof(locationType)}={locationType}, {nameof(filename)}={filename}");
             filename = DefaultFile(typeKey, filename);
             return TryLoadClient(typeKey, locationType, filename);
         }
 
         public bool ClientConfigSave(string typeKey, LocationType locationType)
         {
-            Log.Trace($"{nameof(ClientConfigService)}.{nameof(ClientConfigSave)}", $"{nameof(typeKey)}={typeKey}, {nameof(locationType)}={locationType}");
             object instance;
             if (!_clientStore.TryGet(typeKey, locationType, out instance))
                 return false;
@@ -99,7 +91,6 @@ namespace MarcoZechner.ConfigAPI.Main.Core
 
         public object ClientConfigSaveAndSwitch(string typeKey, LocationType locationType, string filename)
         {
-            Log.Trace($"{nameof(ClientConfigService)}.{nameof(ClientConfigSaveAndSwitch)}", $"{nameof(typeKey)}={typeKey}, {nameof(locationType)}={locationType}, {nameof(filename)}={filename}");
             filename = DefaultFile(typeKey, filename);
 
             object instance;
@@ -115,8 +106,6 @@ namespace MarcoZechner.ConfigAPI.Main.Core
 
         public bool ClientConfigExport(string typeKey, LocationType locationType, string filename, bool overwrite)
         {
-            Log.Trace($"{nameof(ClientConfigService)}.{nameof(ClientConfigExport)}", $"{nameof(typeKey)}={typeKey}, {nameof(locationType)}={locationType}, {nameof(filename)}={filename}, {nameof(overwrite)}={overwrite}");
-            
             if (string.IsNullOrEmpty(filename))
                 return false;
 
@@ -152,14 +141,11 @@ namespace MarcoZechner.ConfigAPI.Main.Core
 
         private object TryLoadClient(string typeKey, LocationType locationType, string filename)
         {
-            Log.Trace($"{nameof(ClientConfigService)}.{nameof(TryLoadClient)}", $"{nameof(typeKey)}={typeKey}, {nameof(locationType)}={locationType}, {nameof(filename)}={filename}");
-            
             var def = new HooksDefinition(_configUserHooks, typeKey);
 
             // External TOML content
             var externalCurrent = _configUserHooks.LoadFile(locationType, filename);
             var externalDefaults = _configUserHooks.LoadFile(locationType, DefaultSidecar(filename));
-            Log.Debug(ConfigApiTopics.None, 0, $"{nameof(ClientConfigService)}.{nameof(TryLoadClient)}: Loaded externalCurrent length: \n\t{(externalCurrent != null ? externalCurrent.Length.ToString() : "null")},\n\texternalDefaults length: {(externalDefaults != null ? externalDefaults.Length.ToString() : "null")}");
             
             
             // If missing or unreadable: create defaults, write both files, return default instance.
@@ -249,9 +235,6 @@ namespace MarcoZechner.ConfigAPI.Main.Core
 
         private void SaveClientToFile(string typeKey, LocationType locationType, string filename, object instance)
         {
-            Log.Trace($"{nameof(ClientConfigService)}.{nameof(SaveClientToFile)}", $"{nameof(typeKey)}={typeKey}, {nameof(locationType)}={locationType}, {nameof(instance)} is not null: {instance != null}");
-            
-            
             if (!_configUserHooks.IsInstanceOf(typeKey, instance))
                 throw new Exception("SaveClientToFile: instance/typeKey mismatch: " + typeKey);
 
@@ -273,8 +256,6 @@ namespace MarcoZechner.ConfigAPI.Main.Core
 
         private bool ExternalFileMatchesType(string typeKey, string existingExternal)
         {
-            Log.Trace($"{nameof(ClientConfigService)}.{nameof(ExternalFileMatchesType)}", $"{nameof(typeKey)}={typeKey}, {nameof(existingExternal)}.Length: {existingExternal.Length}");
-            
             // The robust way is: ToInternal + check root name == definition.TypeName (or typeKey)
             // We keep this cheap and deterministic.
             var def = new HooksDefinition(_configUserHooks, typeKey);

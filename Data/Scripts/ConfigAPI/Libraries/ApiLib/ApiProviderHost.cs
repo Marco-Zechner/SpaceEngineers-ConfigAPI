@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using MarcoZechner.ConfigAPI.Scripts.ConfigAPI.Shared;
 using Sandbox.ModAPI;
 
 namespace MarcoZechner.ApiLib
@@ -97,7 +98,35 @@ namespace MarcoZechner.ApiLib
         
         private bool VerifyApi(string clientApiVersion, string clientModName, ulong clientModSteamId)
         {
-            return MajorVersionMatch(clientApiVersion, _cfg.ApiVersion);
+            if (!MajorVersionMatch(clientApiVersion, _cfg.ApiVersion))
+            {
+                CfgLog.Error("API version mismatch:\n" +
+                             $"Client mod '{clientModName}' (SteamId {clientModSteamId})\n" +
+                             $"requests API version '{clientApiVersion}',\n" +
+                             $"but provider '{_cfg.ApiProviderModId}' uses '{_cfg.ApiVersion}'.\n" +
+                             "Connection rejected.");
+                return false;
+            }
+
+            if (!MinorVersionMatch(clientApiVersion, _cfg.ApiVersion))
+            {
+                CfgLog.Info("API minor version mismatch:\n" +
+                            $"Client mod '{clientModName}' (SteamId {clientModSteamId})\n" +
+                            $"requests API version '{clientApiVersion}',\n" +
+                            $"but provider '{_cfg.ApiProviderModId}' uses '{_cfg.ApiVersion}'.\n" +
+                            "Connection accepted, update recommended.");
+                return true;
+            }
+
+            if (!PatchVersionMatch(clientApiVersion, _cfg.ApiVersion))
+            {
+                CfgLog.Info("API patch version mismatch:\n" +
+                            $"Client mod '{clientModName}' (SteamId {clientModSteamId})\n" +
+                            $"requests API version '{clientApiVersion}',\n" +
+                            $"but provider '{_cfg.ApiProviderModId}' uses '{_cfg.ApiVersion}'.\n" +
+                            "Connection accepted, update recommended.");
+            }
+            return true;
         }
         
         public static bool MajorVersionMatch(string clientApiVersion, string providerApiVersion)
@@ -110,8 +139,8 @@ namespace MarcoZechner.ApiLib
 
             return client[0] == provider[0];
         }
-        
-        public static bool MinorVersionMatch(string clientApiVersion, string providerApiVersion)
+
+        private static bool MinorVersionMatch(string clientApiVersion, string providerApiVersion)
         {
             var client = (clientApiVersion ?? "").Split('.');
             var provider = providerApiVersion.Split('.');
@@ -121,8 +150,8 @@ namespace MarcoZechner.ApiLib
 
             return client[0] == provider[0] && client[1] == provider[1];
         }
-        
-        public static bool PatchVersionMatch(string clientApiVersion, string providerApiVersion)
+
+        private static bool PatchVersionMatch(string clientApiVersion, string providerApiVersion)
         {
             var client = (clientApiVersion ?? "").Split('.');
             var provider = providerApiVersion.Split('.');

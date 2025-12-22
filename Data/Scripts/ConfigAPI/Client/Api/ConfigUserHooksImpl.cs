@@ -2,9 +2,9 @@
 using System.Collections.Generic;
 using MarcoZechner.ApiLib;
 using MarcoZechner.ConfigAPI.Client.Core;
+using MarcoZechner.ConfigAPI.Scripts.ConfigAPI.Shared;
 using MarcoZechner.ConfigAPI.Shared.Domain;
 using MarcoZechner.ConfigAPI.Shared.Api;
-using MarcoZechner.ConfigAPI.Shared.Logging;
 using Sandbox.ModAPI;
 
 namespace MarcoZechner.ConfigAPI.Client.Api
@@ -30,16 +30,11 @@ namespace MarcoZechner.ConfigAPI.Client.Api
 
         public static bool IsRegistered(string typeKey)
         {
-            CfgLog.Logger.Trace($"{nameof(ConfigUserHooksImpl)}.{nameof(IsRegistered)}", $"{nameof(typeKey)}={typeKey}");
-            if (string.IsNullOrEmpty(typeKey))
-                return false;
-
-            return _defs.ContainsKey(typeKey);
+            return !string.IsNullOrEmpty(typeKey) && _defs.ContainsKey(typeKey);
         }
         
         public static void Register<T>() where T : ConfigBase, new()
         {
-            CfgLog.Logger.Trace($"{nameof(ConfigUserHooksImpl)}.{nameof(Register)}");
             var key = typeof(T).FullName;
             if (key == null)
                 throw new Exception("Type.FullName is null (unexpected in SE).");
@@ -49,7 +44,6 @@ namespace MarcoZechner.ConfigAPI.Client.Api
         
         public object NewDefault(string typeKey)
         {
-            CfgLog.Logger.Trace($"{nameof(ConfigUserHooksImpl)}.{nameof(NewDefault)}", $"{nameof(typeKey)}={typeKey}");
             var def = GetDef(typeKey);
             var obj = def.NewDefault();
             return obj;
@@ -57,7 +51,6 @@ namespace MarcoZechner.ConfigAPI.Client.Api
 
         public bool IsInstanceOf(string typeKey, object instance)
         {
-            CfgLog.Logger.Trace($"{nameof(ConfigUserHooksImpl)}.{nameof(IsInstanceOf)}", $"{nameof(typeKey)}={typeKey}");
             if (instance == null)
                 return false;
 
@@ -66,71 +59,69 @@ namespace MarcoZechner.ConfigAPI.Client.Api
 
         public string SerializeToInternalXml(string typeKey, object instance)
         {
-            CfgLog.Logger.Trace($"{nameof(ConfigUserHooksImpl)}.{nameof(SerializeToInternalXml)}", $"{nameof(typeKey)}={typeKey}");
             var def = GetDef(typeKey);
             return def.SerializeToInternalXml((ConfigBase)instance);
         }
 
         public object DeserializeFromInternalXml(string typeKey, string internalXml)
         {
-            CfgLog.Logger.Trace($"{nameof(ConfigUserHooksImpl)}.{nameof(DeserializeFromInternalXml)}", $"{nameof(typeKey)}={typeKey}");
             var def = GetDef(typeKey);
             return def.DeserializeFromInternalXml(internalXml);
         }
 
         public IReadOnlyDictionary<string, string> GetVariableDescriptions(string typeKey)
         {
-            CfgLog.Logger.Trace($"{nameof(ConfigUserHooksImpl)}.{nameof(GetVariableDescriptions)}", $"{nameof(typeKey)}={typeKey}");
             var def = GetDef(typeKey);
             return def.GetVariableDescriptions();
         }
 
         public string LoadFile(LocationType locationType, string filename)
         {
-            CfgLog.Logger.Trace($"{nameof(ConfigUserHooksImpl)}.{nameof(LoadFile)}", $"{nameof(locationType)}={locationType}, {nameof(filename)}={filename}");
+            CfgLog.Info($"Loading file: locationType={locationType}, filename={filename}");
             if (string.IsNullOrEmpty(filename))
                 return null;
 
-            var path = filename;
             if (locationType == LocationType.Local)
             {
-                if (!MyAPIGateway.Utilities.FileExistsInLocalStorage(path, typeof(ConfigUserHooksImpl)))
+                if (!MyAPIGateway.Utilities.FileExistsInLocalStorage(filename, typeof(ConfigUserHooksImpl)))
                     return null;
 
-                using (var reader = MyAPIGateway.Utilities.ReadFileInLocalStorage(path, typeof(ConfigUserHooksImpl)))
+                using (var reader = MyAPIGateway.Utilities.ReadFileInLocalStorage(filename, typeof(ConfigUserHooksImpl)))
                     return reader.ReadToEnd();
             }
             
-            if (!MyAPIGateway.Utilities.FileExistsInGlobalStorage(path))
+            if (!MyAPIGateway.Utilities.FileExistsInGlobalStorage(filename))
                 return null;
 
-            using (var reader = MyAPIGateway.Utilities.ReadFileInGlobalStorage(path))
+            using (var reader = MyAPIGateway.Utilities.ReadFileInGlobalStorage(filename))
                 return reader.ReadToEnd();
         }
 
         public void SaveFile(LocationType locationType, string filename, string content)
         {
-            CfgLog.Logger.Trace($"{nameof(ConfigUserHooksImpl)}.{nameof(SaveFile)}", $"{nameof(locationType)}={locationType}, {nameof(filename)}={filename},\n\t{nameof(content)}={content ?? "null"}");
+            CfgLog.Info($"Saving file: locationType={locationType}, filename={filename}");
             if (string.IsNullOrEmpty(filename))
-                throw new Exception("SaveFile: filename is null/empty.");
-
-            var path = filename;
-            CfgLog.Logger.Debug(ConfigApiTopics.Callbacks, 0,$"{nameof(ConfigUserHooksImpl)}.{nameof(SaveFile)}: Writing to path: {path}");
+            {
+                var ex = new Exception("SaveFile: filename is null/empty.");
+                CfgLog.Error("Cannot Save Config. Filename is null/empty.", ex);
+                throw ex;
+            }
 
             if (locationType == LocationType.Local)
             {
-                using (var writer = MyAPIGateway.Utilities.WriteFileInLocalStorage(path, typeof(ConfigUserHooksImpl)))
+                using (var writer = MyAPIGateway.Utilities.WriteFileInLocalStorage(filename, typeof(ConfigUserHooksImpl)))
                     writer.Write(content ?? string.Empty);
                 return;
             }
             
-            using (var writer = MyAPIGateway.Utilities.WriteFileInGlobalStorage(path))
+            using (var writer = MyAPIGateway.Utilities.WriteFileInGlobalStorage(filename))
                 writer.Write(content ?? string.Empty);
         }
+        
 
         public void BackupFile(LocationType locationType, string filename)
         {
-            CfgLog.Logger.Trace($"{nameof(ConfigUserHooksImpl)}.{nameof(BackupFile)}", $"{nameof(locationType)}={locationType}, {nameof(filename)}={filename}");
+            CfgLog.Info($"Creating Backup of file: locationType={locationType}, filename={filename}");
             if (string.IsNullOrEmpty(filename))
                 return;
             
@@ -202,7 +193,6 @@ namespace MarcoZechner.ConfigAPI.Client.Api
 
         private static IConfigDefinition GetDef(string typeKey)
         {
-            CfgLog.Logger.Trace($"{nameof(ConfigUserHooksImpl)}.{nameof(GetDef)}", $"{nameof(typeKey)}={typeKey}");
             if (string.IsNullOrEmpty(typeKey))
                 throw new Exception("ConfigUserHooksImpl: typeKey is null/empty.");
 
