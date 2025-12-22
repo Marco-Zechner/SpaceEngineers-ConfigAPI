@@ -27,11 +27,11 @@ namespace MarcoZechner.LoggingLite
         // Static surface
         public static LogConfig Config => _inst.ConfigInstance;
 
-        public static void Info(string msg) => _inst.InfoInstance(msg);
-        public static void Warning(string msg) => _inst.WarningInstance(msg);
-        public static void Error(string msg) => _inst.ErrorInstance(msg);
-        public static void Error(string msg, Exception ex) => _inst.ErrorInstance(msg, ex);
-        public static void Debug(Func<string> msgFactory) => _inst.DebugInstance(msgFactory);
+        public static void Info(string msg, bool forceChat = false) => _inst.InfoInstance(msg, forceChat);
+        public static void Warning(string msg, bool forceChat = false) => _inst.WarningInstance(msg, forceChat);
+        public static void Error(string msg, bool forceChat = false) => _inst.ErrorInstance(msg, forceChat);
+        public static void Error(string msg, Exception ex, bool forceChat = false) => _inst.ErrorInstance(msg, ex, forceChat);
+        public static void Debug(Func<string> msgFactory, bool forceChat = false) => _inst.DebugInstance(msgFactory, forceChat);
 
         public static void Close() => _inst.CloseWriter();
         public static void TryFlushChat() => _inst.FlushChat();
@@ -74,36 +74,36 @@ namespace MarcoZechner.LoggingLite
         // ------------------------------------------------------------
         // Instance logging API (called by static wrappers)
         // ------------------------------------------------------------
-        protected void InfoInstance(string message)
+        protected void InfoInstance(string message, bool forceChat)
         {
             WriteFile("INFO", message);
 
-            if (ConfigInstance.InfoInChat)
+            if (ConfigInstance.InfoInChat || forceChat)
                 WriteChat("INFO", message);
         }
 
-        protected void WarningInstance(string message)
+        protected void WarningInstance(string message, bool forceChat)
         {
             WriteFile("WARN", message);
 
-            if (ConfigInstance.WarningInChat)
+            if (ConfigInstance.WarningInChat || forceChat)
                 WriteChat("WARN", message);
         }
 
-        protected void ErrorInstance(string message)
+        protected void ErrorInstance(string message, bool forceChat)
         {
             WriteFile("ERROR", message);
 
-            if (ConfigInstance.ErrorInChat)
+            if (ConfigInstance.ErrorInChat || forceChat)
                 WriteChat("ERROR", message);
         }
 
-        protected void ErrorInstance(string message, Exception ex)
+        protected void ErrorInstance(string message, Exception ex, bool forceChat)
         {
             if (message == null) message = "";
 
             // main line
-            ErrorInstance(message);
+            ErrorInstance(message, forceChat);
 
             if (ex == null) return;
 
@@ -111,14 +111,13 @@ namespace MarcoZechner.LoggingLite
             WriteFile("ERROR", BuildExceptionBlock(ex));
 
             // chat: short summary only
-            if (ConfigInstance.ErrorInChat)
-            {
-                var shortMsg = ex.GetType().Name + ": " + (ex.Message ?? "null");
-                WriteChat("ERROR", shortMsg);
-            }
+            if (!ConfigInstance.ErrorInChat && !forceChat) return;
+            
+            var shortMsg = ex.GetType().Name + ": " + (ex.Message ?? "null");
+            WriteChat("ERROR", shortMsg);
         }
 
-        protected void DebugInstance(Func<string> messageFactory)
+        protected void DebugInstance(Func<string> messageFactory, bool forceChat)
         {
             if (!ConfigInstance.DebugEnabled) return;
             if (messageFactory == null) return;
@@ -132,7 +131,7 @@ namespace MarcoZechner.LoggingLite
 
             WriteFile("DEBUG", msg);
 
-            if (ConfigInstance.DebugInChat)
+            if (ConfigInstance.DebugInChat || forceChat)
                 WriteChat("DEBUG", msg);
         }
 
