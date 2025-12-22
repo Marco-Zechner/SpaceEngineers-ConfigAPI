@@ -27,6 +27,12 @@ namespace MarcoZechner.ConfigAPI.Scripts.ConfigAPI.Shared
             {
                 TryFlushChat();
             }
+            
+            protected override void UnloadData()
+            {
+                base.UnloadData();
+                Close();
+            }
         }
     }
 }
