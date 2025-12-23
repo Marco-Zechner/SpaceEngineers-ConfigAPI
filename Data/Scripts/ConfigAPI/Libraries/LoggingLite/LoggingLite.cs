@@ -23,9 +23,23 @@ namespace MarcoZechner.LoggingLite
     {
         // Static singleton per derived type
         private static readonly TSelf _inst = new TSelf();
+        
+        private LogConfig ConfigInstance { get; }
+        
+        protected LogBase()
+        {
+            ConfigInstance = new LogConfig();
+            ChangeConfig(ConfigInstance);
+            if (ConfigInstance == null) throw new InvalidOperationException("ChangeConfig() returned null.");
+        }
+        
+        protected abstract void ChangeConfig(LogConfig defaultConfig);
 
         // Static surface
-        public static LogConfig Config => _inst.ConfigInstance;
+        /// <summary>
+        /// THIS IS NULL DURING THE CONSTRUCTOR OF THE DERIVED CLASS
+        /// </summary>
+        public static LogConfig Config => _inst?.ConfigInstance;
 
         public static void Info(string msg, bool forceChat = false) => _inst.InfoInstance(msg, forceChat);
         public static void Warning(string msg, bool forceChat = false) => _inst.WarningInstance(msg, forceChat);
@@ -47,7 +61,6 @@ namespace MarcoZechner.LoggingLite
         // ------------------------------------------------------------
         // Instance state
         // ------------------------------------------------------------
-        private LogConfig ConfigInstance { get; } = new LogConfig();
 
         private TextWriter _writer;
         private bool _writerFailed;

@@ -5,20 +5,20 @@ namespace MarcoZechner.ConfigAPI.Scripts.ConfigAPI.Shared
 {
     public sealed class CfgLog : LogBase<CfgLog>
     {
-        protected override string FileName => "Main.ConfigAPI.log";
-
-        public CfgLog()
+        protected override void ChangeConfig(LogConfig defaultConfig)
         {
-            Config.ChatName = "ConfigAPI";
-            Config.WarningInChat = true;
-            Config.ErrorInChat = true;
-            Config.InfoInChat = false;
+            defaultConfig.ChatName = "ConfigAPI";
+            defaultConfig.WarningInChat = true;
+            defaultConfig.ErrorInChat = true;
+            defaultConfig.InfoInChat = false;
 
-            Config.DebugEnabled = false;
-            Config.DebugInChat = false;
+            defaultConfig.DebugEnabled = false;
+            defaultConfig.DebugInChat = false;
 
-            Config.MaxLineChars = 400;
+            defaultConfig.MaxLineChars = 400;
         }
+
+        protected override string FileName => "Main.ConfigAPI.log";
         
         [MySessionComponentDescriptor(MyUpdateOrder.NoUpdate)]
         public sealed class CfgLogFlushSession : MySessionComponentBase
