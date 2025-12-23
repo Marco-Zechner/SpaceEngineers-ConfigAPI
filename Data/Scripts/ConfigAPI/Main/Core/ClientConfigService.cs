@@ -44,11 +44,21 @@ namespace MarcoZechner.ConfigAPI.Main.Core
             return typeKey + ".toml";
         }
         
+        private static string EnsureFileExtension(string filename)
+        {
+            if (string.IsNullOrEmpty(filename) || filename.EndsWith(".toml", StringComparison.OrdinalIgnoreCase))
+                return filename;
+
+            return filename + ".toml";
+        }
+        
         private static string DefaultSidecar(string filename)
             => filename + ".default.toml";
         
         public object ClientConfigGet(string typeKey, LocationType locationType, string filename)
         {
+            filename = EnsureFileExtension(filename);
+            
             filename = DefaultFile(typeKey, filename);
 
             object existing;
@@ -68,9 +78,27 @@ namespace MarcoZechner.ConfigAPI.Main.Core
             _clientStore.Set(typeKey, locationType, def, filename);
             return def;
         }
+        
+        public object ClientConfigReload(string typeKey, LocationType locationType)
+        {
+            string currentFile;
+            return _clientStore.TryGetCurrentFile(typeKey, locationType, out currentFile) 
+                ? TryLoadClient(typeKey, locationType, currentFile) 
+                : null;
+        }
+        
+        public string ClientConfigGetCurrentFileName(string typeKey, LocationType locationType)
+        {
+            string currentFile;
+            return _clientStore.TryGetCurrentFile(typeKey, locationType, out currentFile) 
+                ? currentFile 
+                : null;
+        }
 
         public object ClientConfigLoadAndSwitch(string typeKey, LocationType locationType, string filename)
         {
+            filename = EnsureFileExtension(filename);
+            
             filename = DefaultFile(typeKey, filename);
             return TryLoadClient(typeKey, locationType, filename);
         }
@@ -91,6 +119,8 @@ namespace MarcoZechner.ConfigAPI.Main.Core
 
         public object ClientConfigSaveAndSwitch(string typeKey, LocationType locationType, string filename)
         {
+            filename = EnsureFileExtension(filename);
+            
             filename = DefaultFile(typeKey, filename);
 
             object instance;
@@ -106,6 +136,8 @@ namespace MarcoZechner.ConfigAPI.Main.Core
 
         public bool ClientConfigExport(string typeKey, LocationType locationType, string filename, bool overwrite)
         {
+            filename = EnsureFileExtension(filename);
+            
             if (string.IsNullOrEmpty(filename))
                 return false;
 
@@ -141,6 +173,8 @@ namespace MarcoZechner.ConfigAPI.Main.Core
 
         private object TryLoadClient(string typeKey, LocationType locationType, string filename)
         {
+            filename = EnsureFileExtension(filename);
+            
             var def = new HooksDefinition(_configUserHooks, typeKey);
 
             // External TOML content
@@ -235,6 +269,8 @@ namespace MarcoZechner.ConfigAPI.Main.Core
 
         private void SaveClientToFile(string typeKey, LocationType locationType, string filename, object instance)
         {
+            filename = EnsureFileExtension(filename);
+            
             if (!_configUserHooks.IsInstanceOf(typeKey, instance))
                 throw new Exception("SaveClientToFile: instance/typeKey mismatch: " + typeKey);
 

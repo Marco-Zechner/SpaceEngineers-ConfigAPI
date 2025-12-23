@@ -85,6 +85,25 @@ namespace MarcoZechner.ConfigAPI.Client.Core
             EnsureBound();
             return Service.ClientConfigSave(_typeKey, _location);
         }
+        
+        public T Reload<T>() where T : ConfigBase, new()
+        {
+            EnsureBound();
+            var obj = Service.ClientConfigReload(_typeKey, _location);
+            if (obj == null) return null;
+            
+            var cfg = (T)obj;
+            cfg.__Bind(_typeKey, _location);
+            return cfg;
+        }
+        
+        public string CurrentFile {
+            get
+            {
+                EnsureBound();
+                return Service.ClientConfigGetCurrentFileName(_typeKey, _location);
+            }
+        }
 
         /// <summary>
         /// Force reload from disk and replace the provider instance.

@@ -9,6 +9,8 @@ namespace MarcoZechner.ConfigAPI.Client.Api
     public sealed class ConfigService : IConfigService
     {
         private Func<string, int, string, object> _clientConfigGet;
+        private Func<string, int, object> _clientConfigReload;
+        private Func<string, int, string> _clientConfigGetCurrentFileName;
         private Func<string, int, string, object> _clientConfigLoadAndSwitch;
         private Func<string, int, bool> _clientConfigSave;
         private Func<string, int, string, object> _clientConfigSaveAndSwitch;
@@ -33,6 +35,8 @@ namespace MarcoZechner.ConfigAPI.Client.Api
             var assignments = new Dictionary<string, Action<Delegate>>
             {
                 [nameof(ClientConfigGet)] = d => _clientConfigGet = (Func<string, int, string, object>)d,
+                [nameof(ClientConfigReload)] = d => _clientConfigReload = (Func<string, int, object>)d,
+                [nameof(ClientConfigGetCurrentFileName)] = d => _clientConfigGetCurrentFileName = (Func<string, int, string>)d,
                 [nameof(ClientConfigLoadAndSwitch)] = d => _clientConfigLoadAndSwitch = (Func<string, int, string, object>)d,
                 [nameof(ClientConfigSave)] = d => _clientConfigSave = (Func<string, int, bool>)d,
                 [nameof(ClientConfigSaveAndSwitch)] = d => _clientConfigSaveAndSwitch = (Func<string, int, string, object>)d,
@@ -69,6 +73,12 @@ namespace MarcoZechner.ConfigAPI.Client.Api
         
         public object ClientConfigGet(string typeKey, LocationType locationType, string filename)
             => _clientConfigGet?.Invoke(typeKey, (int)locationType, filename);
+        
+        public object ClientConfigReload(string typeKey, LocationType locationType)
+            => _clientConfigReload?.Invoke(typeKey, (int)locationType);
+                
+        public string ClientConfigGetCurrentFileName(string typeKey, LocationType locationType)
+            => _clientConfigGetCurrentFileName?.Invoke(typeKey, (int)locationType);
         
         public object ClientConfigLoadAndSwitch(string typeKey, LocationType locationType, string filename)
             => _clientConfigLoadAndSwitch?.Invoke(typeKey, (int)locationType, filename);

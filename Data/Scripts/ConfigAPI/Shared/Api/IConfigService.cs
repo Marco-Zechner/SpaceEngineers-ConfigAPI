@@ -21,6 +21,18 @@ namespace MarcoZechner.ConfigAPI.Shared.Api
         object ClientConfigGet(string typeKey, LocationType locationType, string filename);
 
         /// <summary>
+        /// Reload the config from disk and replace the in-memory instance.
+        /// Returns null if load failed; otherwise returns the new instance.
+        /// </summary>
+        object ClientConfigReload(string typeKey, LocationType locationType);
+
+        /// <summary>
+        /// Get the filename that the current in-memory instance was loaded from.
+        /// Returns null if instance doesn't exist yet.
+        /// </summary>
+        string ClientConfigGetCurrentFileName(string typeKey, LocationType locationType);
+        
+        /// <summary>
         /// Force load config from disk and replace the in-memory instance.
         /// Returns null if load failed; otherwise returns the new instance.
         /// </summary>

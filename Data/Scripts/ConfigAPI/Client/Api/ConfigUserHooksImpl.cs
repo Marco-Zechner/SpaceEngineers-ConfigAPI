@@ -77,7 +77,8 @@ namespace MarcoZechner.ConfigAPI.Client.Api
 
         public string LoadFile(LocationType locationType, string filename)
         {
-            CfgLog.Info($"Loading file: locationType={locationType}, filename={filename}");
+            if (!filename.Contains(".default."))
+                CfgLog.Info($"Loading file: locationType={locationType}, filename={filename}");
             if (string.IsNullOrEmpty(filename))
                 return null;
 
@@ -99,7 +100,8 @@ namespace MarcoZechner.ConfigAPI.Client.Api
 
         public void SaveFile(LocationType locationType, string filename, string content)
         {
-            CfgLog.Info($"Saving file: locationType={locationType}, filename={filename}");
+            if (!filename.Contains(".default."))
+                CfgLog.Info($"Saving file: locationType={locationType}, filename={filename}");
             if (string.IsNullOrEmpty(filename))
             {
                 var ex = new Exception("SaveFile: filename is null/empty.");
@@ -121,7 +123,8 @@ namespace MarcoZechner.ConfigAPI.Client.Api
 
         public void BackupFile(LocationType locationType, string filename)
         {
-            CfgLog.Info($"Creating Backup of file: locationType={locationType}, filename={filename}");
+            if (!filename.Contains(".default."))
+                CfgLog.Info($"Creating Backup of file: locationType={locationType}, filename={filename}");
             if (string.IsNullOrEmpty(filename))
                 return;
             

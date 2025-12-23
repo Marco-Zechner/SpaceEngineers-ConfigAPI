@@ -37,6 +37,12 @@ namespace MarcoZechner.ConfigAPI.Main.Api
         public object ClientConfigGet(string typeKey, LocationType locationType, string filename) 
             => _clientConfigService.ClientConfigGet(typeKey, locationType, filename);
 
+        public object ClientConfigReload(string typeKey, LocationType locationType)
+            => _clientConfigService.ClientConfigReload(typeKey, locationType);
+
+        public string ClientConfigGetCurrentFileName(string typeKey, LocationType locationType)
+            => _clientConfigService.ClientConfigGetCurrentFileName(typeKey, locationType);
+
         public object ClientConfigLoadAndSwitch(string typeKey, LocationType locationType, string filename)
             => _clientConfigService.ClientConfigLoadAndSwitch(typeKey, locationType, filename);
 
