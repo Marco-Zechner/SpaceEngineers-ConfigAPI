@@ -128,6 +128,7 @@ namespace MarcoZechner.ApiLib
             var boundMainDict = _setupApi.Connect(_consumerModId, _consumerModName, _callbackApiInstance);
             _onApiLoaded?.Invoke(boundMainDict);
             ApiLoaded = boundMainDict != null;
+            CfgLog.Info("API loaded successfully.");
         }
     }
 }
