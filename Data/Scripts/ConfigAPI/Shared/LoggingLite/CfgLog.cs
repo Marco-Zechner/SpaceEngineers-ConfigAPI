@@ -1,38 +1,22 @@
 ﻿using MarcoZechner.LoggingLite;
-using VRage.Game.Components;
 
 namespace MarcoZechner.ConfigAPI.Scripts.ConfigAPI.Shared
 {
     public sealed class CfgLog : LogBase<CfgLog>
     {
-        protected override void ChangeConfig(LogConfig defaultConfig)
+        protected override string FileName => "Client.ConfigAPI.log";
+
+        protected override void Configure(LogConfig c)
         {
-            defaultConfig.ChatName = "ConfigAPI";
-            defaultConfig.WarningInChat = true;
-            defaultConfig.ErrorInChat = true;
-            defaultConfig.InfoInChat = false;
+            c.ChatName = "ConfigAPI";
+            c.WarningInChat = true;
+            c.ErrorInChat = true;
+            c.InfoInChat = false;
 
-            defaultConfig.DebugEnabled = false;
-            defaultConfig.DebugInChat = false;
+            c.DebugEnabled = false;
+            c.DebugInChat = false;
 
-            defaultConfig.MaxLineChars = 400;
-        }
-
-        protected override string FileName => "Main.ConfigAPI.log";
-        
-        [MySessionComponentDescriptor(MyUpdateOrder.NoUpdate)]
-        public sealed class CfgLogFlushSession : MySessionComponentBase
-        {
-            public override void BeforeStart()
-            {
-                TryFlushChat();
-            }
-            
-            protected override void UnloadData()
-            {
-                base.UnloadData();
-                Close();
-            }
+            c.MaxLineChars = 400;
         }
     }
 }

@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using Sandbox.ModAPI;
+using VRage.Game.Components;
 
 namespace MarcoZechner.LoggingLite
 {
@@ -18,28 +19,78 @@ namespace MarcoZechner.LoggingLite
         public int MaxLineChars = 0;
     }
 
-    public abstract class LogBase<TSelf>
+   /// <summary>
+    /// Central runtime so chat flush + file close can be done once per mod load/unload.
+    /// Idempotent and safe even if multiple loggers exist.
+    /// </summary>
+    public static class LoggingLiteRuntime
+    {
+        private static readonly object _lock = new object();
+        private static readonly List<ILogInternal> _logs = new List<ILogInternal>();
+
+        internal interface ILogInternal
+        {
+            void FlushChatInternal();
+            void CloseWriterInternal();
+        }
+
+        internal static void Register(ILogInternal log)
+        {
+            lock (_lock) _logs.Add(log);
+        }
+
+        public static void FlushAll()
+        {
+            lock (_lock)
+            {
+                foreach (var t in _logs)
+                    t.FlushChatInternal();
+            }
+        }
+
+        public static void CloseAll()
+        {
+            lock (_lock)
+            {
+                foreach (var t in _logs)
+                    t.CloseWriterInternal();
+            }
+        }
+
+        /// <summary>
+        /// Add this component once (e.g., in your shared/common assembly).
+        /// It flushes queued chat as soon as MyAPIGateway.Utilities becomes available,
+        /// and closes all writers on unload.
+        /// </summary>
+        [MySessionComponentDescriptor(MyUpdateOrder.NoUpdate)]
+        public sealed class LoggingLiteSession : MySessionComponentBase
+        {
+            public override void BeforeStart()
+            {
+                FlushAll();
+            }
+
+            protected override void UnloadData()
+            {
+                base.UnloadData();
+                CloseAll();
+            }
+        }
+    }
+
+    /// <summary>
+    /// CRTP logger base. Derived class only overrides:
+    /// - Configure(LogConfig cfg)
+    /// - FileName
+    ///
+    /// Safety: if someone writes ExampleLog : LogBase&lt;CfgLog>, it throws immediately.
+    /// </summary>
+    public abstract class LogBase<TSelf> : LoggingLiteRuntime.ILogInternal
         where TSelf : LogBase<TSelf>, new()
     {
-        // Static singleton per derived type
         private static readonly TSelf _inst = new TSelf();
-        
-        private LogConfig ConfigInstance { get; }
-        
-        protected LogBase()
-        {
-            ConfigInstance = new LogConfig();
-            ChangeConfig(ConfigInstance);
-            if (ConfigInstance == null) throw new InvalidOperationException("ChangeConfig() returned null.");
-        }
-        
-        protected abstract void ChangeConfig(LogConfig defaultConfig);
 
-        // Static surface
-        /// <summary>
-        /// THIS IS NULL DURING THE CONSTRUCTOR OF THE DERIVED CLASS
-        /// </summary>
-        public static LogConfig Config => _inst?.ConfigInstance;
+        public static LogConfig Config => _inst._cfg;
 
         public static void Info(string msg, bool forceChat = false) => _inst.InfoInstance(msg, forceChat);
         public static void Warning(string msg, bool forceChat = false) => _inst.WarningInstance(msg, forceChat);
@@ -47,20 +98,11 @@ namespace MarcoZechner.LoggingLite
         public static void Error(string msg, Exception ex, bool forceChat = false) => _inst.ErrorInstance(msg, ex, forceChat);
         public static void Debug(Func<string> msgFactory, bool forceChat = false) => _inst.DebugInstance(msgFactory, forceChat);
 
-        public static void Close() => _inst.CloseWriter();
+        // Optional: allow manual flushing/close, but typically the session does it.
         public static void TryFlushChat() => _inst.FlushChat();
+        public static void Close() => _inst.CloseWriter();
 
-        // ------------------------------------------------------------
-        // Required mod-specific identity (implemented by derived class)
-        // ------------------------------------------------------------
-        protected abstract string FileName { get; }
-
-        // Use derived type as local storage identity
-        private static Type StorageType => typeof(TSelf);
-
-        // ------------------------------------------------------------
-        // Instance state
-        // ------------------------------------------------------------
+        private readonly LogConfig _cfg;
 
         private TextWriter _writer;
         private bool _writerFailed;
@@ -73,66 +115,85 @@ namespace MarcoZechner.LoggingLite
 
         private readonly Queue<ChatEntry> _chatQueue = new Queue<ChatEntry>();
 
-        public void CloseWriter()
+        protected LogBase()
+        {
+            // Runtime generic safety guard: kills the exact wrong-TSelf mistake immediately.
+            if (GetType() != typeof(TSelf))
+                throw new InvalidOperationException(
+                    "LoggingLite: TSelf mismatch. " +
+                    "You must inherit as: sealed class " + GetType().Name + " : LogBase<" + GetType().Name + ">");
+
+            _cfg = new LogConfig();
+            Configure(_cfg);
+
+            LoggingLiteRuntime.Register(this);
+        }
+
+        /// <summary>Derived sets defaults here.</summary>
+        protected abstract void Configure(LogConfig cfg);
+
+        /// <summary>Derived chooses file name here.</summary>
+        protected abstract string FileName { get; }
+
+        /// <summary>
+        /// Storage identity for SE local storage. Default: the logger type itself.
+        /// Override only if you have a specific reason.
+        /// </summary>
+        protected virtual Type StorageType => typeof(TSelf);
+
+        // -------------------------
+        // Internal lifecycle (runtime/session)
+        // -------------------------
+        void LoggingLiteRuntime.ILogInternal.FlushChatInternal() => FlushChat();
+        void LoggingLiteRuntime.ILogInternal.CloseWriterInternal() => CloseWriter();
+
+        private void CloseWriter()
         {
             try { _writer?.Close(); }
-            catch
-            {
-                // ignored
-            }
-
+            catch { /* ignored */ }
             _writer = null;
         }
 
-        // ------------------------------------------------------------
-        // Instance logging API (called by static wrappers)
-        // ------------------------------------------------------------
-        protected void InfoInstance(string message, bool forceChat)
+        // -------------------------
+        // Instance logging API
+        // -------------------------
+        private void InfoInstance(string message, bool forceChat)
         {
             WriteFile("INFO", message);
-
-            if (ConfigInstance.InfoInChat || forceChat)
-                WriteChat("INFO", message);
+            if (_cfg.InfoInChat || forceChat) WriteChat("INFO", message);
         }
 
-        protected void WarningInstance(string message, bool forceChat)
+        private void WarningInstance(string message, bool forceChat)
         {
             WriteFile("WARN", message);
-
-            if (ConfigInstance.WarningInChat || forceChat)
-                WriteChat("WARN", message);
+            if (_cfg.WarningInChat || forceChat) WriteChat("WARN", message);
         }
 
-        protected void ErrorInstance(string message, bool forceChat)
+        private void ErrorInstance(string message, bool forceChat)
         {
             WriteFile("ERROR", message);
-
-            if (ConfigInstance.ErrorInChat || forceChat)
-                WriteChat("ERROR", message);
+            if (_cfg.ErrorInChat || forceChat) WriteChat("ERROR", message);
         }
 
-        protected void ErrorInstance(string message, Exception ex, bool forceChat)
+        private void ErrorInstance(string message, Exception ex, bool forceChat)
         {
             if (message == null) message = "";
 
-            // main line
             ErrorInstance(message, forceChat);
 
             if (ex == null) return;
 
-            // file: full exception block
             WriteFile("ERROR", BuildExceptionBlock(ex));
 
-            // chat: short summary only
-            if (!ConfigInstance.ErrorInChat && !forceChat) return;
-            
+            if (!_cfg.ErrorInChat && !forceChat) return;
+
             var shortMsg = ex.GetType().Name + ": " + (ex.Message ?? "null");
             WriteChat("ERROR", shortMsg);
         }
 
-        protected void DebugInstance(Func<string> messageFactory, bool forceChat)
+        private void DebugInstance(Func<string> messageFactory, bool forceChat)
         {
-            if (!ConfigInstance.DebugEnabled) return;
+            if (!_cfg.DebugEnabled) return;
             if (messageFactory == null) return;
 
             string msg;
@@ -144,13 +205,13 @@ namespace MarcoZechner.LoggingLite
 
             WriteFile("DEBUG", msg);
 
-            if (ConfigInstance.DebugInChat || forceChat)
+            if (_cfg.DebugInChat || forceChat)
                 WriteChat("DEBUG", msg);
         }
 
-        // ------------------------------------------------------------
+        // -------------------------
         // Core write helpers
-        // ------------------------------------------------------------
+        // -------------------------
         private void EnsureWriter()
         {
             if (_writer != null || _writerFailed) return;
@@ -211,7 +272,7 @@ namespace MarcoZechner.LoggingLite
 
         private void WriteChat(string type, string message)
         {
-            var sender = ConfigInstance.ChatName ?? "Log";
+            var sender = _cfg.ChatName ?? "Log";
             var msg = (message ?? "");
 
             msg = msg.Replace("\r\n", " ").Replace("\n", " ");
@@ -225,13 +286,11 @@ namespace MarcoZechner.LoggingLite
                 return;
             }
 
-            // Before writing, flush anything queued
-            FlushChat();
-
+            FlushChatConsidered();
             MyAPIGateway.Utilities.ShowMessage(sender, final);
         }
 
-        protected void FlushChat()
+        private void FlushChat()
         {
             if (MyAPIGateway.Utilities == null) return;
 
@@ -242,10 +301,17 @@ namespace MarcoZechner.LoggingLite
             }
         }
 
+        // flush queued messages right before showing new ones
+        private void FlushChatConsidered()
+        {
+            if (_chatQueue.Count == 0) return;
+            FlushChat();
+        }
+
         private string TrimIfNeeded(string s)
         {
             if (s == null) return "null";
-            var max = ConfigInstance.MaxLineChars;
+            var max = _cfg.MaxLineChars;
             if (max <= 0 || s.Length <= max) return s;
             return s.Substring(0, max) + " … (trimmed, len=" + s.Length + ")";
         }
