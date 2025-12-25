@@ -2,6 +2,7 @@
 using MarcoZechner.ConfigAPI.Main.Api;
 using MarcoZechner.ConfigAPI.Main.Core.Migrator;
 using MarcoZechner.ConfigAPI.Main.Domain;
+using MarcoZechner.ConfigAPI.Scripts.ConfigAPI.Shared;
 using MarcoZechner.ConfigAPI.Shared.Domain;
 
 namespace MarcoZechner.ConfigAPI.Main.Core
@@ -15,7 +16,6 @@ namespace MarcoZechner.ConfigAPI.Main.Core
     /// </summary>
     public sealed class ClientConfigService
     {
-        
         private readonly ConfigUserHooks _configUserHooks;
         private readonly IXmlConverter _converter;
         private readonly IConfigLayoutMigrator _migrator;
@@ -51,9 +51,17 @@ namespace MarcoZechner.ConfigAPI.Main.Core
 
             return filename + ".toml";
         }
-        
+
         private static string DefaultSidecar(string filename)
-            => filename + ".default.toml";
+        {
+            if (string.IsNullOrEmpty(filename) || filename.EndsWith(".default.toml", StringComparison.OrdinalIgnoreCase))
+                return filename;
+            
+            if (filename.EndsWith(".toml", StringComparison.OrdinalIgnoreCase))
+                return filename.Substring(0, filename.Length - 5) + ".default.toml";
+            
+            return filename + ".default.toml";
+        }
         
         public object ClientConfigGet(string typeKey, LocationType locationType, string filename)
         {
@@ -246,11 +254,20 @@ namespace MarcoZechner.ConfigAPI.Main.Core
 
             // If normalization changed anything, rewrite disk.
             // (We compare internal XML first, then write external TOML.)
-            var changedCurrent = !string.Equals(layout.NormalizedXml, xmlCurrentFromFile, StringComparison.Ordinal);
-            var changedDefaults = !string.Equals(layout.NormalizedDefaultsXml, xmlOldDefaultsFromFile, StringComparison.Ordinal);
+            var changedCurrent = !string.Equals(
+                LayoutXml.Canonicalize(layout.NormalizedXml),
+                LayoutXml.Canonicalize(xmlCurrentFromFile), 
+                StringComparison.Ordinal);
+            var changedDefaults = !string.Equals(
+                LayoutXml.Canonicalize(layout.NormalizedDefaultsXml), 
+                LayoutXml.Canonicalize(xmlOldDefaultsFromFile), 
+                StringComparison.Ordinal);
 
             if (changedCurrent || changedDefaults)
             {
+                CfgLog.Debug(() => $"{layout.NormalizedXml}\n\n{xmlCurrentFromFile}");
+                CfgLog.Debug(() => $"{layout.NormalizedDefaultsXml}\n\n{xmlOldDefaultsFromFile}");
+                
                 var newExternalCurrent = _converter.ToExternal(def, layout.NormalizedXml, true);
                 var newExternalDefaults = _converter.ToExternal(def, layout.NormalizedDefaultsXml, true);
 

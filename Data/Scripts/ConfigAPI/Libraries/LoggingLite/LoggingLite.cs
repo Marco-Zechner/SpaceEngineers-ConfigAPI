@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using Sandbox.ModAPI;
 using VRage.Game.Components;
+using VRage.Utils;
 
 namespace MarcoZechner.LoggingLite
 {
@@ -101,11 +102,12 @@ namespace MarcoZechner.LoggingLite
         // Optional: allow manual flushing/close, but typically the session does it.
         public static void TryFlushChat() => _inst.FlushChat();
         public static void Close() => _inst.CloseWriter();
+        public static void Reopen() => _inst.ReopenWriter();
 
         private readonly LogConfig _cfg;
 
         private TextWriter _writer;
-        private bool _writerFailed;
+        private bool _writerWasClosed;
 
         private struct ChatEntry
         {
@@ -144,16 +146,36 @@ namespace MarcoZechner.LoggingLite
         // -------------------------
         // Internal lifecycle (runtime/session)
         // -------------------------
-        void LoggingLiteRuntime.ILogInternal.FlushChatInternal() => FlushChat();
+        void LoggingLiteRuntime.ILogInternal.FlushChatInternal()
+        {
+            FlushChat();
+            Info("Flushed log chat messages.");
+        }
         void LoggingLiteRuntime.ILogInternal.CloseWriterInternal() => CloseWriter();
 
         private void CloseWriter()
         {
+            Info("Closing log writer.");
             try { _writer?.Close(); }
             catch { /* ignored */ }
             _writer = null;
+            _writerWasClosed = true;
         }
 
+        private void ReopenWriter()
+        {
+            if (!_writerWasClosed)
+            {
+                Warning("Tried to reopen log writer even though it was not closed.");
+                return;
+            }
+            _writer = null;
+            if (!EnsureWriter())
+            {
+                MyLog.Default.WriteLine($"[{Config.ChatName}] \"{FileName}\" Failed to reopen log writer.");
+            }
+        }
+        
         // -------------------------
         // Instance logging API
         // -------------------------
@@ -212,32 +234,37 @@ namespace MarcoZechner.LoggingLite
         // -------------------------
         // Core write helpers
         // -------------------------
-        private void EnsureWriter()
+        private bool EnsureWriter()
         {
-            if (_writer != null || _writerFailed) return;
+            if (_writer != null) return true;
 
+            if (_writerWasClosed) return false;
+            
+            if (MyAPIGateway.Utilities == null) return false;
+            
+            var file = FileName;
+            if (string.IsNullOrEmpty(file))
+                file = "Log.log";
+            
             try
             {
-                if (MyAPIGateway.Utilities == null)
-                    return;
-
-                var file = FileName;
-                if (string.IsNullOrEmpty(file))
-                    file = "Log.log";
-
                 _writer = MyAPIGateway.Utilities.WriteFileInLocalStorage(file, StorageType);
             }
             catch
             {
-                _writerFailed = true;
                 _writer = null;
             }
+
+            return true;
         }
 
         private void WriteFile(string type, string message)
         {
-            EnsureWriter();
-            if (_writer == null) return;
+            if (!EnsureWriter())
+            {
+                MyLog.Default.WriteLine($"[{Config.ChatName}] \"{FileName}\" Failed to write log message: {type} {message}");
+                return;
+            }
 
             var ts = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
             var prefix = ts + " " + type + " ";

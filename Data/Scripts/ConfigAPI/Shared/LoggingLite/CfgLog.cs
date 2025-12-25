@@ -4,7 +4,7 @@ namespace MarcoZechner.ConfigAPI.Scripts.ConfigAPI.Shared
 {
     public sealed class CfgLog : LogBase<CfgLog>
     {
-        protected override string FileName => "Client.ConfigAPI.log";
+        protected override string FileName => "Main.ConfigAPI.log";
 
         protected override void Configure(LogConfig c)
         {
@@ -13,7 +13,7 @@ namespace MarcoZechner.ConfigAPI.Scripts.ConfigAPI.Shared
             c.ErrorInChat = true;
             c.InfoInChat = false;
 
-            c.DebugEnabled = false;
+            c.DebugEnabled = true;
             c.DebugInChat = false;
 
             c.MaxLineChars = 400;

@@ -4,13 +4,6 @@ using System.Text;
 
 namespace MarcoZechner.ConfigAPI.Main.Core.Migrator
 {
-   /// <summary>
-    /// XML layout helper:
-    /// - Parse direct children of the root into raw XML fragments.
-    /// - Build a canonical document with stable, idempotent indentation.
-    ///
-    /// No reflection, no XmlReader. Pure string parsing.
-    /// </summary>
     public static class LayoutXml
     {
         private const string XML_DECL = "<?xml version=\"1.0\" encoding=\"utf-16\"?>";
@@ -18,18 +11,53 @@ namespace MarcoZechner.ConfigAPI.Main.Core.Migrator
         private const string XSI_NS = "http://www.w3.org/2001/XMLSchema-instance";
         private const string ROOT_INDENT = "  ";
 
-        /// <summary>
-        /// Extracts direct child elements of the root as raw XML blocks.
-        /// Each value starts with '&lt;ChildName&gt;' (no leading spaces)
-        /// and ends at the matching closing tag.
-        /// </summary>
-        public static Dictionary<string, string> ParseChildren(string xml, out string rootName)
+        public struct Child
         {
-            var result = new Dictionary<string, string>();
+            public string Name;
+            public string Block; // raw xml fragment: <Name>...</Name> or <Name .../>
+        }
+        
+        public sealed class Children
+        {
+            public readonly List<Child> Ordered;
+            private readonly Dictionary<string, int> _index; // name -> first occurrence index
+
+            public Children(List<Child> ordered)
+            {
+                Ordered = ordered ?? new List<Child>();
+                _index = new Dictionary<string, int>(StringComparer.Ordinal);
+                for (int i = 0; i < Ordered.Count; i++)
+                {
+                    // If duplicates exist (shouldn't for serializer), keep the first for lookup.
+                    if (!_index.ContainsKey(Ordered[i].Name))
+                        _index.Add(Ordered[i].Name, i);
+                }
+            }
+
+            public bool TryGet(string name, out string block)
+            {
+                int idx;
+                if (_index.TryGetValue(name, out idx))
+                {
+                    block = Ordered[idx].Block;
+                    return true;
+                }
+                block = null;
+                return false;
+            }
+
+            public bool Contains(string name) => _index.ContainsKey(name);
+        }
+
+        /// <summary>
+        /// Ordered parse: returns direct root children in the exact order found in the XML.
+        /// </summary>
+        public static Children ParseChildren(string xml, out string rootName)
+        {
+            var resultList = new List<Child>();
             rootName = string.Empty;
 
-            if (string.IsNullOrEmpty(xml))
-                return result;
+            if (string.IsNullOrEmpty(xml)) return new Children(resultList);
 
             var len = xml.Length;
             var pos = 0;
@@ -38,12 +66,10 @@ namespace MarcoZechner.ConfigAPI.Main.Core.Migrator
             while (pos < len)
             {
                 var lt = xml.IndexOf('<', pos);
-                if (lt < 0)
-                    return result;
+                if (lt < 0) return new Children(resultList);
 
                 var gt = xml.IndexOf('>', lt + 1);
-                if (gt < 0)
-                    return result;
+                if (gt < 0) return new Children(resultList);
 
                 var tagContent = xml.Substring(lt + 1, gt - lt - 1).Trim();
                 if (tagContent.Length == 0)
@@ -60,36 +86,27 @@ namespace MarcoZechner.ConfigAPI.Main.Core.Migrator
                 }
 
                 var spaceIdx = tagContent.IndexOf(' ');
-                rootName = spaceIdx >= 0
-                    ? tagContent.Substring(0, spaceIdx)
-                    : tagContent;
+                rootName = spaceIdx >= 0 ? tagContent.Substring(0, spaceIdx) : tagContent;
 
                 pos = gt + 1;
                 break;
             }
 
-            if (string.IsNullOrEmpty(rootName))
-                return result;
+            if (string.IsNullOrEmpty(rootName)) return new Children(resultList);
 
             var endRootTag = "</" + rootName + ">";
             var endIndex = xml.LastIndexOf(endRootTag, StringComparison.Ordinal);
-            if (endIndex < 0 || endIndex <= pos)
-                return result;
+            if (endIndex < 0 || endIndex <= pos) return new Children(resultList);
 
-            // Inner content between <root ...> and </root>
             var inner = xml.Substring(pos, endIndex - pos);
             var innerLen = inner.Length;
             var i = 0;
 
-            // 2) Scan inner for direct children
+            // 2) Scan inner for direct children in-order
             while (i < innerLen)
             {
-                // Skip whitespace
-                while (i < innerLen && char.IsWhiteSpace(inner[i]))
-                    i++;
-
-                if (i >= innerLen)
-                    break;
+                while (i < innerLen && char.IsWhiteSpace(inner[i])) i++;
+                if (i >= innerLen) break;
 
                 if (inner[i] != '<')
                 {
@@ -99,8 +116,7 @@ namespace MarcoZechner.ConfigAPI.Main.Core.Migrator
 
                 var startTagOpen = i;
                 var startTagClose = inner.IndexOf('>', startTagOpen + 1);
-                if (startTagClose < 0)
-                    break;
+                if (startTagClose < 0) break;
 
                 var startContent = inner.Substring(startTagOpen + 1, startTagClose - startTagOpen - 1).Trim();
                 if (startContent.Length == 0)
@@ -117,18 +133,18 @@ namespace MarcoZechner.ConfigAPI.Main.Core.Migrator
                 }
 
                 var spaceIndex = startContent.IndexOf(' ');
-                var childName = spaceIndex >= 0
-                    ? startContent.Substring(0, spaceIndex)
-                    : startContent;
+                var selfClosing = startContent.Length > 0 && startContent[startContent.Length - 1] == '/';
 
-                var selfClosing = startContent.Length > 0 &&
-                                  startContent[startContent.Length - 1] == '/';
+                var childName = spaceIndex >= 0 ? startContent.Substring(0, spaceIndex) : startContent;
+                if (selfClosing && childName.EndsWith("/", StringComparison.Ordinal))
+                    childName = childName.TrimEnd('/');
 
                 if (selfClosing)
                 {
                     var childEnd = startTagClose + 1;
                     var block = inner.Substring(startTagOpen, childEnd - startTagOpen);
-                    result[childName] = block;
+
+                    resultList.Add(new Child { Name = childName, Block = block });
                     i = childEnd;
                     continue;
                 }
@@ -140,12 +156,10 @@ namespace MarcoZechner.ConfigAPI.Main.Core.Migrator
                 while (searchPos < innerLen && depth > 0)
                 {
                     var nextLt = inner.IndexOf('<', searchPos);
-                    if (nextLt < 0)
-                        break;
+                    if (nextLt < 0) break;
 
                     var nextGt = inner.IndexOf('>', nextLt + 1);
-                    if (nextGt < 0)
-                        break;
+                    if (nextGt < 0) break;
 
                     var t = inner.Substring(nextLt + 1, nextGt - nextLt - 1).Trim();
                     if (t.Length == 0)
@@ -168,107 +182,104 @@ namespace MarcoZechner.ConfigAPI.Main.Core.Migrator
                     {
                         name = t.Substring(1);
                         var sp = name.IndexOf(' ');
-                        if (sp >= 0)
-                            name = name.Substring(0, sp);
+                        if (sp >= 0) name = name.Substring(0, sp);
                     }
                     else
                     {
                         var sp = t.IndexOf(' ');
                         name = sp >= 0 ? t.Substring(0, sp) : t;
+
+                        // self closing tag does not change depth
+                        var isSelf = t.Length > 0 && t[t.Length - 1] == '/';
+                        if (isSelf)
+                        {
+                            searchPos = nextGt + 1;
+                            continue;
+                        }
                     }
 
                     if (!closing && name == childName)
-                    {
                         depth++;
-                    }
-                    else if (closing && name == childName)
-                    {
-                        depth--;
-                    }
+                    else if (closing && name == childName) depth--;
 
                     searchPos = nextGt + 1;
 
-                    if (depth == 0)
-                    {
-                        var childEnd = nextGt + 1;
-                        var block = inner.Substring(startTagOpen, childEnd - startTagOpen);
-                        result[childName] = block;
-                        i = childEnd;
-                        break;
-                    }
-                }
+                    if (depth != 0) continue;
+                    
+                    var childEnd = nextGt + 1;
+                    var block = inner.Substring(startTagOpen, childEnd - startTagOpen);
 
-                if (depth > 0)
-                {
-                    // malformed; stop scanning to avoid weird slices
+                    resultList.Add(new Child { Name = childName, Block = block });
+                    i = childEnd;
                     break;
                 }
+
+                if (depth > 0) break;
             }
 
-            return result;
+            return new Children(resultList);
         }
 
         /// <summary>
-        /// Build a full, canonical XML doc:
-        /// - Fixed xml declaration + namespaces.
-        /// - Root children indented by 2 spaces.
-        /// - For each child block, only the *first* line gets root indent;
-        ///   inner lines keep their existing indentation.
-        /// This makes Build ∘ ParseChildren idempotent.
+        /// Build canonical doc while preserving the exact child order given by the list.
         /// </summary>
-        public static string Build(string rootName, IDictionary<string, string> children)
+        public static string Build(string rootName, Children children)
         {
             var sb = new StringBuilder();
 
             sb.Append(XML_DECL).Append("\r\n");
             sb.Append('<').Append(rootName)
-              .Append(" xmlns:xsd=\"").Append(XSD_NS).Append('"')
-              .Append(" xmlns:xsi=\"").Append(XSI_NS).Append('"')
-              .Append('>')
-              .Append("\r\n");
+                .Append(" xmlns:xsd=\"").Append(XSD_NS).Append('"')
+                .Append(" xmlns:xsi=\"").Append(XSI_NS).Append('"')
+                .Append('>')
+                .Append("\r\n");
 
-            foreach (var kv in children)
+            if (children != null)
             {
-                var block = kv.Value ?? string.Empty;
-
-                // Normalize newlines for internal processing
-                block = block.Replace("\r\n", "\n");
-
-                var lines = block.Split(new[] { '\n' }, StringSplitOptions.None);
-                var firstLineEmitted = false;
-
-                for (var i = 0; i < lines.Length; i++)
+                for (int k = 0; k < children.Ordered.Count; k++)
                 {
-                    var line = lines[i];
+                    var block = children.Ordered[k].Block ?? string.Empty;
 
-                    // Skip completely empty / whitespace-only lines
-                    if (string.IsNullOrWhiteSpace(line))
-                        continue;
+                    block = block.Replace("\r\n", "\n");
+                    var lines = block.Split(new[] { '\n' }, StringSplitOptions.None);
+                    var firstLineEmitted = false;
 
-                    // Normalize trailing whitespace, keep leading as-is
-                    var trimmedEnd = line.TrimEnd('\r', ' ', '\t');
-
-                    if (!firstLineEmitted)
+                    for (var i = 0; i < lines.Length; i++)
                     {
-                        // First line of the block: add root indent.
-                        // Note: by construction from ParseChildren, this line starts at '<'
-                        // without leading spaces.
-                        sb.Append(ROOT_INDENT);
-                        sb.Append(trimmedEnd);
-                        sb.Append("\r\n");
-                        firstLineEmitted = true;
-                    }
-                    else
-                    {
-                        // Inner lines: keep existing indentation exactly.
-                        sb.Append(trimmedEnd);
-                        sb.Append("\r\n");
+                        var line = lines[i];
+                        if (string.IsNullOrWhiteSpace(line))
+                            continue;
+
+                        var trimmedEnd = line.TrimEnd('\r', ' ', '\t');
+
+                        if (!firstLineEmitted)
+                        {
+                            sb.Append(ROOT_INDENT).Append(trimmedEnd).Append("\r\n");
+                            firstLineEmitted = true;
+                        }
+                        else
+                        {
+                            sb.Append(trimmedEnd).Append("\r\n");
+                        }
                     }
                 }
             }
 
             sb.Append("</").Append(rootName).Append('>');
             return sb.ToString();
+        }
+
+        /// <summary>
+        /// Canonicalize without reordering: Parse -> Build with the same ordering.
+        /// Use this for "format-insensitive" comparisons.
+        /// </summary>
+        public static string Canonicalize(string xml)
+        {
+            string root;
+            var list = ParseChildren(xml, out root);
+            return string.IsNullOrEmpty(root) 
+                ? (xml ?? string.Empty).Trim() 
+                : Build(root, list);
         }
     }
 }

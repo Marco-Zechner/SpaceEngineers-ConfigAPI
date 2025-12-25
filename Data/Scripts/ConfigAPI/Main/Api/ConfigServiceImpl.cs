@@ -107,6 +107,8 @@ namespace MarcoZechner.ConfigAPI.Main.Api
             return new Dictionary<string, Delegate>
             {
                 { nameof(ClientConfigGet), new Func<string, int, string, object>(ClientConfigGetInternal) },
+                { nameof(ClientConfigReload), new Func<string, int, object>(ClientConfigReloadInternal) },
+                { nameof(ClientConfigGetCurrentFileName), new Func<string, int, string>(ClientConfigGetCurrentFileNameInternal) },
                 { nameof(ClientConfigLoadAndSwitch), new Func<string, int, string, object>(ClientConfigLoadAndSwitchInternal) },
                 { nameof(ClientConfigSave), new Func<string, int, bool>(ClientConfigSaveInternal) },
                 { nameof(ClientConfigSaveAndSwitch), new Func<string, int, string, object>(ClientConfigSaveAndSwitchInternal) },
@@ -128,7 +130,11 @@ namespace MarcoZechner.ConfigAPI.Main.Api
         // ===============================================================
         
         private object ClientConfigGetInternal(string typeKey, int locationTypeEnum, string filename) 
-            => ClientConfigGet(typeKey, (LocationType)locationTypeEnum, filename);
+            => ClientConfigGet(typeKey, (LocationType)locationTypeEnum, filename);      
+        private object ClientConfigReloadInternal(string typeKey, int locationTypeEnum) 
+            => ClientConfigReload(typeKey, (LocationType)locationTypeEnum);      
+        private string ClientConfigGetCurrentFileNameInternal(string typeKey, int locationTypeEnum) 
+            => ClientConfigGetCurrentFileName(typeKey, (LocationType)locationTypeEnum);
         private object ClientConfigLoadAndSwitchInternal(string typeKey, int locationTypeEnum, string filename)
             => ClientConfigLoadAndSwitch(typeKey, (LocationType)locationTypeEnum, filename);
         private bool ClientConfigSaveInternal(string typeKey, int locationTypeEnum) 
