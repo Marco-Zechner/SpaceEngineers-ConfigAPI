@@ -18,8 +18,10 @@ namespace MarcoZechner.ConfigAPI.Client.Core
         private static void EnsureApiLoaded()
         {
             if (!ServiceLoader.ApiLoaded || ServiceLoader.Service == null)
+            {
                 throw new InvalidOperationException(
                     "ConfigStorage: ConfigAPI is not loaded. Call ConfigStorage.Init(modContext) first.");
+            }
         }
         
         private static void EnsureRegistered<T>(string typeKey)

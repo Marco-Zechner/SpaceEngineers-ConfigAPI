@@ -1,6 +1,5 @@
 ﻿using MarcoZechner.ConfigAPI.Client.Api;
 using MarcoZechner.ConfigAPI.Shared.Domain;
-using MarcoZechner.ConfigAPI.Shared.Api;
 
 namespace MarcoZechner.ConfigAPI.Client.Core
 {
@@ -15,7 +14,7 @@ namespace MarcoZechner.ConfigAPI.Client.Core
     /// </summary>
     public sealed class CfgSync<T> where T : ConfigBase, new()
     {
-        private readonly string _typeKey;
+        public readonly string TypeKey;
         private readonly string _defaultFile;
 
         private bool _initQueued;
@@ -27,8 +26,8 @@ namespace MarcoZechner.ConfigAPI.Client.Core
 
         internal CfgSync(string defaultFile)
         {
-            _typeKey = typeof(T).FullName;
-            _defaultFile = string.IsNullOrEmpty(defaultFile) ? (_typeKey + ".toml") : defaultFile;
+            TypeKey = typeof(T).FullName;
+            _defaultFile = string.IsNullOrEmpty(defaultFile) ? (TypeKey + ".toml") : defaultFile;
 
             // local fallback defaults until API becomes available
             _auth = new T();
@@ -81,7 +80,7 @@ namespace MarcoZechner.ConfigAPI.Client.Core
             EnsureInit(service);
 
             // Pump the provider once. Provider applies update to its internal Auth.
-            var update = service.ServerConfigGetUpdate(_typeKey);
+            var update = service.ServerConfigGetUpdate(TypeKey);
 
             // Regardless of whether update is null, we can refresh Auth/Draft cheaply
             // to make sure local references always track provider state.
@@ -108,7 +107,7 @@ namespace MarcoZechner.ConfigAPI.Client.Core
 
             EnsureInit(service);
 
-            service.ServerConfigResetDraft(_typeKey);
+            service.ServerConfigResetDraft(TypeKey);
             // Pull new draft reference
             RefreshAuthDraft(service, refreshDraft: true);
         }
@@ -128,7 +127,7 @@ namespace MarcoZechner.ConfigAPI.Client.Core
             if (string.IsNullOrEmpty(file))
                 return false;
 
-            return service.ServerConfigLoadAndSwitch(_typeKey, file, _serverIteration);
+            return service.ServerConfigLoadAndSwitch(TypeKey, file, _serverIteration);
         }
 
         public bool Save()
@@ -139,7 +138,7 @@ namespace MarcoZechner.ConfigAPI.Client.Core
 
             EnsureInit(service);
 
-            return service.ServerConfigSave(_typeKey, _serverIteration);
+            return service.ServerConfigSave(TypeKey, _serverIteration);
         }
 
         public bool SaveAndSwitch(string file)
@@ -153,7 +152,7 @@ namespace MarcoZechner.ConfigAPI.Client.Core
             if (string.IsNullOrEmpty(file))
                 return false;
 
-            return service.ServerConfigSaveAndSwitch(_typeKey, file, _serverIteration);
+            return service.ServerConfigSaveAndSwitch(TypeKey, file, _serverIteration);
         }
 
         public bool Export(string file, bool overwrite = false)
@@ -167,21 +166,21 @@ namespace MarcoZechner.ConfigAPI.Client.Core
             if (string.IsNullOrEmpty(file))
                 return false;
 
-            return service.ServerConfigExport(_typeKey, file, overwrite);
+            return service.ServerConfigExport(TypeKey, file, overwrite);
         }
 
         // ===============================================================
         // Internals
         // ===============================================================
 
-        private void EnsureInit(IConfigService service)
+        private void EnsureInit(ConfigService service)
         {
             if (_initQueued)
                 return;
 
             // Provider contract: returns current internal Auth (or default created there)
             // and triggers server open/request to send authoritative snapshot.
-            var obj = service.ServerConfigInit(_typeKey, _defaultFile);
+            var obj = service.ServerConfigInit(TypeKey, _defaultFile);
 
             _initQueued = true;
 
@@ -194,10 +193,10 @@ namespace MarcoZechner.ConfigAPI.Client.Core
             RefreshAuthDraft(service, refreshDraft: true);
         }
 
-        private void RefreshAuthDraft(IConfigService service, bool refreshDraft)
+        private void RefreshAuthDraft(ConfigService service, bool refreshDraft)
         {
             // Auth
-            var authObj = service.ServerConfigGetAuth(_typeKey);
+            var authObj = service.ServerConfigGetAuth(TypeKey);
             var authCast = authObj as T;
             if (authCast != null)
                 _auth = authCast;
@@ -205,7 +204,7 @@ namespace MarcoZechner.ConfigAPI.Client.Core
             if (!refreshDraft) return;
             
             // Draft (optional)
-            var draftObj = service.ServerConfigGetDraft(_typeKey);
+            var draftObj = service.ServerConfigGetDraft(TypeKey);
             var draftCast = draftObj as T;
             if (draftCast != null)
                 _draft = draftCast;
