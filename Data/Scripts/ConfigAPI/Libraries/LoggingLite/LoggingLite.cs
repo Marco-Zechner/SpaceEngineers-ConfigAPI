@@ -138,6 +138,11 @@ namespace MarcoZechner.LoggingLite
         protected abstract string FileName { get; }
 
         /// <summary>
+        /// If true, log file is stored in world storage instead of local storage.
+        /// </summary>
+        protected virtual bool SaveInWorld { get; } = false;
+
+        /// <summary>
         /// Storage identity for SE local storage. Default: the logger type itself.
         /// Override only if you have a specific reason.
         /// </summary>
@@ -248,7 +253,9 @@ namespace MarcoZechner.LoggingLite
             
             try
             {
-                _writer = MyAPIGateway.Utilities.WriteFileInLocalStorage(file, StorageType);
+                _writer = SaveInWorld 
+                    ? MyAPIGateway.Utilities.WriteFileInWorldStorage(file, StorageType) 
+                    : MyAPIGateway.Utilities.WriteFileInLocalStorage(file, StorageType);
             }
             catch
             {
