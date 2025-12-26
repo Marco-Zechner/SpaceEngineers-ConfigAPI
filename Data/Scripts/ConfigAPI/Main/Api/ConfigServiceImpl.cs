@@ -4,8 +4,10 @@ using MarcoZechner.ApiLib;
 using MarcoZechner.ConfigAPI.Main.Core;
 using MarcoZechner.ConfigAPI.Main.Core.Migrator;
 using MarcoZechner.ConfigAPI.Main.Core.XmlConverter;
+using MarcoZechner.ConfigAPI.Main.NetworkCore;
 using MarcoZechner.ConfigAPI.Shared.Domain;
 using MarcoZechner.ConfigAPI.Shared.Api;
+using VRage;
 
 namespace MarcoZechner.ConfigAPI.Main.Api
 {
@@ -15,12 +17,15 @@ namespace MarcoZechner.ConfigAPI.Main.Api
     /// </summary>
     public sealed class ConfigServiceImpl : IConfigService, IApiProvider
     {
+        internal ServerConfigService ServerWorld => _serverConfigService;
+        
         private readonly ulong _consumerModId;
         private readonly string _consumerModName;
         private readonly ConfigUserHooks _configUserHooks;
-        private ClientConfigService _clientConfigService;
+        private readonly ClientConfigService _clientConfigService;
+        private readonly ServerConfigService _serverConfigService;
 
-        public ConfigServiceImpl(ulong modId, string modName, ConfigUserHooks configUserHooks)
+        public ConfigServiceImpl(ulong modId, string modName, ConfigUserHooks configUserHooks, IWorldConfigNetwork worldNet)
         {
             _consumerModId = modId;
             _consumerModName = modName;
@@ -29,6 +34,13 @@ namespace MarcoZechner.ConfigAPI.Main.Api
                 _configUserHooks,
                 new TomlXmlConverter(),
                 new ConfigLayoutMigrator()
+            );
+            
+            _serverConfigService = new ServerConfigService(
+                _consumerModId,
+                _configUserHooks,
+                new ConfigLayoutMigrator(),
+                worldNet
             );
         }
 
@@ -56,51 +68,33 @@ namespace MarcoZechner.ConfigAPI.Main.Api
             => _clientConfigService.ClientConfigExport(typeKey, locationType, filename, overwrite);
 
         // Server-side APIs
-        
+
         public object ServerConfigInit(string typeKey, string defaultFile)
-        {
-            throw new Exception("Not Implemented");
-        }
+            => _serverConfigService.ServerConfigInit(typeKey, defaultFile);
 
         public CfgUpdate ServerConfigGetUpdate(string typeKey)
-        {
-            throw new Exception("Not Implemented");
-        }
+            => _serverConfigService.ServerConfigGetUpdate(typeKey);
 
         public object ServerConfigGetAuth(string typeKey)
-        {
-            throw new Exception("Not Implemented");
-        }
+            => _serverConfigService.ServerConfigGetAuth(typeKey);
 
         public object ServerConfigGetDraft(string typeKey)
-        {
-            throw new Exception("Not Implemented");
-        }
+            => _serverConfigService.ServerConfigGetDraft(typeKey);
 
         public void ServerConfigResetDraft(string typeKey)
-        {
-            throw new Exception("Not Implemented");
-        }
+            => _serverConfigService.ServerConfigResetDraft(typeKey);
 
         public bool ServerConfigLoadAndSwitch(string typeKey, string file, ulong baseIteration)
-        {
-            throw new Exception("Not Implemented");
-        }
+            => _serverConfigService.ServerConfigLoadAndSwitch(typeKey, file, baseIteration);
 
         public bool ServerConfigSave(string typeKey, ulong baseIteration)
-        {
-            throw new Exception("Not Implemented");
-        }
+            => _serverConfigService.ServerConfigSave(typeKey, baseIteration);
 
         public bool ServerConfigSaveAndSwitch(string typeKey, string file, ulong baseIteration)
-        {
-            throw new Exception("Not Implemented");
-        }
+            => _serverConfigService.ServerConfigSaveAndSwitch(typeKey, file, baseIteration);
 
         public bool ServerConfigExport(string typeKey, string file, bool overwrite)
-        {
-            throw new Exception("Not Implemented");
-        }
+            => _serverConfigService.ServerConfigExport(typeKey, file, overwrite);
 
         public Dictionary<string, Delegate> ConvertToDict()
         {
@@ -114,7 +108,7 @@ namespace MarcoZechner.ConfigAPI.Main.Api
                 { nameof(ClientConfigSaveAndSwitch), new Func<string, int, string, object>(ClientConfigSaveAndSwitchInternal) },
                 { nameof(ClientConfigExport), new Func<string, int, string, bool, bool>(ClientConfigExportInternal) },
                 { nameof(ServerConfigInit), new Func<string, string, object>(ServerConfigInit) },
-                { nameof(ServerConfigGetUpdate), new Func<string, object[]>(ServerConfigGetUpdateInternal) },
+                { nameof(ServerConfigGetUpdate), new Func<string, MyTuple<int, string, ulong, ulong, string>>(ServerConfigGetUpdateInternal) },
                 { nameof(ServerConfigGetAuth), new Func<string, object>(ServerConfigGetAuth) },
                 { nameof(ServerConfigGetDraft), new Func<string, object>(ServerConfigGetDraft) },
                 { nameof(ServerConfigResetDraft), new Action<string>(ServerConfigResetDraft) },
@@ -144,21 +138,22 @@ namespace MarcoZechner.ConfigAPI.Main.Api
         private bool ClientConfigExportInternal(string typeKey, int locationTypeEnum, string filename, bool overwrite) 
             => ClientConfigExport(typeKey, (LocationType)locationTypeEnum, filename, overwrite);
         
-        private object[] ServerConfigGetUpdateInternal(string typeKey)
+        private MyTuple<int, string, ulong, ulong, string> ServerConfigGetUpdateInternal(string typeKey)
         {
-            var results = new object[5];
             var cfgUpdate = ServerConfigGetUpdate(typeKey);
             if (cfgUpdate == null)
             {
-                return null;
+                return new MyTuple<int, string, ulong, ulong, string>();
             }
             
-            results[0] = (int)cfgUpdate.WorldOpKind;
-            results[1] = cfgUpdate.Error;
-            results[2] = cfgUpdate.TriggeredBy;
-            results[3] = cfgUpdate.ServerIteration;
-            results[4] = cfgUpdate.CurrentFile;
-            return results;
+            var resultsTuple = new MyTuple<int, string, ulong, ulong, string>();
+            
+            resultsTuple.Item1 = (int)cfgUpdate.WorldOpKind;
+            resultsTuple.Item2 = cfgUpdate.Error;
+            resultsTuple.Item3 = cfgUpdate.TriggeredBy;
+            resultsTuple.Item4 = cfgUpdate.ServerIteration;
+            resultsTuple.Item5 = cfgUpdate.CurrentFile;
+            return resultsTuple;
         }
     }
 }

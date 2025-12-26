@@ -1,5 +1,6 @@
-﻿using System.Collections.Generic;
+﻿using Digi.NetworkLib;
 using MarcoZechner.ApiLib;
+using MarcoZechner.ConfigAPI.Main.NetworkCore;
 using MarcoZechner.ConfigAPI.Scripts.ConfigAPI.Shared;
 using MarcoZechner.ConfigAPI.Shared.Api;
 using VRage.Game.Components;
@@ -9,14 +10,17 @@ namespace MarcoZechner.ConfigAPI.Main.Api
     [MySessionComponentDescriptor(MyUpdateOrder.NoUpdate)]
     public sealed class ServiceProviderSession : MySessionComponentBase
     {
-        // Stored callback APIs per consumer mod
-        private static readonly Dictionary<ulong, ConfigUserHooks> _callbacksByMod
-            = new Dictionary<ulong, ConfigUserHooks>();
-
         private ApiProviderHost _host;
-
+        private Network _net;
+        private ServerWorldAuthority _authority;
+        private WorldConfigNetworkCore _worldNet;
+        
         public override void LoadData()
         {
+            _net = new Network(12345, "ConfigAPI");
+            _authority = new ServerWorldAuthority();
+            _worldNet  = new WorldConfigNetworkCore(_net, _authority);
+            
             _host = new ApiProviderHost(new ConfigApiBootstrap(), Connect, Disconnect);
             _host.Load();
             CfgLog.Info("ConfigAPI loaded");
@@ -24,14 +28,26 @@ namespace MarcoZechner.ConfigAPI.Main.Api
 
         protected override void UnloadData()
         {
-            if (_host == null) return;
+            if (_host != null)
+            {
+                _host.Unload();
+                _host = null;
+            }
             
-            _host.Unload();
-            _host = null;
+            if (_worldNet != null)
+            {
+                _worldNet.Unload();
+                _worldNet = null;
+            }
+
+            _net?.Dispose();
+            _net = null;
+
+            _authority = null;
         }
 
         // Called by ApiLib when a consumer connects
-        private static IApiProvider Connect(
+        private IApiProvider Connect(
             ulong consumerModId,
             string consumerModName,
             IApiProvider configUserHooks
@@ -40,19 +56,24 @@ namespace MarcoZechner.ConfigAPI.Main.Api
             CfgLog.Info($"{consumerModId}:{consumerModName} connected to ConfigAPI");
             
             // store callbacks for provider -> consumer calls
-            _callbacksByMod[consumerModId] = new ConfigUserHooks(configUserHooks);
+            var hooks = new ConfigUserHooks(configUserHooks);
 
-            // return bound main api dict for this consumer
-            return new ConfigServiceImpl(consumerModId, consumerModName, _callbacksByMod[consumerModId]);
+            var worldFacade  = _worldNet.CreateConsumerFacade(consumerModId);
+            
+            var api = new ConfigServiceImpl(consumerModId, consumerModName, hooks, worldFacade);
+            
+            _worldNet.RegisterConsumer(consumerModId, api.ServerWorld);
+
+            return api;
         }
 
         // Called by ApiLib when a consumer disconnects, which means another mod on the same machine is probably unloading.
         // That normally only happens when the world unloads so we don't really need to do anything special here.
         // but it's here if you want to do some cleanup per mod.
-        private static void Disconnect(ulong consumerModId)
+        private void Disconnect(ulong consumerModId)
         {
             CfgLog.Info($"{consumerModId} disconnected from ConfigAPI");
-            _callbacksByMod.Remove(consumerModId);
+            _worldNet.UnregisterConsumer(consumerModId);
         }
     }
 }

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using MarcoZechner.ApiLib;
 using MarcoZechner.ConfigAPI.Shared.Domain;
 using MarcoZechner.ConfigAPI.Shared.Api;
+using VRage;
 
 namespace MarcoZechner.ConfigAPI.Client.Api
 {
@@ -16,7 +17,7 @@ namespace MarcoZechner.ConfigAPI.Client.Api
         private Func<string, int, string, object> _clientConfigSaveAndSwitch;
         private Func<string, int, string, bool, bool> _clientConfigExport;
         private Func<string, string, object> _serverConfigInit;
-        private Func<string, object[]> _serverConfigGetUpdate;
+        private Func<string, MyTuple<int, string, ulong, ulong, string>> _serverConfigGetUpdate;
         private Func<string, object> _worldGetAuth;
         private Func<string, object> _worldGetDraft;
         private Action<string> _worldResetDraft;
@@ -42,7 +43,7 @@ namespace MarcoZechner.ConfigAPI.Client.Api
                 [nameof(ClientConfigSaveAndSwitch)] = d => _clientConfigSaveAndSwitch = (Func<string, int, string, object>)d,
                 [nameof(ClientConfigExport)] = d => _clientConfigExport = (Func<string, int, string, bool, bool>)d,
                 [nameof(ServerConfigInit)] = d => _serverConfigInit = (Func<string, string, object>)d,
-                [nameof(ServerConfigGetUpdate)] = d => _serverConfigGetUpdate = (Func<string, object[]>)d, //TODO Mytuple<>
+                [nameof(ServerConfigGetUpdate)] = d => _serverConfigGetUpdate = (Func<string, MyTuple<int, string, ulong, ulong, string>>)d,
                 [nameof(ServerConfigGetAuth)] = d => _worldGetAuth = (Func<string, object>)d,
                 [nameof(ServerConfigGetDraft)] = d => _worldGetDraft = (Func<string, object>)d,
                 [nameof(ServerConfigResetDraft)] = d => _worldResetDraft = (Action<string>)d,
@@ -102,17 +103,19 @@ namespace MarcoZechner.ConfigAPI.Client.Api
         {
             var del = _serverConfigGetUpdate;
 
-            var objArr = del?.Invoke(typeKey);
-            if (objArr == null || objArr.Length != 5)
+            var result = del?.Invoke(typeKey);
+            if (result == null)
                 return null;
+
+            var cfgUpdateTuple = (MyTuple<int, string, ulong, ulong, string>)result;
 
             return new CfgUpdate
             {
-                WorldOpKind = (WorldOpKind)objArr[0],
-                Error = (string)objArr[1],
-                TriggeredBy = (long)objArr[2],
-                ServerIteration = (ulong)objArr[3],
-                CurrentFile = (string)objArr[4]
+                WorldOpKind = (WorldOpKind)cfgUpdateTuple.Item1,
+                Error = cfgUpdateTuple.Item2,
+                TriggeredBy = cfgUpdateTuple.Item3,
+                ServerIteration = cfgUpdateTuple.Item4,
+                CurrentFile = cfgUpdateTuple.Item5
             };
         }
 

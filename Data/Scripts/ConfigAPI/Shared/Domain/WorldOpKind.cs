@@ -3,11 +3,12 @@
     public enum WorldOpKind
     {
         Unknown = 0,
-        WorldUpdate = 1,
+        Error = 1,
         LoadAndSwitch = 2,
-        Save = 3,
+        Reload = 3,
         SaveAndSwitch = 4,
-        Export = 5,
-        Error = 6
+        Save = 5,
+        Export = 6,
+        WorldUpdate = 7,
     }
 }
