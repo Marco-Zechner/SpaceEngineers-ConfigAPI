@@ -74,6 +74,8 @@ namespace MarcoZechner.ConfigAPI.Client.Core
         {
             var typeKey = TypeKey<T>();
 
+            EnsureRegistered<T>(typeKey);
+            
             object existing;
             if (_worldCache.TryGetValue(typeKey, out existing))
                 return (CfgSync<T>)existing;

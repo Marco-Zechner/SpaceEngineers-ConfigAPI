@@ -28,11 +28,9 @@ namespace MarcoZechner.ConfigAPI.Client.Api
         // Registration API (call from your boilerplate when the mod loads)
         // --------------------------------------------------------------------
 
-        public static bool IsRegistered(string typeKey)
-        {
-            return !string.IsNullOrEmpty(typeKey) && _defs.ContainsKey(typeKey);
-        }
-        
+        public static bool IsRegistered(string typeKey) 
+            => !string.IsNullOrEmpty(typeKey) && _defs.ContainsKey(typeKey);
+
         public static void Register<T>() where T : ConfigBase, new()
         {
             var key = typeof(T).FullName;

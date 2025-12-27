@@ -103,9 +103,7 @@ namespace MarcoZechner.ConfigAPI.Client.Api
         
         public CfgUpdate ServerConfigGetUpdate(string typeKey)
         {
-            var del = _serverConfigGetUpdate;
-
-            var result = del?.Invoke(typeKey);
+            var result = _serverConfigGetUpdate?.Invoke(typeKey);
             if (result == null)
                 return null;
 

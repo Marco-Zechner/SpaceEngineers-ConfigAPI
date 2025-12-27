@@ -1,4 +1,5 @@
-﻿using Digi.NetworkLib;
+﻿using System;
+using Digi.NetworkLib;
 using MarcoZechner.ApiLib;
 using MarcoZechner.ConfigAPI.Main.NetworkCore;
 using MarcoZechner.ConfigAPI.Scripts.ConfigAPI.Shared;
@@ -34,6 +35,7 @@ namespace MarcoZechner.ConfigAPI.Main.Api
             
             if (_worldNet != null)
             {
+                CfgLog.Warning($"Mods still connected: {_worldNet.RegisteredConsumerModIds.Count} - unloading anyway.");
                 _worldNet.Unload();
                 _worldNet = null;
             }
@@ -50,6 +52,13 @@ namespace MarcoZechner.ConfigAPI.Main.Api
         )
         {
             CfgLog.Info($"{consumerModId}:{consumerModName} connected to ConfigAPI");
+
+            if (_worldNet.RegisteredConsumerModIds.Contains(consumerModId))
+            {
+                var ex = new Exception($"ConfigAPI: Mod {consumerModId} tried to connect twice as consumer");
+                CfgLog.Error(ex.Message, ex);
+                return null;
+            }
             
             // store callbacks for provider -> consumer calls
             var hooks = new ConfigUserHooks(configUserHooks);

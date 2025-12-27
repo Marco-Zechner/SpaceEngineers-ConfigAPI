@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using MarcoZechner.ConfigAPI.Main.Api;
 using MarcoZechner.ConfigAPI.Main.Domain;
 using MarcoZechner.ConfigAPI.Main.NetworkCore;
+using MarcoZechner.ConfigAPI.Scripts.ConfigAPI.Shared;
 using MarcoZechner.ConfigAPI.Shared.Domain;
 
 namespace MarcoZechner.ConfigAPI.Main.Core
@@ -166,7 +167,7 @@ namespace MarcoZechner.ConfigAPI.Main.Core
             st.DraftXml = st.AuthXml;
             st.DraftObj = DeserializeOrFallback(typeKey, st.DraftXml, st.DraftObj);
 
-            Enqueue(st, WorldOpKind.WorldUpdate, error: null, triggeredBy: 0);
+            // Enqueue(st, WorldOpKind.WorldUpdate, error: null, triggeredBy: 0); //TODO this is not really an update
         }
         
         public bool ServerConfigReload(string typeKey, ulong baseIteration)
@@ -328,30 +329,35 @@ namespace MarcoZechner.ConfigAPI.Main.Core
 
             if (!string.IsNullOrEmpty(error))
             {
+                CfgLogWorld.Error($"{nameof(WorldConfigClientService)}.{nameof(OnNetworkPacket)}: {error}");
                 Enqueue(st, WorldOpKind.Error, error, triggeredBy);
                 return;
             }
 
-            if (op == WorldOpKind.WorldUpdate)
+            if (op != WorldOpKind.WorldUpdate)
             {
-                if (string.IsNullOrEmpty(xmlData))
-                {
-                    Enqueue(st, WorldOpKind.Error, "WorldUpdate missing XmlData", triggeredBy);
-                    return;
-                }
-
-                var normalized = NormalizeAgainstDefaults(st.Definition, xmlData);
-
-                st.AuthXml = normalized;
-                st.AuthObj = DeserializeOrFallback(typeKey, st.AuthXml, st.AuthObj);
-
-                // Draft is NOT auto-updated by design.
-                Enqueue(st, WorldOpKind.WorldUpdate, null, triggeredBy);
+                // Op-results (Save/Load/etc) can be surfaced as info-only updates.
+                // Enqueue(st, op, null, triggeredBy); //TODO: currently these shouldn't generate updates
+                CfgLogWorld.Warning($"{nameof(WorldConfigClientService)}.{nameof(OnNetworkPacket)}: " +
+                    $"Ignoring non-WorldUpdate op {op} for typeKey {typeKey}.");
+                return;
+            }
+            
+            if (string.IsNullOrEmpty(xmlData))
+            {
+                CfgLogWorld.Error(
+                    $"{nameof(WorldConfigClientService)}.{nameof(OnNetworkPacket)}: WorldUpdate missing XmlDat");
+                Enqueue(st, WorldOpKind.Error, "WorldUpdate missing XmlData", triggeredBy);
                 return;
             }
 
-            // Op-results (Save/Load/etc) can be surfaced as info-only updates.
-            Enqueue(st, op, null, triggeredBy);
+            var normalized = NormalizeAgainstDefaults(st.Definition, xmlData);
+
+            st.AuthXml = normalized;
+            st.AuthObj = DeserializeOrFallback(typeKey, st.AuthXml, st.AuthObj);
+
+            // Draft is NOT auto-updated by design.
+            Enqueue(st, WorldOpKind.WorldUpdate, null, triggeredBy);
         }
 
         // ===============================================================

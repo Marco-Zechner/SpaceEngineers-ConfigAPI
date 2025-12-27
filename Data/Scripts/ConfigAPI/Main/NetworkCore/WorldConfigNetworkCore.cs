@@ -13,6 +13,8 @@ namespace MarcoZechner.ConfigAPI.Main.NetworkCore
 {
     public sealed class WorldConfigNetworkCore : IWorldConfigNetworkCore
     {
+        public List<ulong> RegisteredConsumerModIds => _sinks.Keys.ToList();
+        
         public static WorldConfigNetworkCore Instance { get; private set; }
 
         private readonly Network _net;
@@ -42,6 +44,7 @@ namespace MarcoZechner.ConfigAPI.Main.NetworkCore
             _sinks.Clear();
             _configServices.Clear();
             _userHooks.Clear();
+            _currentIterationsPerMod.Clear();
         }
 
         public void RegisterConsumer(ulong consumerModId, IWorldConfigClientSink sink, InternalConfigService configService, IConfigUserHooks userHooks)
@@ -52,6 +55,7 @@ namespace MarcoZechner.ConfigAPI.Main.NetworkCore
             _sinks[consumerModId] = sink;
             _configServices[consumerModId] = configService;
             _userHooks[consumerModId] = userHooks;
+            _currentIterationsPerMod[consumerModId] = new Dictionary<string, ulong>();
         }
 
         public void UnregisterConsumer(ulong consumerModId)
@@ -59,6 +63,7 @@ namespace MarcoZechner.ConfigAPI.Main.NetworkCore
             _sinks.Remove(consumerModId);
             _configServices.Remove(consumerModId);
             _userHooks.Remove(consumerModId);
+            _currentIterationsPerMod.Remove(consumerModId);
         }
 
         public IWorldConfigNetwork CreateConsumerFacade(ulong consumerModId)
