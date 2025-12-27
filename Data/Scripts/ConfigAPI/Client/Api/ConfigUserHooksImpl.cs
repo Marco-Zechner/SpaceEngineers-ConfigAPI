@@ -54,7 +54,7 @@ namespace MarcoZechner.ConfigAPI.Client.Api
             if (instance == null)
                 return false;
 
-            return instance.GetType().FullName == typeKey;
+            return instance.GetType().FullName == typeKey; //TODO: maybe add modID check to prevent cross assembly issues?
         }
 
         public string SerializeToInternalXml(string typeKey, object instance)
@@ -82,20 +82,31 @@ namespace MarcoZechner.ConfigAPI.Client.Api
             if (string.IsNullOrEmpty(filename))
                 return null;
 
-            if (locationType == LocationType.Local)
+            switch (locationType)
             {
-                if (!MyAPIGateway.Utilities.FileExistsInLocalStorage(filename, typeof(ConfigUserHooksImpl)))
-                    return null;
+                case LocationType.Local:
+                    if (!MyAPIGateway.Utilities.FileExistsInLocalStorage(filename, typeof(ConfigUserHooksImpl)))
+                        return null;
 
-                using (var reader = MyAPIGateway.Utilities.ReadFileInLocalStorage(filename, typeof(ConfigUserHooksImpl)))
-                    return reader.ReadToEnd();
+                    using (var reader = MyAPIGateway.Utilities.ReadFileInLocalStorage(filename, typeof(ConfigUserHooksImpl)))
+                        return reader.ReadToEnd();
+                case LocationType.Global:
+                    if (!MyAPIGateway.Utilities.FileExistsInGlobalStorage(filename))
+                        return null;
+
+                    using (var reader = MyAPIGateway.Utilities.ReadFileInGlobalStorage(filename))
+                        return reader.ReadToEnd();
+                case LocationType.World:
+                    if (ModSession.IsClientInMp)
+                        throw new Exception("WorldLoad called on client? Report this to me (discord: mz00956");
+                    if (!MyAPIGateway.Utilities.FileExistsInWorldStorage(filename, typeof(ConfigUserHooksImpl)))
+                        return null;
+
+                    using (var reader = MyAPIGateway.Utilities.ReadFileInWorldStorage(filename, typeof(ConfigUserHooksImpl)))
+                        return reader.ReadToEnd();
+                default:
+                    throw new Exception("LoadFile: Unknown LocationType: " + locationType);
             }
-            
-            if (!MyAPIGateway.Utilities.FileExistsInGlobalStorage(filename))
-                return null;
-
-            using (var reader = MyAPIGateway.Utilities.ReadFileInGlobalStorage(filename))
-                return reader.ReadToEnd();
         }
 
         public void SaveFile(LocationType locationType, string filename, string content)
@@ -109,15 +120,25 @@ namespace MarcoZechner.ConfigAPI.Client.Api
                 throw ex;
             }
 
-            if (locationType == LocationType.Local)
+            switch (locationType)
             {
-                using (var writer = MyAPIGateway.Utilities.WriteFileInLocalStorage(filename, typeof(ConfigUserHooksImpl)))
-                    writer.Write(content ?? string.Empty);
-                return;
+                case LocationType.Local:
+                    using (var writer = MyAPIGateway.Utilities.WriteFileInLocalStorage(filename, typeof(ConfigUserHooksImpl)))
+                        writer.Write(content ?? string.Empty);
+                    return;
+                case LocationType.Global:
+                    using (var writer = MyAPIGateway.Utilities.WriteFileInGlobalStorage(filename))
+                        writer.Write(content ?? string.Empty);
+                    return;
+                case LocationType.World:
+                    if (ModSession.IsClientInMp)
+                        throw new Exception("WorldSave called on client? Report this to me (discord: mz00956");
+                    using (var writer = MyAPIGateway.Utilities.WriteFileInWorldStorage(filename, typeof(ConfigUserHooksImpl)))
+                        writer.Write(content ?? string.Empty);
+                    return;
+                default:
+                    throw new Exception("LoadFile: Unknown LocationType: " + locationType);
             }
-            
-            using (var writer = MyAPIGateway.Utilities.WriteFileInGlobalStorage(filename))
-                writer.Write(content ?? string.Empty);
         }
         
 
@@ -127,39 +148,30 @@ namespace MarcoZechner.ConfigAPI.Client.Api
                 CfgLog.Info($"Creating Backup of file: locationType={locationType}, filename={filename}");
             if (string.IsNullOrEmpty(filename))
                 return;
+
+            switch (locationType)
+            {
+                case LocationType.Local:
+                    if (!MyAPIGateway.Utilities.FileExistsInLocalStorage(filename, typeof(ConfigUserHooksImpl)))
+                        return;
+                    break;
+                case LocationType.Global:
+                    if (!MyAPIGateway.Utilities.FileExistsInGlobalStorage(filename))
+                        return;
+                    break;
+                case LocationType.World:
+                    if (ModSession.IsClientInMp)
+                        throw new Exception("WorldBackup called on client? Report this to me (discord: mz00956");
+                    if (!MyAPIGateway.Utilities.FileExistsInWorldStorage(filename, typeof(ConfigUserHooksImpl)))
+                        return;
+                    break;
+                default:
+                    throw new Exception("BackupFile: Unknown LocationType: " + locationType);
+            }
             
-            var srcPath = filename;
-            if (locationType == LocationType.Local)
-            {
-                if (!MyAPIGateway.Utilities.FileExistsInLocalStorage(srcPath, typeof(ConfigUserHooksImpl)))
-                    return;
-            }
-            else
-            {
-                if (!MyAPIGateway.Utilities.FileExistsInGlobalStorage(srcPath))
-                    return;
-            }
-
-
             var backupPath = filename + ".bak";
-
-            string data;
-            if (locationType == LocationType.Local)
-            {
-                using (var reader = MyAPIGateway.Utilities.ReadFileInLocalStorage(srcPath, typeof(ConfigUserHooksImpl)))
-                    data = reader.ReadToEnd();
-
-                using (var writer = MyAPIGateway.Utilities.WriteFileInLocalStorage(backupPath, typeof(ConfigUserHooksImpl)))
-                    writer.Write(data);
-                return;
-            }
-            
-            using (var reader = MyAPIGateway.Utilities.ReadFileInGlobalStorage(srcPath))
-                data = reader.ReadToEnd();
-
-            using (var writer = MyAPIGateway.Utilities.WriteFileInGlobalStorage(backupPath))
-                writer.Write(data);
-
+            var data = LoadFile(locationType, filename);
+            SaveFile(locationType, backupPath, data);
         }
         
         public Dictionary<string, Delegate> ConvertToDict()

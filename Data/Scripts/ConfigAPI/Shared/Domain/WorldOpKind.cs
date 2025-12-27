@@ -4,11 +4,12 @@
     {
         Unknown = 0,
         Error = 1,
-        LoadAndSwitch = 2,
-        Reload = 3,
-        SaveAndSwitch = 4,
-        Save = 5,
-        Export = 6,
-        WorldUpdate = 7,
+        Get = 2,
+        LoadAndSwitch = 3,
+        Reload = 4,
+        SaveAndSwitch = 5,
+        Save = 6,
+        Export = 7,
+        WorldUpdate = 8,
     }
 }

@@ -69,7 +69,7 @@ namespace MarcoZechner.ConfigAPI.Shared.Api
         /// and requests the server to open (if not already opened) and send the authoritative snapshot.
         /// If it has already been called, it returns the internal authoritative instance (same as ServerConfigGetAuth).
         /// </summary>
-        object ServerConfigInit(string typeKey, string defaultFile);
+        void ServerConfigInit(string typeKey, string defaultFile);
 
         /// <summary>
         /// Pump the world sync once (should be called once per update loop).
@@ -84,13 +84,13 @@ namespace MarcoZechner.ConfigAPI.Shared.Api
         /// Get current authoritative snapshot (opaque object).
         /// UserMod casts this to its config type.
         /// </summary>
-        object ServerConfigGetAuth(string typeKey); //TODO: implement NOT over Network
+        object ServerConfigGetAuth(string typeKey);
 
         /// <summary>
         /// Get current draft snapshot (opaque object).
         /// UserMod casts this to its config type and edits it locally.
         /// </summary>
-        object ServerConfigGetDraft(string typeKey); //TODO: implement NOT over Network
+        object ServerConfigGetDraft(string typeKey);
 
         /// <summary>
         /// Replace Draft with a deep copy of Auth (provider uses callback serialize/deserialize).
@@ -102,7 +102,15 @@ namespace MarcoZechner.ConfigAPI.Shared.Api
         // Return false if a request is already in flight for this (typeKey).
         // BaseIteration should be whatever the UserMod last observed from WorldGetUpdate/Auth.
         // -------------------------
+        
+        /// <summary>
+        /// Reload the config from disk and replace the in-memory instance.
+        /// </summary>
+        bool ServerConfigReload(string typeKey, ulong baseIteration);
 
+        /// <summary>
+        /// Force load config from specific file on disk and replace the in-memory instance.
+        /// </summary>
         bool ServerConfigLoadAndSwitch(string typeKey, string file, ulong baseIteration);
 
         /// <summary>

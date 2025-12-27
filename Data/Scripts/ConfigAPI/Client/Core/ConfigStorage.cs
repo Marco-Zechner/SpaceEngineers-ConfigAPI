@@ -17,11 +17,11 @@ namespace MarcoZechner.ConfigAPI.Client.Core
 
         private static void EnsureApiLoaded()
         {
-            if (!ServiceLoader.ApiLoaded || ServiceLoader.Service == null)
-            {
-                throw new InvalidOperationException(
-                    "ConfigStorage: ConfigAPI is not loaded. Call ConfigStorage.Init(modContext) first.");
-            }
+            if (ServiceLoader.ApiLoaded) return;
+            
+            CfgLogWorld.Error("ConfigStorage: ConfigAPI is not loaded. Call ConfigStorage.Init(modContext) first.");
+            throw new InvalidOperationException(
+                "ConfigStorage: ConfigAPI is not loaded. Call ConfigStorage.Init(modContext) first.");
         }
         
         private static void EnsureRegistered<T>(string typeKey)
@@ -72,8 +72,6 @@ namespace MarcoZechner.ConfigAPI.Client.Core
         public static CfgSync<T> World<T>(string defaultFile = null)
             where T : ConfigBase, new()
         {
-            EnsureApiLoaded();
-
             var typeKey = TypeKey<T>();
 
             object existing;

@@ -19,6 +19,7 @@ namespace MarcoZechner.ConfigAPI.Client.Core
 
         private bool _initQueued;
         private ulong _serverIteration;
+        private ulong? _draftIteration;
         private string _currentFile;
 
         private T _auth;
@@ -37,6 +38,7 @@ namespace MarcoZechner.ConfigAPI.Client.Core
             _draft.ApplyDefaults();
 
             _serverIteration = 0;
+            _draftIteration = null;
             _currentFile = _defaultFile;
         }
 
@@ -54,6 +56,10 @@ namespace MarcoZechner.ConfigAPI.Client.Core
         /// Last known server iteration (used as baseIteration for requests).
         /// </summary>
         public ulong ServerIteration => _serverIteration;
+        /// <summary>
+        /// Last known draft iteration (from last sync).
+        /// </summary>
+        public ulong DraftIteration => _draftIteration ?? 0;
 
         /// <summary>
         /// Last known current file on the server (from updates).
@@ -81,18 +87,22 @@ namespace MarcoZechner.ConfigAPI.Client.Core
 
             // Pump the provider once. Provider applies update to its internal Auth.
             var update = service.ServerConfigGetUpdate(TypeKey);
-
-            // Regardless of whether update is null, we can refresh Auth/Draft cheaply
-            // to make sure local references always track provider state.
-            RefreshAuthDraft(service, update != null);
-
-            if (update == null) return null; //TODO: maybe return a "no-op" update instead?
+                
+            if (update == null)
+            {
+                // Keep references fresh (auth always, draft optionally)
+                RefreshAuthDraft(service, refreshDraft: false);
+                return null;
+            }
             
             // Track metadata so requests can use correct baseIteration.
             _serverIteration = update.ServerIteration;
             if (!string.IsNullOrEmpty(update.CurrentFile))
                 _currentFile = update.CurrentFile;
 
+            var initDraftBase = _draftIteration == null;
+            RefreshAuthDraft(service, refreshDraft: initDraftBase);
+            
             return update;
         }
 
@@ -116,6 +126,17 @@ namespace MarcoZechner.ConfigAPI.Client.Core
         // World operations
         // -------------------------
 
+        public bool Reload()
+        {
+            var service = ServiceLoader.Service;
+            if (service == null)
+                return false;
+            
+            EnsureInit(service);
+            
+            return service.ServerConfigReload(TypeKey, ServerIteration);
+        }
+        
         public bool LoadAndSwitch(string file)
         {
             var service = ServiceLoader.Service;
@@ -127,7 +148,7 @@ namespace MarcoZechner.ConfigAPI.Client.Core
             if (string.IsNullOrEmpty(file))
                 return false;
 
-            return service.ServerConfigLoadAndSwitch(TypeKey, file, _serverIteration);
+            return service.ServerConfigLoadAndSwitch(TypeKey, file, ServerIteration);
         }
 
         public bool Save()
@@ -137,8 +158,11 @@ namespace MarcoZechner.ConfigAPI.Client.Core
                 return false;
 
             EnsureInit(service);
+            
+            if (_draftIteration == null)
+                return false; // cannot save before initial sync
 
-            return service.ServerConfigSave(TypeKey, _serverIteration);
+            return service.ServerConfigSave(TypeKey, DraftIteration);
         }
 
         public bool SaveAndSwitch(string file)
@@ -152,7 +176,10 @@ namespace MarcoZechner.ConfigAPI.Client.Core
             if (string.IsNullOrEmpty(file))
                 return false;
 
-            return service.ServerConfigSaveAndSwitch(TypeKey, file, _serverIteration);
+            if (_draftIteration == null)
+                return false; // cannot save before initial sync
+            
+            return service.ServerConfigSaveAndSwitch(TypeKey, file, DraftIteration);
         }
 
         public bool Export(string file, bool overwrite = false)
@@ -180,16 +207,11 @@ namespace MarcoZechner.ConfigAPI.Client.Core
 
             // Provider contract: returns current internal Auth (or default created there)
             // and triggers server open/request to send authoritative snapshot.
-            var obj = service.ServerConfigInit(TypeKey, _defaultFile);
+            service.ServerConfigInit(TypeKey, _defaultFile);
 
             _initQueued = true;
 
-            // If provider returned something useful immediately, use it.
-            var cast = obj as T;
-            if (cast != null)
-                _auth = cast;
-
-            // Also pull draft immediately if available.
+            // pull draft immediately if available.
             RefreshAuthDraft(service, refreshDraft: true);
         }
 
@@ -206,8 +228,10 @@ namespace MarcoZechner.ConfigAPI.Client.Core
             // Draft (optional)
             var draftObj = service.ServerConfigGetDraft(TypeKey);
             var draftCast = draftObj as T;
-            if (draftCast != null)
-                _draft = draftCast;
+            if (draftCast == null) return;
+            
+            _draft = draftCast;
+            _draftIteration = _serverIteration;
         }
     }
 }

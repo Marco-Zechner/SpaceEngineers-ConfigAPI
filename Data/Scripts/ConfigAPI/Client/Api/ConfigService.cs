@@ -16,11 +16,12 @@ namespace MarcoZechner.ConfigAPI.Client.Api
         private Func<string, int, bool> _clientConfigSave;
         private Func<string, int, string, object> _clientConfigSaveAndSwitch;
         private Func<string, int, string, bool, bool> _clientConfigExport;
-        private Func<string, string, object> _serverConfigInit;
+        private Action<string, string> _serverConfigInit;
         private Func<string, MyTuple<int, string, ulong, ulong, string>> _serverConfigGetUpdate;
         private Func<string, object> _worldGetAuth;
         private Func<string, object> _worldGetDraft;
         private Action<string> _worldResetDraft;
+        private Func<string, ulong, bool> _worldReload;
         private Func<string, string, ulong, bool> _worldLoadAndSwitch;
         private Func<string, ulong, bool> _worldSave;
         private Func<string, string, ulong, bool> _worldSaveAndSwitch;
@@ -42,11 +43,12 @@ namespace MarcoZechner.ConfigAPI.Client.Api
                 [nameof(ClientConfigSave)] = d => _clientConfigSave = (Func<string, int, bool>)d,
                 [nameof(ClientConfigSaveAndSwitch)] = d => _clientConfigSaveAndSwitch = (Func<string, int, string, object>)d,
                 [nameof(ClientConfigExport)] = d => _clientConfigExport = (Func<string, int, string, bool, bool>)d,
-                [nameof(ServerConfigInit)] = d => _serverConfigInit = (Func<string, string, object>)d,
+                [nameof(ServerConfigInit)] = d => _serverConfigInit = (Action<string, string>)d,
                 [nameof(ServerConfigGetUpdate)] = d => _serverConfigGetUpdate = (Func<string, MyTuple<int, string, ulong, ulong, string>>)d,
                 [nameof(ServerConfigGetAuth)] = d => _worldGetAuth = (Func<string, object>)d,
                 [nameof(ServerConfigGetDraft)] = d => _worldGetDraft = (Func<string, object>)d,
                 [nameof(ServerConfigResetDraft)] = d => _worldResetDraft = (Action<string>)d,
+                [nameof(ServerConfigReload)] = d => _worldReload = (Func<string, ulong, bool>)d,
                 [nameof(ServerConfigLoadAndSwitch)] = d => _worldLoadAndSwitch = (Func<string, string, ulong, bool>)d,
                 [nameof(ServerConfigSave)] = d => _worldSave = (Func<string, ulong, bool>)d,
                 [nameof(ServerConfigSaveAndSwitch)] = d => _worldSaveAndSwitch = (Func<string, string, ulong, bool>)d,
@@ -96,7 +98,7 @@ namespace MarcoZechner.ConfigAPI.Client.Api
         // -------------------------
         // World config: client-side sync surface
 
-        public object ServerConfigInit(string typeKey, string defaultFile)
+        public void ServerConfigInit(string typeKey, string defaultFile)
             => _serverConfigInit?.Invoke(typeKey, defaultFile);
         
         public CfgUpdate ServerConfigGetUpdate(string typeKey)
@@ -127,6 +129,9 @@ namespace MarcoZechner.ConfigAPI.Client.Api
 
         public void ServerConfigResetDraft(string typeKey)
             => _worldResetDraft?.Invoke(typeKey);
+
+        public bool ServerConfigReload(string typeKey, ulong baseIteration)
+            => _worldReload?.Invoke(typeKey, baseIteration) ?? false;
 
         public bool ServerConfigLoadAndSwitch(string typeKey, string file, ulong baseIteration)
             => _worldLoadAndSwitch?.Invoke(typeKey, file, baseIteration) ?? false;

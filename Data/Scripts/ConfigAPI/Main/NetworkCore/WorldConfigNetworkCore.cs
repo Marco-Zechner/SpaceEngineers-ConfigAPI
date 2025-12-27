@@ -1,8 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using Digi.NetworkLib;
+using MarcoZechner.ConfigAPI.Main.Core;
+using MarcoZechner.ConfigAPI.Scripts.ConfigAPI.Shared;
+using MarcoZechner.ConfigAPI.Shared.Api;
 using Sandbox.ModAPI;
 using MarcoZechner.ConfigAPI.Shared.Domain;
+using VRage.Game.ModAPI;
 
 namespace MarcoZechner.ConfigAPI.Main.NetworkCore
 {
@@ -11,19 +16,21 @@ namespace MarcoZechner.ConfigAPI.Main.NetworkCore
         public static WorldConfigNetworkCore Instance { get; private set; }
 
         private readonly Network _net;
-        private readonly ServerWorldAuthority _authority;
 
         private readonly Dictionary<ulong, IWorldConfigClientSink> _sinks
-            = new Dictionary<ulong, IWorldConfigClientSink>();
+            = new Dictionary<ulong, IWorldConfigClientSink>();        
+        private readonly Dictionary<ulong, InternalConfigService> _configServices
+            = new Dictionary<ulong, InternalConfigService>();        
+        private readonly Dictionary<ulong, IConfigUserHooks> _userHooks
+            = new Dictionary<ulong, IConfigUserHooks>();
+        private readonly Dictionary<ulong, Dictionary<string, ulong>> _currentIterationsPerMod
+            = new Dictionary<ulong, Dictionary<string, ulong>>();
 
-        public WorldConfigNetworkCore(Network net, ServerWorldAuthority authority)
+        public WorldConfigNetworkCore(Network net)
         {
             if (net == null) throw new ArgumentNullException(nameof(net));
-            if (authority == null) throw new ArgumentNullException(nameof(authority));
 
             _net = net;
-            _authority = authority;
-
             Instance = this;
         }
 
@@ -33,17 +40,25 @@ namespace MarcoZechner.ConfigAPI.Main.NetworkCore
                 Instance = null;
 
             _sinks.Clear();
+            _configServices.Clear();
+            _userHooks.Clear();
         }
 
-        public void RegisterConsumer(ulong consumerModId, IWorldConfigClientSink sink)
+        public void RegisterConsumer(ulong consumerModId, IWorldConfigClientSink sink, InternalConfigService configService, IConfigUserHooks userHooks)
         {
             if (sink == null) throw new ArgumentNullException(nameof(sink));
+            if (configService == null) throw new ArgumentNullException(nameof(configService));
+            if (userHooks == null) throw new ArgumentNullException(nameof(userHooks));
             _sinks[consumerModId] = sink;
+            _configServices[consumerModId] = configService;
+            _userHooks[consumerModId] = userHooks;
         }
 
         public void UnregisterConsumer(ulong consumerModId)
         {
             _sinks.Remove(consumerModId);
+            _configServices.Remove(consumerModId);
+            _userHooks.Remove(consumerModId);
         }
 
         public IWorldConfigNetwork CreateConsumerFacade(ulong consumerModId)
@@ -65,51 +80,201 @@ namespace MarcoZechner.ConfigAPI.Main.NetworkCore
             else
                 HandleOnClient(p);
         }
+        
+        private static IMyPlayer GetPlayerBySteamId(ulong steamId)
+        {
+            var players = new List<IMyPlayer>();
+            MyAPIGateway.Players.GetPlayers(players);
+            return players.FirstOrDefault(p => p.SteamUserId == steamId);
+        }
 
         private void HandleOnServer(WorldConfigPacket req, ref PacketInfo packetInfo, ulong senderSteamId)
         {
-            string authXml, err, curFile;
-            ulong iter;
-
-            if (req.Op == WorldOpKind.Reload)
+            // check if sender is admin via IMyPlayer.PromoteLevel
+            var player = GetPlayerBySteamId(senderSteamId);
+            if (player == null || player.PromoteLevel < MyPromoteLevel.Admin)
             {
-                _authority.TryGetAuthSnapshot(
-                    req.ConsumerModId,
-                    req.TypeKey,
-                    req.FileName,
-                    out authXml,
-                    out iter,
-                    out curFile,
-                    out err);
-            }
-            else
-            {
-                _authority.ApplyOp(
-                    senderSteamId,
-                    req.ConsumerModId,
-                    req.TypeKey,
-                    req.Op,
-                    req.BaseIteration,
-                    req.FileName,
-                    req.Overwrite,
-                    req.XmlData,
-                    out authXml,
-                    out iter,
-                    out curFile,
-                    out err);
-            }
+                if (req.Op != WorldOpKind.Get)
+                {
+                    CfgLogWorld.Warning($"Player {player?.DisplayName ?? "Unknown"} ({senderSteamId}) attempted a restricted WorldConfig operation: {req.Op}");
+                    req.Op = WorldOpKind.Error;
+                    req.Error = "Permission denied: Only admins can perform this operation.";
+                    req.TriggeredBy = senderSteamId;
 
+                    packetInfo.Relay = RelayMode.ReturnToSender;
+                    packetInfo.Reserialize = true;
+                    return;
+                }
+            }
+            
+            if (!_configServices.ContainsKey(req.ConsumerModId))
+            {
+                req.Op = WorldOpKind.Error;
+                req.Error = $"No config service registered for ConsumerModId {req.ConsumerModId}";
+                CfgLogWorld.Error(req.Error);
+                req.TriggeredBy = senderSteamId;
+
+                packetInfo.Relay = RelayMode.ReturnToSender;
+                packetInfo.Reserialize = true;
+                return;
+            }
+            
             // Turn request object into response/broadcast.
-            req.Op = WorldOpKind.WorldUpdate;
-            req.ServerIteration = iter;
-            req.FileName = curFile;
-            req.XmlData = authXml;
-            req.Error = err;
             req.TriggeredBy = senderSteamId;
 
             // Broadcast authoritative snapshot to everyone (including sender)
-            packetInfo.Relay = RelayMode.ToEveryone;
             packetInfo.Reserialize = true;
+
+            var consumerModId = req.ConsumerModId;
+            var cfgService = _configServices[consumerModId]; //TODO tryGetvalue & error message
+            var typeKey = req.TypeKey;
+            var fileName = req.FileName;
+            const LocationType location = LocationType.World;
+            object newInstance;
+
+            Dictionary<string, ulong> currentIterations;
+            if (!_currentIterationsPerMod.TryGetValue(consumerModId, out currentIterations))
+            {
+                currentIterations = new Dictionary<string, ulong>();
+                _currentIterationsPerMod[consumerModId] = currentIterations;
+            }
+            
+            if (!currentIterations.ContainsKey(typeKey))
+                currentIterations[typeKey] = 0;
+            
+            // Check for stale requests
+            var currentIteration = currentIterations[typeKey];
+            if (req.BaseIteration != currentIteration)
+            {
+                if (req.Op != WorldOpKind.Get)
+                {
+                    req.Op = WorldOpKind.Error;
+                    req.Error = $"Stale request detected for typeKey {typeKey}. CurrentIteration={currentIteration}, RequestBaseIteration={req.BaseIteration}";
+                    packetInfo.Relay = RelayMode.ReturnToSender;
+                    packetInfo.Reserialize = true;
+                    
+                    bool wasCached;
+                    newInstance = cfgService.ConfigGet(typeKey, location, fileName, out wasCached);
+                    if (newInstance != null)
+                    {
+                        req.XmlData = _userHooks[consumerModId].SerializeToInternalXml(req.TypeKey, newInstance);
+                        if (wasCached)
+                        {
+                            req.ServerIteration = currentIterations[typeKey];
+                            req.Op = WorldOpKind.WorldUpdate;
+                            packetInfo.Relay = RelayMode.ReturnToSender;
+                            return;
+                        }
+                        req.ServerIteration = ++currentIterations[typeKey];
+                        req.Op = WorldOpKind.WorldUpdate;
+                        packetInfo.Relay = RelayMode.ToEveryone;
+                        VariableStorage.Persist(consumerModId, req);
+                        return;
+                    }
+                    req.Error += $"\nConfigGet returned null for typeKey {typeKey} at location {location} with fileName {fileName}";
+                    CfgLogWorld.Warning(req.Error);
+                    return;
+                }
+            }
+            
+            switch (req.Op)
+            {
+                case WorldOpKind.Get:
+                    bool wasCached;
+                    newInstance = cfgService.ConfigGet(typeKey, location, fileName, out wasCached);
+                    if (newInstance != null)
+                    {
+                        req.XmlData = _userHooks[consumerModId].SerializeToInternalXml(req.TypeKey, newInstance);
+                        if (wasCached)
+                        {
+                            req.ServerIteration = currentIterations[typeKey];
+                            req.Op = WorldOpKind.WorldUpdate;
+                            packetInfo.Relay = RelayMode.ReturnToSender;
+                            return;
+                        }
+                        req.ServerIteration = ++currentIterations[typeKey];
+                        req.Op = WorldOpKind.WorldUpdate;
+                        packetInfo.Relay = RelayMode.ToEveryone;
+                        VariableStorage.Persist(consumerModId, req);
+                        return;
+                    }
+                    req.Error = $"ConfigGet returned null for typeKey {typeKey} at location {location} with fileName {fileName}";
+                    break;
+                case WorldOpKind.LoadAndSwitch:
+                    newInstance = cfgService.ConfigLoadAndSwitch(typeKey, location, fileName);
+                    if (newInstance != null)
+                    {
+                        req.XmlData = _userHooks[consumerModId].SerializeToInternalXml(req.TypeKey, newInstance);
+                        req.ServerIteration = ++currentIterations[typeKey];
+                        req.Op = WorldOpKind.WorldUpdate;
+                        packetInfo.Relay = RelayMode.ToEveryone;
+                        VariableStorage.Persist(consumerModId, req);
+                        return;
+                    }
+                    req.Error = $"ConfigLoadAndSwitch returned null for typeKey {typeKey} at location {location} with fileName {fileName}";
+                    break;
+                case WorldOpKind.Reload:
+                    newInstance = cfgService.ConfigReload(typeKey, location);
+                    if (newInstance != null)
+                    {
+                        req.XmlData = _userHooks[consumerModId].SerializeToInternalXml(req.TypeKey, newInstance);
+                        req.ServerIteration = ++currentIterations[typeKey];
+                        req.Op = WorldOpKind.WorldUpdate;
+                        packetInfo.Relay = RelayMode.ToEveryone;
+                        VariableStorage.Persist(consumerModId, req);
+                        return;
+                    }
+                    req.Error = $"ConfigReload returned null for typeKey {typeKey} at location {location}";
+                    break;
+                case WorldOpKind.SaveAndSwitch:
+                    newInstance = cfgService.ConfigSaveAndSwitch(typeKey, location, fileName, req.XmlData);
+                    if (newInstance != null)
+                    {
+                        req.XmlData = _userHooks[consumerModId].SerializeToInternalXml(req.TypeKey, newInstance);
+                        req.ServerIteration = ++currentIterations[typeKey];
+                        req.Op = WorldOpKind.WorldUpdate;
+                        packetInfo.Relay = RelayMode.ToEveryone;
+                        VariableStorage.Persist(consumerModId, req);
+                        return;
+                    }
+                    req.Error = $"ConfigSaveAndSwitch returned null for typeKey {typeKey} at location {location} with fileName {fileName}";
+                    break;
+                case WorldOpKind.Save:
+                    if (cfgService.ConfigSave(typeKey, location, req.XmlData))
+                    {
+                        req.FileName = cfgService.ConfigGetCurrentFileName(typeKey, location);
+                        bool _;
+                        var inst = cfgService.ConfigGet(typeKey, location, req.FileName, out _);
+                        if (inst != null)
+                            req.XmlData = _userHooks[consumerModId].SerializeToInternalXml(typeKey, inst);
+
+                        req.ServerIteration = ++currentIterations[typeKey];
+                        req.Op = WorldOpKind.WorldUpdate;
+                        packetInfo.Relay = RelayMode.ToEveryone;
+                        VariableStorage.Persist(consumerModId, req);
+                        return;
+                    }
+                    req.Error = $"ConfigSave failed for typeKey {typeKey} at location {location}";
+                    break;
+                case WorldOpKind.Export:
+                    if (cfgService.ConfigExport(typeKey, location, fileName, req.Overwrite))
+                    {
+                        req.ServerIteration = currentIterations[typeKey];
+                        packetInfo.Relay = RelayMode.ReturnToSender;
+                        return;
+                    }
+                    req.Error = $"ConfigExport failed for typeKey {typeKey} at location {location} with fileName {fileName}";
+                    break;
+                case WorldOpKind.Unknown:
+                case WorldOpKind.Error:
+                case WorldOpKind.WorldUpdate:
+                default:
+                    throw new Exception($"Invalid WorldOpKind: {req.Op}");
+            }
+            
+            req.Op = WorldOpKind.Error;
+            CfgLogWorld.Warning(req.Error);
+            packetInfo.Relay = RelayMode.ReturnToSender;
         }
 
         private void HandleOnClient(WorldConfigPacket msg)

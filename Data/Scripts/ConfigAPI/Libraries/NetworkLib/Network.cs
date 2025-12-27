@@ -129,7 +129,7 @@ namespace Digi.NetworkLib
             RelayToClients(packet, 0, serialized);
         }
 
-        void RelayToClients(PacketBase packet, ulong senderSteamId = 0, byte[] serialized = null)
+        private void RelayToClients(PacketBase packet, ulong senderSteamId = 0, byte[] serialized = null)
         {
             if(!MyAPIGateway.Multiplayer.IsServer)
                 throw new Exception($"{_modName}: Clients can't relay packets!");
@@ -137,7 +137,7 @@ namespace Digi.NetworkLib
             _tempPlayers.Clear();
             MyAPIGateway.Players.GetPlayers(_tempPlayers);
 
-            foreach(IMyPlayer p in _tempPlayers)
+            foreach(var p in _tempPlayers)
             {
                 // skip sending to self (server player) or back to sender
                 if(p.SteamUserId == MyAPIGateway.Multiplayer.ServerId || p.SteamUserId == senderSteamId)
@@ -151,15 +151,26 @@ namespace Digi.NetworkLib
 
             _tempPlayers.Clear();
         }
+        
+        private void RelayToSenderOnly(PacketBase packet, ulong senderSteamId, byte[] serialized = null)
+        {
+            if(!MyAPIGateway.Multiplayer.IsServer)
+                throw new Exception($"{_modName}: Clients can't relay packets!");
+
+            if(serialized == null) // only serialize if necessary
+                serialized = MyAPIGateway.Utilities.SerializeToBinary(packet);
+
+            MyAPIGateway.Multiplayer.SendMessageTo(ChannelId, serialized, senderSteamId);
+        }
 
         /// <summary>
         /// Executed when a packet is received on this machine
         /// </summary>
-        void ReceivedPacket(ushort channelId, byte[] serialized, ulong senderSteamId, bool isSenderServer)
+        private void ReceivedPacket(ushort channelId, byte[] serialized, ulong senderSteamId, bool isSenderServer)
         {
             try
             {
-                PacketBase packet = MyAPIGateway.Utilities.SerializeFromBinary<PacketBase>(serialized);
+                var packet = MyAPIGateway.Utilities.SerializeFromBinary<PacketBase>(serialized);
                 HandlePacket(packet, senderSteamId, serialized);
             }
             catch(Exception e)
@@ -175,7 +186,7 @@ namespace Digi.NetworkLib
 
                 _tempPlayers.Clear();
                 MyAPIGateway.Players.GetPlayers(_tempPlayers, (p) => p.SteamUserId == senderSteamId); // callback not ideal for speed but this is an error so whatever
-                IMyPlayer sender = _tempPlayers.FirstOrDefault();
+                var sender = _tempPlayers.FirstOrDefault();
                 _tempPlayers.Clear();
 
                 if(ReceiveExceptionHandler != null)
@@ -189,14 +200,14 @@ namespace Digi.NetworkLib
             }
         }
 
-        void HandlePacket(PacketBase packet, ulong senderSteamId, byte[] serialized = null)
+        private void HandlePacket(PacketBase packet, ulong senderSteamId, byte[] serialized = null)
         {
             // Server-side OriginalSenderSteamId validation
             if(MyAPIGateway.Multiplayer.IsServer)
             {
                 if(senderSteamId != packet.OriginalSenderSteamId)
                 {
-                    string text = $"WARNING: packet {packet.GetType().Name} from {senderSteamId.ToString()} has altered OriginalSenderSteamId to {packet.OriginalSenderSteamId.ToString()}. Replaced it with proper id, but if this triggers for everyone then it's a bug somewhere.";
+                    var text = $"WARNING: packet {packet.GetType().Name} from {senderSteamId.ToString()} has altered OriginalSenderSteamId to {packet.OriginalSenderSteamId.ToString()}. Replaced it with proper id, but if this triggers for everyone then it's a bug somewhere.";
                     if(ErrorHandler != null)
                         ErrorHandler.Invoke(text);
                     else
@@ -207,7 +218,7 @@ namespace Digi.NetworkLib
                 }
             }
 
-            PacketInfo packetInfo = new PacketInfo()
+            var packetInfo = new PacketInfo()
             {
                 Relay = RelayMode.None,
                 Reserialize = false,
@@ -215,24 +226,24 @@ namespace Digi.NetworkLib
 
             packet.Received(ref packetInfo, senderSteamId);
 
-            if(MyAPIGateway.Multiplayer.IsServer)
+            if (!MyAPIGateway.Multiplayer.IsServer) return;
+            
+            if(packetInfo.Reserialize)
             {
-                if(packetInfo.Reserialize)
-                {
-                    serialized = null;
-                }
+                serialized = null;
+            }
 
-                switch(packetInfo.Relay)
-                {
-                    case RelayMode.None: break;
-                    case RelayMode.ToOthers: RelayToClients(packet, senderSteamId, serialized); break;
-                    case RelayMode.ToEveryone: RelayToClients(packet, 0, serialized); break;
-                    default: throw new Exception($"{_modName}: Unknown relay mode: {packetInfo.Relay.ToString()}");
-                }
+            switch(packetInfo.Relay)
+            {
+                case RelayMode.None: break;
+                case RelayMode.ToOthers: RelayToClients(packet, senderSteamId, serialized); break;
+                case RelayMode.ToEveryone: RelayToClients(packet, 0, serialized); break;
+                case RelayMode.ReturnToSender: RelayToSenderOnly(packet, senderSteamId, serialized); break;
+                default: throw new Exception($"{_modName}: Unknown relay mode: {packetInfo.Relay.ToString()}");
             }
         }
 
-        void DefaultExceptionHandler(Exception e)
+        private void DefaultExceptionHandler(Exception e)
         {
             MyLog.Default.WriteLineAndConsole($"{_modName} ERROR: {e}");
 
@@ -240,7 +251,7 @@ namespace Digi.NetworkLib
                 MyAPIGateway.Utilities.ShowNotification($"[ERROR: {_modName}: {e.Message} | Send SpaceEngineers.Log to mod author]", 10000, MyFontEnum.Red);
         }
 
-        void DefaultErrorHandler(string error)
+        private void DefaultErrorHandler(string error)
         {
             MyLog.Default.WriteLineAndConsole($"{_modName} ERROR: {error}");
 
@@ -301,5 +312,11 @@ namespace Digi.NetworkLib
         /// If server is also a player this does not send to them twice.
         /// </summary>
         ToEveryone,
+        
+        /// <summary>
+        /// Automatically sends this packet only back to the sender client.<br />
+        /// If server is also a player this does not send to them twice.
+        /// </summary>
+        ReturnToSender
     }
 }

@@ -8,21 +8,21 @@ using MarcoZechner.ConfigAPI.Shared.Domain;
 namespace MarcoZechner.ConfigAPI.Main.Core
 {
     /// <summary>
-    /// Local/Global config handling (no networking).
+    /// Local/Global/World config handling (no networking).
     /// Uses:
     /// - ConfigUserHooks for file IO + (de)serialize
     /// - IXmlConverter for TOML &lt;-> internal XML
     /// - IConfigLayoutMigrator for default/layout migration
     /// </summary>
-    public sealed class ClientConfigService
+    public sealed class InternalConfigService
     {
         private readonly ConfigUserHooks _configUserHooks;
         private readonly IXmlConverter _converter;
         private readonly IConfigLayoutMigrator _migrator;
 
-        private readonly ClientConfigStore _clientStore = new ClientConfigStore();
+        private readonly ConfigInstanceStore _instanceStore = new ConfigInstanceStore();
 
-        public ClientConfigService(
+        public InternalConfigService(
             ConfigUserHooks configUserHooks,
             IXmlConverter converter,
             IConfigLayoutMigrator migrator)
@@ -63,17 +63,21 @@ namespace MarcoZechner.ConfigAPI.Main.Core
             return filename + ".default.toml";
         }
         
-        public object ClientConfigGet(string typeKey, LocationType locationType, string filename)
+        public object ConfigGet(string typeKey, LocationType locationType, string filename, out bool wasCached)
         {
             filename = EnsureFileExtension(filename);
             
             filename = DefaultFile(typeKey, filename);
 
+            wasCached = true;
+            
             object existing;
-            if (_clientStore.TryGet(typeKey, locationType, out existing))
+            if (_instanceStore.TryGet(typeKey, locationType, out existing))
                 return existing;
+            
+            wasCached = false;
 
-            var loaded = TryLoadClient(typeKey, locationType, filename);
+            var loaded = TryLoad(typeKey, locationType, filename);
             if (loaded != null)
                 return loaded;
 
@@ -81,68 +85,68 @@ namespace MarcoZechner.ConfigAPI.Main.Core
             if (def == null)
                 throw new Exception("ClientConfigGet: NewDefault returned null for " + typeKey);
 
-            SaveClientToFile(typeKey, locationType, filename, def);
+            SaveToFile(typeKey, locationType, filename, def);
 
-            _clientStore.Set(typeKey, locationType, def, filename);
+            _instanceStore.Set(typeKey, locationType, def, filename);
             return def;
         }
         
-        public object ClientConfigReload(string typeKey, LocationType locationType)
+        public object ConfigReload(string typeKey, LocationType locationType)
         {
             string currentFile;
-            return _clientStore.TryGetCurrentFile(typeKey, locationType, out currentFile) 
-                ? TryLoadClient(typeKey, locationType, currentFile) 
+            return _instanceStore.TryGetCurrentFile(typeKey, locationType, out currentFile) 
+                ? TryLoad(typeKey, locationType, currentFile) 
                 : null;
         }
         
-        public string ClientConfigGetCurrentFileName(string typeKey, LocationType locationType)
+        public string ConfigGetCurrentFileName(string typeKey, LocationType locationType)
         {
             string currentFile;
-            return _clientStore.TryGetCurrentFile(typeKey, locationType, out currentFile) 
+            return _instanceStore.TryGetCurrentFile(typeKey, locationType, out currentFile) 
                 ? currentFile 
                 : null;
         }
 
-        public object ClientConfigLoadAndSwitch(string typeKey, LocationType locationType, string filename)
+        public object ConfigLoadAndSwitch(string typeKey, LocationType locationType, string filename)
         {
             filename = EnsureFileExtension(filename);
             
             filename = DefaultFile(typeKey, filename);
-            return TryLoadClient(typeKey, locationType, filename);
+            return TryLoad(typeKey, locationType, filename);
         }
 
-        public bool ClientConfigSave(string typeKey, LocationType locationType)
+        public bool ConfigSave(string typeKey, LocationType locationType, string xmlOverride = null)
         {
             object instance;
-            if (!_clientStore.TryGet(typeKey, locationType, out instance))
+            if (!_instanceStore.TryGet(typeKey, locationType, out instance))
                 return false;
 
             string file;
-            if (!_clientStore.TryGetCurrentFile(typeKey, locationType, out file))
+            if (!_instanceStore.TryGetCurrentFile(typeKey, locationType, out file))
                 return false;
 
-            SaveClientToFile(typeKey, locationType, file, instance);
+            SaveToFile(typeKey, locationType, file, instance, xmlOverride);
             return true;
         }
 
-        public object ClientConfigSaveAndSwitch(string typeKey, LocationType locationType, string filename)
+        public object ConfigSaveAndSwitch(string typeKey, LocationType locationType, string filename, string xmlOverride = null)
         {
             filename = EnsureFileExtension(filename);
             
             filename = DefaultFile(typeKey, filename);
 
             object instance;
-            if (!_clientStore.TryGet(typeKey, locationType, out instance))
+            if (!_instanceStore.TryGet(typeKey, locationType, out instance))
                 return null;
 
-            SaveClientToFile(typeKey, locationType, filename, instance);
+            SaveToFile(typeKey, locationType, filename, instance, xmlOverride);
 
             // Keep same instance reference; you can change this later if you want “reload after save”.
-            _clientStore.Set(typeKey, locationType, instance, filename);
+            _instanceStore.Set(typeKey, locationType, instance, filename);
             return instance;
         }
 
-        public bool ClientConfigExport(string typeKey, LocationType locationType, string filename, bool overwrite)
+        public bool ConfigExport(string typeKey, LocationType locationType, string filename, bool overwrite)
         {
             filename = EnsureFileExtension(filename);
             
@@ -150,11 +154,11 @@ namespace MarcoZechner.ConfigAPI.Main.Core
                 return false;
 
             object instance;
-            if (!_clientStore.TryGet(typeKey, locationType, out instance))
+            if (!_instanceStore.TryGet(typeKey, locationType, out instance))
                 return false;
 
             string current;
-            if (_clientStore.TryGetCurrentFile(typeKey, locationType, out current))
+            if (_instanceStore.TryGetCurrentFile(typeKey, locationType, out current))
             {
                 if (string.Equals(current, filename, StringComparison.OrdinalIgnoreCase))
                     return false;
@@ -171,7 +175,7 @@ namespace MarcoZechner.ConfigAPI.Main.Core
                     return false;
             }
 
-            SaveClientToFile(typeKey, locationType, filename, instance);
+            SaveToFile(typeKey, locationType, filename, instance);
             return true;
         }
         
@@ -179,7 +183,7 @@ namespace MarcoZechner.ConfigAPI.Main.Core
         // Helpers
         // -------------------------
 
-        private object TryLoadClient(string typeKey, LocationType locationType, string filename)
+        private object TryLoad(string typeKey, LocationType locationType, string filename)
         {
             filename = EnsureFileExtension(filename);
             
@@ -203,7 +207,7 @@ namespace MarcoZechner.ConfigAPI.Main.Core
                 _configUserHooks.SaveFile(locationType, DefaultSidecar(filename), external);
 
                 var instDefault = _configUserHooks.DeserializeFromInternalXml(typeKey, xmlCurrentDefaults);
-                _clientStore.Set(typeKey, locationType, instDefault, filename);
+                _instanceStore.Set(typeKey, locationType, instDefault, filename);
                 return instDefault;
             }
 
@@ -225,7 +229,7 @@ namespace MarcoZechner.ConfigAPI.Main.Core
                 _configUserHooks.SaveFile(locationType, DefaultSidecar(filename), external);
 
                 var instDefault = _configUserHooks.DeserializeFromInternalXml(typeKey, xmlCurrentDefaults);
-                _clientStore.Set(typeKey, locationType, instDefault, filename);
+                _instanceStore.Set(typeKey, locationType, instDefault, filename);
                 return instDefault;
             }
 
@@ -280,21 +284,26 @@ namespace MarcoZechner.ConfigAPI.Main.Core
             if (inst == null)
                 return null;
 
-            _clientStore.Set(typeKey, locationType, inst, filename);
+            _instanceStore.Set(typeKey, locationType, inst, filename);
             return inst;
         }
 
-        private void SaveClientToFile(string typeKey, LocationType locationType, string filename, object instance)
+        private void SaveToFile(string typeKey, LocationType locationType, string filename, object instance, string xmlOverride = null)
         {
             filename = EnsureFileExtension(filename);
-            
-            if (!_configUserHooks.IsInstanceOf(typeKey, instance))
-                throw new Exception("SaveClientToFile: instance/typeKey mismatch: " + typeKey);
 
             var def = new HooksDefinition(_configUserHooks, typeKey);
 
-            // instance -> internal xml
-            var internalXml = _configUserHooks.SerializeToInternalXml(typeKey, instance);
+            var internalXml = xmlOverride;
+            if (xmlOverride == null)
+            {
+                if (!_configUserHooks.IsInstanceOf(typeKey, instance))
+                    throw new Exception("SaveClientToFile: instance/typeKey mismatch: " + typeKey);
+                
+                // instance -> internal xml
+                internalXml = _configUserHooks.SerializeToInternalXml(typeKey, instance);
+            }
+            // TODO: if the file exists we also need to check if the typeKey of the file matches the instance
 
             // current defaults XML (code)
             var xmlCurrentDefaults = def.GetCurrentDefaultsInternalXml();

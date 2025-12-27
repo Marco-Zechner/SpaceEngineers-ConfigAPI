@@ -21,7 +21,7 @@ namespace MarcoZechner.ConfigAPI.Main.Core
     /// Payload:
     /// - XmlData is internal canonical XML for now.
     /// </summary>
-    public sealed class ServerConfigService : IWorldConfigClientSink
+    public sealed class WorldConfigClientService : IWorldConfigClientSink
     {
         private const int MAX_UPDATES_PER_TYPE = 64;
 
@@ -35,9 +35,9 @@ namespace MarcoZechner.ConfigAPI.Main.Core
             = new Dictionary<string, WorldState>(StringComparer.Ordinal);
 
         private static string Key(ulong consumerModId, string typeKey)
-            => consumerModId.ToString() + "|" + typeKey;
+            => consumerModId + "|" + typeKey;
 
-        public ServerConfigService(
+        public WorldConfigClientService(
             ulong consumerModId,
             ConfigUserHooks hooks,
             IConfigLayoutMigrator migrator,
@@ -57,7 +57,7 @@ namespace MarcoZechner.ConfigAPI.Main.Core
         // API surface called by ConfigServiceImpl
         // ===============================================================
 
-        public object ServerConfigInit(string typeKey, string defaultFile)
+        public void ServerConfigInit(string typeKey, string defaultFile)
         {
             if (string.IsNullOrEmpty(typeKey))
                 throw new ArgumentNullException(nameof(typeKey));
@@ -66,7 +66,7 @@ namespace MarcoZechner.ConfigAPI.Main.Core
 
             WorldState st;
             if (_states.TryGetValue(k, out st))
-                return st.AuthObj;
+                return; // already initialized
 
             var def = new HooksDefinition(_hooks, typeKey);
 
@@ -79,8 +79,7 @@ namespace MarcoZechner.ConfigAPI.Main.Core
 
             st = new WorldState(typeKey, def)
             {
-                // if caller passed null, derive something deterministic
-                CurrentFile = !string.IsNullOrEmpty(defaultFile) ? defaultFile : (typeKey + ".toml"),
+                CurrentFile = null, // temp object until server responds
 
                 AuthObj = defObj,
                 AuthXml = defXml,
@@ -89,30 +88,28 @@ namespace MarcoZechner.ConfigAPI.Main.Core
                 DraftXml = defXml,
 
                 ServerIteration = 0UL,
-                InitRequested = false
             };
 
             _states[k] = st;
 
-            // Ask server for snapshot once
-            if (!st.InitRequested)
+            if (VariableStorage.TryRead(_consumerModId, ref st))
             {
-                st.InitRequested = true;
-
-                // Reload is "please send snapshot"; file goes in File
-                _net.SendRequest(new WorldNetRequest
-                {
-                    ConsumerModId = _consumerModId,
-                    TypeKey = typeKey,
-                    Op = WorldOpKind.Reload,
-                    BaseIteration = st.ServerIteration,
-                    FileName = st.CurrentFile,
-                    Overwrite = false,
-                    XmlData = null
-                });
+                st.AuthObj = DeserializeOrFallback(typeKey, st.AuthXml, defObj);
+                st.DraftObj = DeserializeOrFallback(typeKey, st.DraftXml, defObj);
+                return;
             }
-
-            return st.AuthObj;
+            
+            // No variable found, which means the server probably hasn't loaded this config file yet. Request it now.
+            _net.SendRequest(new WorldNetRequest
+            {
+                ConsumerModId = _consumerModId,
+                TypeKey = typeKey,
+                Op = WorldOpKind.Get,
+                BaseIteration = st.ServerIteration,
+                FileName = !string.IsNullOrEmpty(defaultFile) ? defaultFile : typeKey + ".toml", //TODO: ensure valid extension
+                Overwrite = false,
+                XmlData = null
+            });
         }
 
         public CfgUpdate ServerConfigGetUpdate(string typeKey)
@@ -170,6 +167,23 @@ namespace MarcoZechner.ConfigAPI.Main.Core
             st.DraftObj = DeserializeOrFallback(typeKey, st.DraftXml, st.DraftObj);
 
             Enqueue(st, WorldOpKind.WorldUpdate, error: null, triggeredBy: 0);
+        }
+        
+        public bool ServerConfigReload(string typeKey, ulong baseIteration)
+        {
+            if (string.IsNullOrEmpty(typeKey))
+                return false;
+
+            return _net.SendRequest(new WorldNetRequest
+            {
+                ConsumerModId = _consumerModId,
+                TypeKey = typeKey,
+                Op = WorldOpKind.Reload,
+                BaseIteration = baseIteration,
+                FileName = null,
+                Overwrite = false,
+                XmlData = null
+            });
         }
 
         public bool ServerConfigLoadAndSwitch(string typeKey, string file, ulong baseIteration)
@@ -268,7 +282,7 @@ namespace MarcoZechner.ConfigAPI.Main.Core
         // Incoming from NetworkCore (applied locally)
         // ===============================================================
 
-        internal void OnNetworkPacket(
+        private void OnNetworkPacket(
             string typeKey,
             WorldOpKind op,
             ulong serverIteration,
@@ -296,13 +310,12 @@ namespace MarcoZechner.ConfigAPI.Main.Core
 
                 st = new WorldState(typeKey, def)
                 {
-                    CurrentFile = !string.IsNullOrEmpty(currentFile) ? currentFile : (typeKey + ".toml"),
+                    CurrentFile = !string.IsNullOrEmpty(currentFile) ? currentFile : typeKey + ".toml",
                     AuthObj = defObj,
                     AuthXml = defXml,
                     DraftObj = DeserializeOrFallback(typeKey, defXml, defObj),
                     DraftXml = defXml,
                     ServerIteration = 0UL,
-                    InitRequested = true
                 };
 
                 _states[k] = st;
@@ -362,7 +375,7 @@ namespace MarcoZechner.ConfigAPI.Main.Core
         {
             try
             {
-                var obj = _hooks.DeserializeFromInternalXml(typeKey, xml);
+                var obj = _hooks.DeserializeFromInternalXml(typeKey, xml); //TODO: check this out later again. should we throw?, does the backup mechanics work?
                 return obj ?? fallback;
             }
             catch
@@ -391,31 +404,6 @@ namespace MarcoZechner.ConfigAPI.Main.Core
                 ServerIteration = st.ServerIteration,
                 CurrentFile = st.CurrentFile
             });
-        }
-
-        private sealed class WorldState
-        {
-            public readonly string TypeKey;
-            public readonly HooksDefinition Definition;
-
-            public bool InitRequested;
-
-            public string CurrentFile;
-            public ulong ServerIteration;
-
-            public string AuthXml;
-            public object AuthObj;
-
-            public string DraftXml;
-            public object DraftObj;
-
-            public readonly Queue<CfgUpdate> Updates = new Queue<CfgUpdate>();
-
-            public WorldState(string typeKey, HooksDefinition definition)
-            {
-                TypeKey = typeKey;
-                Definition = definition;
-            }
         }
 
         public void OnServerWorldUpdate(WorldConfigPacket packet)

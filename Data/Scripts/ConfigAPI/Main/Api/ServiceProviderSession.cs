@@ -12,14 +12,12 @@ namespace MarcoZechner.ConfigAPI.Main.Api
     {
         private ApiProviderHost _host;
         private Network _net;
-        private ServerWorldAuthority _authority;
         private WorldConfigNetworkCore _worldNet;
         
         public override void LoadData()
         {
             _net = new Network(12345, "ConfigAPI");
-            _authority = new ServerWorldAuthority();
-            _worldNet  = new WorldConfigNetworkCore(_net, _authority);
+            _worldNet  = new WorldConfigNetworkCore(_net);
             
             _host = new ApiProviderHost(new ConfigApiBootstrap(), Connect, Disconnect);
             _host.Load();
@@ -42,8 +40,6 @@ namespace MarcoZechner.ConfigAPI.Main.Api
 
             _net?.Dispose();
             _net = null;
-
-            _authority = null;
         }
 
         // Called by ApiLib when a consumer connects
@@ -62,7 +58,7 @@ namespace MarcoZechner.ConfigAPI.Main.Api
             
             var api = new ConfigServiceImpl(consumerModId, consumerModName, hooks, worldFacade);
             
-            _worldNet.RegisterConsumer(consumerModId, api.ServerWorld);
+            _worldNet.RegisterConsumer(consumerModId, api.WorldConfigClientService, api.InternalConfigService, hooks);
 
             return api;
         }

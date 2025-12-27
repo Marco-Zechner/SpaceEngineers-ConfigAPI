@@ -36,10 +36,8 @@ namespace MarcoZechner.ConfigAPI.Main.NetworkCore
         {
             // Let the network core decide relay behavior and apply.
             var core = WorldConfigNetworkCore.Instance;
-            if (core == null)
-                return;
 
-            core.OnPacketReceived(this, ref packetInfo, senderSteamId);
+            core?.OnPacketReceived(this, ref packetInfo, senderSteamId);
         }
     }
 }

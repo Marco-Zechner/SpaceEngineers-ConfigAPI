@@ -13,8 +13,8 @@
         Global = 1,
         /// <summary>
         /// Saved in 'SEAppData/Saves/[steamID]/[WorldName]/Storage/ModFolder'
+        /// To use world-files you must use the CfgSync API to ensure multiplayer compatibility.
         /// </summary>
-        // World = 2 // world is handled via a separate system.
-        // IF you add it back in, make sure the guard against it in ClientConfigService.cs
+        World = 2 
     }
 }

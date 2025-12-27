@@ -17,26 +17,27 @@ namespace MarcoZechner.ConfigAPI.Main.Api
     /// </summary>
     public sealed class ConfigServiceImpl : IConfigService, IApiProvider
     {
-        internal ServerConfigService ServerWorld => _serverConfigService;
+        internal WorldConfigClientService WorldConfigClientService => _worldConfigClientService;
+        internal InternalConfigService InternalConfigService => _internalConfigService;
         
         private readonly ulong _consumerModId;
         private readonly string _consumerModName;
         private readonly ConfigUserHooks _configUserHooks;
-        private readonly ClientConfigService _clientConfigService;
-        private readonly ServerConfigService _serverConfigService;
+        private readonly InternalConfigService _internalConfigService;
+        private readonly WorldConfigClientService _worldConfigClientService;
 
         public ConfigServiceImpl(ulong modId, string modName, ConfigUserHooks configUserHooks, IWorldConfigNetwork worldNet)
         {
             _consumerModId = modId;
             _consumerModName = modName;
             _configUserHooks = configUserHooks;
-            _clientConfigService = new ClientConfigService(
+            _internalConfigService = new InternalConfigService(
                 _configUserHooks,
                 new TomlXmlConverter(),
                 new ConfigLayoutMigrator()
             );
             
-            _serverConfigService = new ServerConfigService(
+            _worldConfigClientService = new WorldConfigClientService(
                 _consumerModId,
                 _configUserHooks,
                 new ConfigLayoutMigrator(),
@@ -45,56 +46,62 @@ namespace MarcoZechner.ConfigAPI.Main.Api
         }
 
         // Client-side APIs
-        
-        public object ClientConfigGet(string typeKey, LocationType locationType, string filename) 
-            => _clientConfigService.ClientConfigGet(typeKey, locationType, filename);
+
+        public object ClientConfigGet(string typeKey, LocationType locationType, string filename)
+        {
+            bool _;
+            return _internalConfigService.ConfigGet(typeKey, locationType, filename, out _);
+        }
 
         public object ClientConfigReload(string typeKey, LocationType locationType)
-            => _clientConfigService.ClientConfigReload(typeKey, locationType);
+            => _internalConfigService.ConfigReload(typeKey, locationType);
 
         public string ClientConfigGetCurrentFileName(string typeKey, LocationType locationType)
-            => _clientConfigService.ClientConfigGetCurrentFileName(typeKey, locationType);
+            => _internalConfigService.ConfigGetCurrentFileName(typeKey, locationType);
 
         public object ClientConfigLoadAndSwitch(string typeKey, LocationType locationType, string filename)
-            => _clientConfigService.ClientConfigLoadAndSwitch(typeKey, locationType, filename);
+            => _internalConfigService.ConfigLoadAndSwitch(typeKey, locationType, filename);
 
         public bool ClientConfigSave(string typeKey, LocationType locationType)
-            => _clientConfigService.ClientConfigSave(typeKey, locationType);
+            => _internalConfigService.ConfigSave(typeKey, locationType);
 
         public object ClientConfigSaveAndSwitch(string typeKey, LocationType locationType, string filename)
-            => _clientConfigService.ClientConfigSaveAndSwitch(typeKey, locationType, filename);
+            => _internalConfigService.ConfigSaveAndSwitch(typeKey, locationType, filename);
 
         public bool ClientConfigExport(string typeKey, LocationType locationType, string filename, bool overwrite)
-            => _clientConfigService.ClientConfigExport(typeKey, locationType, filename, overwrite);
+            => _internalConfigService.ConfigExport(typeKey, locationType, filename, overwrite);
 
         // Server-side APIs
 
-        public object ServerConfigInit(string typeKey, string defaultFile)
-            => _serverConfigService.ServerConfigInit(typeKey, defaultFile);
+        public void ServerConfigInit(string typeKey, string defaultFile)
+            => _worldConfigClientService.ServerConfigInit(typeKey, defaultFile);
 
         public CfgUpdate ServerConfigGetUpdate(string typeKey)
-            => _serverConfigService.ServerConfigGetUpdate(typeKey);
+            => _worldConfigClientService.ServerConfigGetUpdate(typeKey);
 
         public object ServerConfigGetAuth(string typeKey)
-            => _serverConfigService.ServerConfigGetAuth(typeKey);
+            => _worldConfigClientService.ServerConfigGetAuth(typeKey);
 
         public object ServerConfigGetDraft(string typeKey)
-            => _serverConfigService.ServerConfigGetDraft(typeKey);
+            => _worldConfigClientService.ServerConfigGetDraft(typeKey);
 
         public void ServerConfigResetDraft(string typeKey)
-            => _serverConfigService.ServerConfigResetDraft(typeKey);
+            => _worldConfigClientService.ServerConfigResetDraft(typeKey);
+
+        public bool ServerConfigReload(string typeKey, ulong baseIteration)
+            => _worldConfigClientService.ServerConfigReload(typeKey, baseIteration);
 
         public bool ServerConfigLoadAndSwitch(string typeKey, string file, ulong baseIteration)
-            => _serverConfigService.ServerConfigLoadAndSwitch(typeKey, file, baseIteration);
+            => _worldConfigClientService.ServerConfigLoadAndSwitch(typeKey, file, baseIteration);
 
         public bool ServerConfigSave(string typeKey, ulong baseIteration)
-            => _serverConfigService.ServerConfigSave(typeKey, baseIteration);
+            => _worldConfigClientService.ServerConfigSave(typeKey, baseIteration);
 
         public bool ServerConfigSaveAndSwitch(string typeKey, string file, ulong baseIteration)
-            => _serverConfigService.ServerConfigSaveAndSwitch(typeKey, file, baseIteration);
+            => _worldConfigClientService.ServerConfigSaveAndSwitch(typeKey, file, baseIteration);
 
         public bool ServerConfigExport(string typeKey, string file, bool overwrite)
-            => _serverConfigService.ServerConfigExport(typeKey, file, overwrite);
+            => _worldConfigClientService.ServerConfigExport(typeKey, file, overwrite);
 
         public Dictionary<string, Delegate> ConvertToDict()
         {
@@ -107,11 +114,12 @@ namespace MarcoZechner.ConfigAPI.Main.Api
                 { nameof(ClientConfigSave), new Func<string, int, bool>(ClientConfigSaveInternal) },
                 { nameof(ClientConfigSaveAndSwitch), new Func<string, int, string, object>(ClientConfigSaveAndSwitchInternal) },
                 { nameof(ClientConfigExport), new Func<string, int, string, bool, bool>(ClientConfigExportInternal) },
-                { nameof(ServerConfigInit), new Func<string, string, object>(ServerConfigInit) },
+                { nameof(ServerConfigInit), new Action<string, string>(ServerConfigInit) },
                 { nameof(ServerConfigGetUpdate), new Func<string, MyTuple<int, string, ulong, ulong, string>>(ServerConfigGetUpdateInternal) },
                 { nameof(ServerConfigGetAuth), new Func<string, object>(ServerConfigGetAuth) },
                 { nameof(ServerConfigGetDraft), new Func<string, object>(ServerConfigGetDraft) },
                 { nameof(ServerConfigResetDraft), new Action<string>(ServerConfigResetDraft) },
+                { nameof(ServerConfigReload), new Func<string, ulong, bool>(ServerConfigReload) },
                 { nameof(ServerConfigLoadAndSwitch), new Func<string, string, ulong, bool>(ServerConfigLoadAndSwitch) },
                 { nameof(ServerConfigSave), new Func<string, ulong, bool>(ServerConfigSave) },
                 { nameof(ServerConfigSaveAndSwitch), new Func<string, string, ulong, bool>(ServerConfigSaveAndSwitch) },

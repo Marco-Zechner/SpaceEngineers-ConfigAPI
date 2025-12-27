@@ -3,7 +3,7 @@ using MarcoZechner.ConfigAPI.Shared.Domain;
 
 namespace MarcoZechner.ConfigAPI.Main.Core
 {
-    internal sealed class ClientConfigStore
+    internal sealed class ConfigInstanceStore
     {
         private readonly Dictionary<string, object> _instances = new Dictionary<string, object>();
         private readonly Dictionary<string, string> _currentFiles = new Dictionary<string, string>();
