@@ -2,8 +2,8 @@
 {
     public enum WorldOpKind
     {
-        Unknown = 0,
-        Error = 1,
+        Error = 0,
+        NoUpdate = 1,
         Get = 2,
         LoadAndSwitch = 3,
         Reload = 4,

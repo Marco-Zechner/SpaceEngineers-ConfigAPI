@@ -124,10 +124,11 @@ namespace MarcoZechner.ConfigAPI.Main.Core
             if (!_states.TryGetValue(k, out st))
                 return null;
 
-            if (st.Updates.Count == 0)
-                return null;
-
-            return st.Updates.Dequeue();
+            return st.Updates.Count == 0
+                ? new CfgUpdate() {
+                    WorldOpKind = WorldOpKind.NoUpdate
+                }
+                : st.Updates.Dequeue();
         }
 
         public object ServerConfigGetAuth(string typeKey)

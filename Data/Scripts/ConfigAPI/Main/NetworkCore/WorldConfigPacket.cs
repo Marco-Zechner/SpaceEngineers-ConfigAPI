@@ -8,23 +8,23 @@ namespace MarcoZechner.ConfigAPI.Main.NetworkCore
     public sealed class WorldConfigPacket : PacketBase
     {
         // Which consumer mod this packet is for (routing on the receiving machine)
-        [ProtoMember(2)] public ulong ConsumerModId;
+        [ProtoMember(1)] public ulong ConsumerModId;
 
-        [ProtoMember(3)] public string TypeKey;
+        [ProtoMember(2)] public string TypeKey;
 
         // Operation info
-        [ProtoMember(4)] public WorldOpKind Op;
-        [ProtoMember(5)] public ulong BaseIteration;
+        [ProtoMember(3)] public WorldOpKind Op;
+        [ProtoMember(4)] public ulong BaseIteration;
 
         // Export overwrite
-        [ProtoMember(6)] public bool Overwrite;
+        [ProtoMember(5)] public bool Overwrite;
 
         // Draft payload (client -> server) or snapshot (server -> client)
-        [ProtoMember(7)] public string XmlData;
+        [ProtoMember(6)] public string XmlData;
 
         // Metadata (server -> client)
-        [ProtoMember(8)] public ulong ServerIteration;
-        [ProtoMember(9)] public string FileName;
+        [ProtoMember(7)] public ulong ServerIteration;
+        [ProtoMember(8)] public string FileName;
 
         // Error (server -> client)
         [ProtoMember(10)] public string Error;

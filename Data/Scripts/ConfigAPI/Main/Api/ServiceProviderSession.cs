@@ -57,7 +57,6 @@ namespace MarcoZechner.ConfigAPI.Main.Api
             {
                 var ex = new Exception($"ConfigAPI: Mod {consumerModId} tried to connect twice as consumer");
                 CfgLog.Error(ex.Message, ex);
-                return null;
             }
             
             // store callbacks for provider -> consumer calls

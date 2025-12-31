@@ -270,7 +270,7 @@ namespace MarcoZechner.ConfigAPI.Main.NetworkCore
                     }
                     req.Error = $"ConfigExport failed for typeKey {typeKey} at location {location} with fileName {fileName}";
                     break;
-                case WorldOpKind.Unknown:
+                case WorldOpKind.NoUpdate:
                 case WorldOpKind.Error:
                 case WorldOpKind.WorldUpdate:
                 default:

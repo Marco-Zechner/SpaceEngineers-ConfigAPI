@@ -256,6 +256,7 @@ namespace MarcoZechner.LoggingLite
                 _writer = SaveInWorld 
                     ? MyAPIGateway.Utilities.WriteFileInWorldStorage(file, StorageType) 
                     : MyAPIGateway.Utilities.WriteFileInLocalStorage(file, StorageType);
+                _writerWasClosed = false;
             }
             catch
             {
@@ -314,7 +315,7 @@ namespace MarcoZechner.LoggingLite
 
             var final = type + ": " + msg;
 
-            if (MyAPIGateway.Utilities == null)
+            if (MyAPIGateway.Utilities == null || _writerWasClosed)
             {
                 _chatQueue.Enqueue(new ChatEntry { Sender = sender, Message = final });
                 return;
@@ -357,7 +358,7 @@ namespace MarcoZechner.LoggingLite
 
             var stack = ex.StackTrace;
             if (string.IsNullOrEmpty(stack))
-                return "Exception: " + type + ": " + msg;
+                return "Exception: " + type + ": " + msg + "\n(No stack trace)";
 
             return "Exception: " + type + ": " + msg + "\n" + stack;
         }

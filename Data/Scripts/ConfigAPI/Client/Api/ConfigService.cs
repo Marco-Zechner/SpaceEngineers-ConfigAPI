@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using MarcoZechner.ApiLib;
+using MarcoZechner.ConfigAPI.Scripts.ConfigAPI.Shared;
 using MarcoZechner.ConfigAPI.Shared.Domain;
 using MarcoZechner.ConfigAPI.Shared.Api;
 using VRage;
@@ -105,7 +106,10 @@ namespace MarcoZechner.ConfigAPI.Client.Api
         {
             var result = _serverConfigGetUpdate?.Invoke(typeKey);
             if (result == null)
+            {
+                CfgLog.Error($"{nameof(ServerConfigGetUpdate)} returned null for typeKey '{typeKey}'");
                 return null;
+            }
 
             var cfgUpdateTuple = (MyTuple<int, string, ulong, ulong, string>)result;
 
