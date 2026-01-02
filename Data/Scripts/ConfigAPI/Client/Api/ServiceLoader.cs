@@ -27,11 +27,8 @@ namespace MarcoZechner.ConfigAPI.Client.Api
 
         public static void Unload()
         {
-            if (_bridge != null)
-            {
-                _bridge.Unload();
-                _bridge = null;
-            }
+            _bridge?.Unload();
+            _bridge = null;
 
             _service = null;
         }

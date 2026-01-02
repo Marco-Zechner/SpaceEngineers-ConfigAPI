@@ -29,14 +29,14 @@ namespace MarcoZechner.ConfigAPI.Client.Core
                 {
                     //TODO: add logging
                     // ConfigStorage.Debug?.Log(
-                        // $"Deserialization error in ConfigType {typeof(T).Name}: {message}");
+                    // $"Deserialization error in ConfigType {typeof(T).Name}: {message}");
                     return null;
                 }
                 
                 var enumName = match.Groups["enum"].Value;
                 var attemptedValue = match.Groups["value"].Value;
                 // ConfigStorage.Debug?.Log(
-                    // $"Deserialization error in ConfigType {typeof(T).Name}: '{attemptedValue}' is not a valid value for enum '{enumName}'.");
+                // $"Deserialization error in ConfigType {typeof(T).Name}: '{attemptedValue}' is not a valid value for enum '{enumName}'.");
                 return null;
             }
         }

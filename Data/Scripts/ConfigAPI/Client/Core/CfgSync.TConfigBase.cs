@@ -1,4 +1,5 @@
 ﻿using MarcoZechner.ConfigAPI.Client.Api;
+using MarcoZechner.ConfigAPI.Scripts.ConfigAPI.Shared;
 using MarcoZechner.ConfigAPI.Shared.Domain;
 
 namespace MarcoZechner.ConfigAPI.Client.Core
@@ -33,10 +34,12 @@ namespace MarcoZechner.ConfigAPI.Client.Core
             // local fallback defaults until API becomes available
             _auth = new T();
             _auth.ApplyDefaults();
-
+            _auth.__Bind(TypeKey, LocationType.World);
+            
             _draft = new T();
             _draft.ApplyDefaults();
-
+            _draft.__Bind(TypeKey, LocationType.World);
+            
             _serverIteration = 0;
             _draftIteration = null;
             _currentFile = _defaultFile;
@@ -91,9 +94,11 @@ namespace MarcoZechner.ConfigAPI.Client.Core
             if (update == null)
             {
                 // Keep references fresh (auth always, draft optionally)
-                RefreshAuthDraft(service, refreshDraft: false);
+                // RefreshAuthDraft(service, refreshDraft: false); //TODO: check if needed?
                 return null;
             }
+
+            if (update.WorldOpKind == WorldOpKind.NoUpdate) return update;
             
             // Track metadata so requests can use correct baseIteration.
             _serverIteration = update.ServerIteration;
@@ -102,14 +107,14 @@ namespace MarcoZechner.ConfigAPI.Client.Core
 
             var initDraftBase = _draftIteration == null;
             RefreshAuthDraft(service, refreshDraft: initDraftBase);
-            
+
             return update;
         }
 
         /// <summary>
         /// Draft &lt;- deep copy(Auth) (done by provider via serialize/deserialize callbacks).
         /// </summary>
-        public void ResetDraft()
+        public void ResetDraft(bool onlyUpdateIteration = false)
         {
             var service = ServiceLoader.Service;
             if (service == null)
@@ -119,7 +124,9 @@ namespace MarcoZechner.ConfigAPI.Client.Core
 
             service.ServerConfigResetDraft(TypeKey);
             // Pull new draft reference
-            RefreshAuthDraft(service, refreshDraft: true);
+            RefreshAuthDraft(service, refreshDraft: !onlyUpdateIteration);
+            if (onlyUpdateIteration)
+                _draftIteration = _serverIteration;
         }
 
         // -------------------------
@@ -162,6 +169,12 @@ namespace MarcoZechner.ConfigAPI.Client.Core
             if (_draftIteration == null)
                 return false; // cannot save before initial sync
 
+            if (_draftIteration != _serverIteration)
+            {
+                CfgLogWorld.Warning($"Draft outdated. {TypeKey}");
+                return false;
+            }
+            
             return service.ServerConfigSave(TypeKey, DraftIteration);
         }
 
@@ -178,6 +191,12 @@ namespace MarcoZechner.ConfigAPI.Client.Core
 
             if (_draftIteration == null)
                 return false; // cannot save before initial sync
+            
+            if (_draftIteration != _serverIteration)
+            {
+                CfgLogWorld.Warning($"Draft outdated. {TypeKey}");
+                return false;
+            }
             
             return service.ServerConfigSaveAndSwitch(TypeKey, file, DraftIteration);
         }
@@ -217,13 +236,29 @@ namespace MarcoZechner.ConfigAPI.Client.Core
 
         private void RefreshAuthDraft(ConfigService service, bool refreshDraft)
         {
+            var xmlOldAuth = ConfigXmlSerializer.SerializeToXml(_auth);
+            
             // Auth
             var authObj = service.ServerConfigGetAuth(TypeKey);
             var authCast = authObj as T;
             if (authCast != null)
+            {
                 _auth = authCast;
+                _auth.__Bind(TypeKey, LocationType.World);
+            }
+            var xmlNewAuth = ConfigXmlSerializer.SerializeToXml(_auth);
+            var xmlDraft = ConfigXmlSerializer.SerializeToXml(_draft);
 
-            if (!refreshDraft) return;
+            
+            // either this client made the same changes, or he was the one that updated the auth
+            if (xmlDraft == xmlNewAuth)
+            {
+                _draftIteration = _serverIteration;
+                return;
+            }
+
+            // local draft has unsynced changes and refresh not requested -> keep local draft
+            if (!refreshDraft && xmlDraft != xmlOldAuth) return; 
             
             // Draft (optional)
             var draftObj = service.ServerConfigGetDraft(TypeKey);
@@ -231,6 +266,7 @@ namespace MarcoZechner.ConfigAPI.Client.Core
             if (draftCast == null) return;
             
             _draft = draftCast;
+            _draft.__Bind(TypeKey, LocationType.World);
             _draftIteration = _serverIteration;
         }
     }

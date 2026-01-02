@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Xml.Serialization;
 using MarcoZechner.ConfigAPI.Client.Api;
-using MarcoZechner.ConfigAPI.Scripts.ConfigAPI.Shared;
 using MarcoZechner.ConfigAPI.Shared.Domain;
 
 namespace MarcoZechner.ConfigAPI.Client.Core
@@ -52,7 +51,6 @@ namespace MarcoZechner.ConfigAPI.Client.Core
 
         internal void __Bind(string typeKey, LocationType location) //TODO: :/ __Bind???
         {
-            CfgLog.Info($"ConfigBase: Binding instance of typeKey '{typeKey}' at location '{location}'");
             _typeKey = typeKey;
             _location = location;
         }
