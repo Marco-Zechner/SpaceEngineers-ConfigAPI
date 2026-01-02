@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using MarcoZechner.ConfigAPI.Scripts.ConfigAPI.Shared;
 using Sandbox.ModAPI;
 using VRage.Game;
 using VRage.Game.ModAPI;
@@ -118,19 +119,10 @@ namespace Digi.NetworkLib
             MyAPIGateway.Multiplayer.SendMessageTo(ChannelId, serialized, steamId);
         }
 
-        /// <summary>
-        /// Sends packet (or supplied bytes) to all players except server player.<br />
-        /// NOTE: This does not ignore packet's sender! Only use this if you've not done the action on the sender themselves.<br />
-        /// Only works server side.<br />
-        /// <para><paramref name="serialized"/> = input pre-serialized data if you have it (optimization) or leave null otherwise.</para>
-        /// </summary>
-        public void SendToEveryone(PacketBase packet, byte[] serialized = null)
-        {
-            RelayToClients(packet, 0, serialized);
-        }
-
         private void RelayToClients(PacketBase packet, ulong senderSteamId = 0, byte[] serialized = null)
         {
+            packet.IsRelayPacket = true;
+            
             if(!MyAPIGateway.Multiplayer.IsServer)
                 throw new Exception($"{_modName}: Clients can't relay packets!");
 
@@ -139,12 +131,15 @@ namespace Digi.NetworkLib
 
             foreach(var p in _tempPlayers)
             {
-                // skip sending to self (server player) or back to sender
-                if(p.SteamUserId == MyAPIGateway.Multiplayer.ServerId || p.SteamUserId == senderSteamId)
-                    continue;
-
                 if(serialized == null) // only serialize if necessary, and only once.
                     serialized = MyAPIGateway.Utilities.SerializeToBinary(packet);
+                
+                // skip sending to self (server player) or back to sender
+                if (p.SteamUserId == MyAPIGateway.Multiplayer.ServerId || p.SteamUserId == senderSteamId)
+                {
+                    HandlePacket(packet, MyAPIGateway.Multiplayer.MyId, serialized);
+                    continue;
+                }
 
                 MyAPIGateway.Multiplayer.SendMessageTo(ChannelId, serialized, p.SteamUserId);
             }
@@ -154,12 +149,20 @@ namespace Digi.NetworkLib
         
         private void RelayToSenderOnly(PacketBase packet, ulong senderSteamId, byte[] serialized = null)
         {
+            packet.IsRelayPacket = true;
+            
             if(!MyAPIGateway.Multiplayer.IsServer)
                 throw new Exception($"{_modName}: Clients can't relay packets!");
 
             if(serialized == null) // only serialize if necessary
                 serialized = MyAPIGateway.Utilities.SerializeToBinary(packet);
 
+            if (MyAPIGateway.Multiplayer.ServerId == senderSteamId)
+            {
+                HandlePacket(packet, MyAPIGateway.Multiplayer.MyId, serialized);
+                return;
+            }
+            
             MyAPIGateway.Multiplayer.SendMessageTo(ChannelId, serialized, senderSteamId);
         }
 
@@ -202,6 +205,7 @@ namespace Digi.NetworkLib
 
         private void HandlePacket(PacketBase packet, ulong senderSteamId, byte[] serialized = null)
         {
+            CfgLog.Info("Handling packet: " + packet.GetType().Name);
             // Server-side OriginalSenderSteamId validation
             if(MyAPIGateway.Multiplayer.IsServer)
             {
@@ -223,7 +227,7 @@ namespace Digi.NetworkLib
                 Relay = RelayMode.None,
                 Reserialize = false,
             };
-
+            
             packet.Received(ref packetInfo, senderSteamId);
 
             if (!MyAPIGateway.Multiplayer.IsServer) return;

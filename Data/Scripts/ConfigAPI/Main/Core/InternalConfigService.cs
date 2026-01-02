@@ -85,7 +85,7 @@ namespace MarcoZechner.ConfigAPI.Main.Core
             if (def == null)
                 throw new Exception("ClientConfigGet: NewDefault returned null for " + typeKey);
 
-            SaveToFile(typeKey, locationType, filename, def);
+            SaveToFile(typeKey, locationType, filename, ref def);
 
             _instanceStore.Set(typeKey, locationType, def, filename);
             return def;
@@ -121,11 +121,12 @@ namespace MarcoZechner.ConfigAPI.Main.Core
             if (!_instanceStore.TryGet(typeKey, locationType, out instance))
                 return false;
 
-            string file;
-            if (!_instanceStore.TryGetCurrentFile(typeKey, locationType, out file))
+            string filename;
+            if (!_instanceStore.TryGetCurrentFile(typeKey, locationType, out filename))
                 return false;
 
-            SaveToFile(typeKey, locationType, file, instance, xmlOverride);
+            SaveToFile(typeKey, locationType, filename, ref instance, xmlOverride);
+            _instanceStore.Set(typeKey, locationType, instance, filename);
             return true;
         }
 
@@ -139,7 +140,7 @@ namespace MarcoZechner.ConfigAPI.Main.Core
             if (!_instanceStore.TryGet(typeKey, locationType, out instance))
                 return null;
 
-            SaveToFile(typeKey, locationType, filename, instance, xmlOverride);
+            SaveToFile(typeKey, locationType, filename, ref instance, xmlOverride);
 
             // Keep same instance reference; you can change this later if you want “reload after save”.
             _instanceStore.Set(typeKey, locationType, instance, filename);
@@ -175,7 +176,8 @@ namespace MarcoZechner.ConfigAPI.Main.Core
                     return false;
             }
 
-            SaveToFile(typeKey, locationType, filename, instance);
+            SaveToFile(typeKey, locationType, filename, ref instance);
+            _instanceStore.Set(typeKey, locationType, instance, filename);
             return true;
         }
         
@@ -288,7 +290,7 @@ namespace MarcoZechner.ConfigAPI.Main.Core
             return inst;
         }
 
-        private void SaveToFile(string typeKey, LocationType locationType, string filename, object instance, string xmlOverride = null)
+        private void SaveToFile(string typeKey, LocationType locationType, string filename, ref object instance, string xmlOverride = null)
         {
             filename = EnsureFileExtension(filename);
 
@@ -302,6 +304,10 @@ namespace MarcoZechner.ConfigAPI.Main.Core
                 
                 // instance -> internal xml
                 internalXml = _configUserHooks.SerializeToInternalXml(typeKey, instance);
+            }
+            else
+            {
+                instance = _configUserHooks.DeserializeFromInternalXml(typeKey, internalXml);
             }
             // TODO: if the file exists we also need to check if the typeKey of the file matches the instance
 

@@ -27,11 +27,8 @@ namespace MarcoZechner.ConfigAPI.Main.Api
 
         protected override void UnloadData()
         {
-            if (_host != null)
-            {
-                _host.Unload();
-                _host = null;
-            }
+            _host?.Unload();
+            _host = null;
             
             if (_worldNet != null)
             {

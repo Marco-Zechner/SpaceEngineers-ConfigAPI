@@ -11,5 +11,10 @@
         public ulong TriggeredBy;       // playerId that triggered the applied op (if known)
         public ulong ServerIteration;  // authoritative iteration after the change
         public string CurrentFile;     // server's current file after the change (if provided)
+
+        public override string ToString()
+        {
+            return $"CfgUpdate(Op={WorldOpKind}, Error={Error}, TriggeredBy={TriggeredBy}, ServerIteration={ServerIteration}, CurrentFile={CurrentFile})";
+        }
     }
 }

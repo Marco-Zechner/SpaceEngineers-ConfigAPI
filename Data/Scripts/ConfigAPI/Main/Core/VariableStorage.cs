@@ -5,7 +5,6 @@ namespace MarcoZechner.ConfigAPI.Main.Core
 {
     public static class VariableStorage
     {
-        
         private static string VarId(ulong consumerModId, string typeKey)
             => "ConfigAPI.World.AuthXml|" + consumerModId + "|" + typeKey;
 
@@ -14,7 +13,14 @@ namespace MarcoZechner.ConfigAPI.Main.Core
 
         private static string VarIdFile(ulong consumerModId, string typeKey)
             => "ConfigAPI.World.File|" + consumerModId + "|" + typeKey;
-        
+
+        public static void Clear(ulong consumerModId, string typeKey)
+        {
+            MyAPIGateway.Utilities.RemoveVariable(VarId(consumerModId, typeKey));
+            MyAPIGateway.Utilities.RemoveVariable(VarIdIter(consumerModId, typeKey));
+            MyAPIGateway.Utilities.RemoveVariable(VarIdFile(consumerModId, typeKey));
+        }
+
         public static void Persist(ulong consumerModId, WorldConfigPacket req)
         {
             MyAPIGateway.Utilities.SetVariable(VarId(consumerModId, req.TypeKey), req.XmlData ?? string.Empty);

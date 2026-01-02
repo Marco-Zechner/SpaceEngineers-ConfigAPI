@@ -11,6 +11,9 @@ namespace Digi.NetworkLib
         /// </summary>
         [ProtoMember(1)]
         public ulong OriginalSenderSteamId;
+        
+        [ProtoMember(2)]
+        public bool IsRelayPacket;
 
         public PacketBase()
         {

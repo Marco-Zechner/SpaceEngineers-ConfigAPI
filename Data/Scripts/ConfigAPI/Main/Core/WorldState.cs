@@ -25,5 +25,10 @@ namespace MarcoZechner.ConfigAPI.Main.Core
             TypeKey = typeKey;
             Definition = definition;
         }
+
+        public override string ToString()
+        {
+            return $"WorldState(TypeKey={TypeKey}, CurrentFile={CurrentFile}, ServerIteration={ServerIteration}, AuthXmlLen={(AuthXml != null ? AuthXml.Length : 0)}, DraftXmlLen={(DraftXml != null ? DraftXml.Length : 0)}, UpdatesCount={Updates.Count})";
+        }
     }
 }

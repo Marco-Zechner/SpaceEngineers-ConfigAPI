@@ -60,6 +60,7 @@ namespace MarcoZechner.ConfigAPI.Main.Core
 
         public void ServerConfigInit(string typeKey, string defaultFile)
         {
+            CfgLogWorld.Info($"{nameof(WorldConfigClientService)}.{nameof(ServerConfigInit)}: Initializing typeKey '{typeKey}' with defaultFile '{defaultFile}'");
             if (string.IsNullOrEmpty(typeKey))
                 throw new ArgumentNullException(nameof(typeKey));
 
@@ -92,15 +93,16 @@ namespace MarcoZechner.ConfigAPI.Main.Core
             };
 
             _states[k] = st;
+            CfgLogWorld.Debug(() => $"State: set temp for {typeKey}: {st}\nAuth:{st.AuthObj}\nDraft:{st.DraftObj}");
+            
 
             if (VariableStorage.TryRead(_consumerModId, ref st))
             {
                 st.AuthObj = DeserializeOrFallback(typeKey, st.AuthXml, defObj);
                 st.DraftObj = DeserializeOrFallback(typeKey, st.DraftXml, defObj);
-                return;
+                CfgLogWorld.Debug(() => $"State: read variable for {typeKey}: {st}\nAuth:{st.AuthObj}\nDraft:{st.DraftObj}");
             }
             
-            // No variable found, which means the server probably hasn't loaded this config file yet. Request it now.
             _net.SendRequest(new WorldNetRequest
             {
                 ConsumerModId = _consumerModId,
@@ -122,13 +124,20 @@ namespace MarcoZechner.ConfigAPI.Main.Core
 
             WorldState st;
             if (!_states.TryGetValue(k, out st))
+            {
+                CfgLogWorld.Error($"{nameof(WorldConfigClientService)}.{nameof(ServerConfigGetUpdate)}: No state for typeKey '{typeKey}'");
                 return null;
+            }
 
-            return st.Updates.Count == 0
-                ? new CfgUpdate() {
+            if (st.Updates.Count == 0)
+                return new CfgUpdate()
+                {
                     WorldOpKind = WorldOpKind.NoUpdate
-                }
-                : st.Updates.Dequeue();
+                };
+            
+            var upd = st.Updates.Dequeue();
+            CfgLogWorld.Info($"{nameof(WorldConfigClientService)}.{nameof(ServerConfigGetUpdate)}: Dequeued update: {upd}");
+            return upd;
         }
 
         public object ServerConfigGetAuth(string typeKey)
@@ -167,8 +176,7 @@ namespace MarcoZechner.ConfigAPI.Main.Core
             // Draft <- Auth via XML roundtrip
             st.DraftXml = st.AuthXml;
             st.DraftObj = DeserializeOrFallback(typeKey, st.DraftXml, st.DraftObj);
-
-            // Enqueue(st, WorldOpKind.WorldUpdate, error: null, triggeredBy: 0); //TODO this is not really an update
+            CfgLogWorld.Debug(() => $"State: reset draft for {typeKey}: {st}\nAuth:{st.AuthObj}\nDraft:{st.DraftObj}");
         }
         
         public bool ServerConfigReload(string typeKey, ulong baseIteration)
@@ -207,6 +215,7 @@ namespace MarcoZechner.ConfigAPI.Main.Core
 
         public bool ServerConfigSave(string typeKey, ulong baseIteration)
         {
+            CfgLog.Info($"{nameof(WorldConfigClientService)}.{nameof(ServerConfigSave)}: Saving typeKey '{typeKey}'");
             if (string.IsNullOrEmpty(typeKey))
                 return false;
 
@@ -319,6 +328,7 @@ namespace MarcoZechner.ConfigAPI.Main.Core
                     DraftXml = defXml,
                     ServerIteration = 0UL,
                 };
+                CfgLogWorld.Debug(() => $"State: package, no state for {typeKey}: {st}\nAuth:{st.AuthObj}\nDraft:{st.DraftObj}");
 
                 _states[k] = st;
             }
@@ -328,7 +338,7 @@ namespace MarcoZechner.ConfigAPI.Main.Core
             if (!string.IsNullOrEmpty(currentFile))
                 st.CurrentFile = currentFile;
 
-            if (!string.IsNullOrEmpty(error))
+            if (!string.IsNullOrEmpty(error) || op == WorldOpKind.Error)
             {
                 CfgLogWorld.Error($"{nameof(WorldConfigClientService)}.{nameof(OnNetworkPacket)}: {error}");
                 Enqueue(st, WorldOpKind.Error, error, triggeredBy);
@@ -356,6 +366,7 @@ namespace MarcoZechner.ConfigAPI.Main.Core
 
             st.AuthXml = normalized;
             st.AuthObj = DeserializeOrFallback(typeKey, st.AuthXml, st.AuthObj);
+            CfgLogWorld.Debug(() => $"State: package, for {typeKey}: {st}\nAuth:{st.AuthObj}\nDraft:{st.DraftObj}");
 
             // Draft is NOT auto-updated by design.
             Enqueue(st, WorldOpKind.WorldUpdate, null, triggeredBy);
@@ -398,19 +409,23 @@ namespace MarcoZechner.ConfigAPI.Main.Core
             return res.NormalizedXml ?? xml;
         }
 
-        private void Enqueue(WorldState st, WorldOpKind kind, string error, ulong triggeredBy)
+        private static void Enqueue(WorldState st, WorldOpKind kind, string error, ulong triggeredBy)
         {
             if (st.Updates.Count >= MAX_UPDATES_PER_TYPE)
                 st.Updates.Dequeue();
 
-            st.Updates.Enqueue(new CfgUpdate
+            var upd = new CfgUpdate
             {
                 WorldOpKind = kind,
                 Error = error,
                 TriggeredBy = triggeredBy,
                 ServerIteration = st.ServerIteration,
                 CurrentFile = st.CurrentFile
-            });
+            };
+            
+            CfgLogWorld.Info($"Enqueueing update: {upd}");
+            
+            st.Updates.Enqueue(upd);
         }
 
         public void OnServerWorldUpdate(WorldConfigPacket packet)
