@@ -1,8 +1,4 @@
-﻿using mz.Config.Abstractions;
-using mz.Config.Core.Layout;
-using mz.Config.Core.Storage;
-using mz.Config.Domain;
-using mz.SemanticVersioning;
+﻿using MarcoZechner.ConfigAPI.Main.Core.Migrator;
 using NUnit.Framework;
 
 namespace NewTemplateMod.Tests.XmlLayoutTests
@@ -11,24 +7,16 @@ namespace NewTemplateMod.Tests.XmlLayoutTests
     public class XmlLayoutMigratorIntegrationTests
     {
         private ConfigLayoutMigrator _migrator;
-        private IConfigDefinition _definition;
 
         [SetUp]
         public void SetUp()
         {
             _migrator = new ConfigLayoutMigrator();
-            _definition = new ConfigDefinition<CollectionConfigLayoutTest>();
         }
 
         private static string NormalizeNewlines(string s)
         {
             return s?.Replace("\r\n", "\n").Trim();
-        }
-
-        // Simple test config only for this test; it is never instantiated.
-        private class CollectionConfigLayoutTest : ConfigBase
-        {
-            public override SemanticVersion ConfigVersion => "0.3.0";
         }
 
         [Test]
@@ -62,7 +50,7 @@ namespace NewTemplateMod.Tests.XmlLayoutTests
 
             // First normalization: allowed to change formatting, but not semantics.
             var result1 = _migrator.Normalize(
-                _definition,
+                "CollectionConfigLayoutTest",
                 xmlInput,
                 xmlInput,  // old defaults (identical)
                 xmlInput); // current defaults (identical)
@@ -71,7 +59,7 @@ namespace NewTemplateMod.Tests.XmlLayoutTests
 
             // Second normalization on its own output must be *idempotent*.
             var result2 = _migrator.Normalize(
-                _definition,
+                "CollectionConfigLayoutTest",
                 xml1,
                 xml1,
                 xml1);

@@ -22,11 +22,27 @@ namespace MarcoZechner.ConfigAPI.Main.Core.Migrator
             public readonly List<Child> Ordered;
             private readonly Dictionary<string, int> _index; // name -> first occurrence index
 
+            // For easier testing
+            public Children(Dictionary<string, string> children)
+            {
+                Ordered = new List<Child>();
+                _index = new Dictionary<string, int>(StringComparer.Ordinal);
+                if (children == null) return;
+                
+                var i = 0;
+                foreach (var kvp in children)
+                {
+                    Ordered.Add(new Child { Name = kvp.Key, Block = kvp.Value });
+                    _index.Add(kvp.Key, i);
+                    i++;
+                }
+            }
+            
             public Children(List<Child> ordered)
             {
                 Ordered = ordered ?? new List<Child>();
                 _index = new Dictionary<string, int>(StringComparer.Ordinal);
-                for (int i = 0; i < Ordered.Count; i++)
+                for (var i = 0; i < Ordered.Count; i++)
                 {
                     // If duplicates exist (shouldn't for serializer), keep the first for lookup.
                     if (!_index.ContainsKey(Ordered[i].Name))

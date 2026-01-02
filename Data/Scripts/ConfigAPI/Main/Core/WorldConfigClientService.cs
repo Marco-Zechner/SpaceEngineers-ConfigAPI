@@ -70,7 +70,7 @@ namespace MarcoZechner.ConfigAPI.Main.Core
             if (_states.TryGetValue(k, out st))
                 return; // already initialized
 
-            var def = new HooksDefinition(_hooks, typeKey);
+            var def = new HooksDefinitionMain(_hooks, typeKey);
 
             // Local fallback defaults until server snapshot arrives
             var defObj = _hooks.NewDefault(typeKey);
@@ -311,7 +311,7 @@ namespace MarcoZechner.ConfigAPI.Main.Core
             if (!_states.TryGetValue(k, out st))
             {
                 // Race-safe: allow snapshot before Init()
-                var def = new HooksDefinition(_hooks, typeKey);
+                var def = new HooksDefinitionMain(_hooks, typeKey);
 
                 var defObj = _hooks.NewDefault(typeKey);
                 if (defObj == null)
@@ -328,8 +328,7 @@ namespace MarcoZechner.ConfigAPI.Main.Core
                     DraftXml = defXml,
                     ServerIteration = 0UL,
                 };
-                CfgLogWorld.Debug(() => $"State: package, no state for {typeKey}: {st}\nAuth:{st.AuthObj}\nDraft:{st.DraftObj}");
-
+                
                 _states[k] = st;
             }
 
@@ -347,8 +346,6 @@ namespace MarcoZechner.ConfigAPI.Main.Core
 
             if (op != WorldOpKind.WorldUpdate)
             {
-                // Op-results (Save/Load/etc) can be surfaced as info-only updates.
-                // Enqueue(st, op, null, triggeredBy); //TODO: currently these shouldn't generate updates
                 CfgLogWorld.Warning($"{nameof(WorldConfigClientService)}.{nameof(OnNetworkPacket)}: " +
                     $"Ignoring non-WorldUpdate op {op} for typeKey {typeKey}.");
                 return;
@@ -362,12 +359,11 @@ namespace MarcoZechner.ConfigAPI.Main.Core
                 return;
             }
 
-            var normalized = NormalizeAgainstDefaults(st.Definition, xmlData);
+            var normalized = NormalizeAgainstDefaults(st.DefinitionMain, xmlData);
 
             st.AuthXml = normalized;
             st.AuthObj = DeserializeOrFallback(typeKey, st.AuthXml, st.AuthObj);
-            CfgLogWorld.Debug(() => $"State: package, for {typeKey}: {st}\nAuth:{st.AuthObj}\nDraft:{st.DraftObj}");
-
+            
             // Draft is NOT auto-updated by design.
             Enqueue(st, WorldOpKind.WorldUpdate, null, triggeredBy);
         }
@@ -402,10 +398,10 @@ namespace MarcoZechner.ConfigAPI.Main.Core
             }
         }
 
-        private string NormalizeAgainstDefaults(HooksDefinition def, string xml)
+        private string NormalizeAgainstDefaults(HooksDefinitionMain def, string xml)
         {
             var xmlDefaults = def.GetCurrentDefaultsInternalXml();
-            var res = _migrator.Normalize(def, xml, xmlDefaults, xmlDefaults);
+            var res = _migrator.Normalize(def.TypeName, xml, xmlDefaults, xmlDefaults);
             return res.NormalizedXml ?? xml;
         }
 

@@ -7,7 +7,7 @@ namespace MarcoZechner.ConfigAPI.Main.Core
     public sealed class WorldState
     {
         public readonly string TypeKey;
-        public readonly HooksDefinition Definition;
+        public readonly HooksDefinitionMain DefinitionMain;
 
         public string CurrentFile;
         public ulong ServerIteration;
@@ -20,10 +20,10 @@ namespace MarcoZechner.ConfigAPI.Main.Core
 
         public readonly Queue<CfgUpdate> Updates = new Queue<CfgUpdate>();
 
-        public WorldState(string typeKey, HooksDefinition definition)
+        public WorldState(string typeKey, HooksDefinitionMain definitionMain)
         {
             TypeKey = typeKey;
-            Definition = definition;
+            DefinitionMain = definitionMain;
         }
 
         public override string ToString()

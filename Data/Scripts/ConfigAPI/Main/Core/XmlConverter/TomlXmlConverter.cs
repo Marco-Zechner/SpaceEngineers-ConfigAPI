@@ -33,10 +33,10 @@ namespace MarcoZechner.ConfigAPI.Main.Core.XmlConverter
         // Public API
         // ====================================================================
 
-        public string ToExternal(IConfigDefinition definition, string xmlContent, bool includeDescriptions)
+        public string ToExternal(IConfigDefinitionMain definitionMain, string xmlContent, bool includeDescriptions)
         {
-            if (definition == null)
-                throw new ArgumentNullException(nameof(definition));
+            if (definitionMain == null)
+                throw new ArgumentNullException(nameof(definitionMain));
             if (xmlContent == null)
                 xmlContent = string.Empty;
 
@@ -44,7 +44,7 @@ namespace MarcoZechner.ConfigAPI.Main.Core.XmlConverter
             var rootChildren = ParseRootChildren(xmlContent, out rootName);
 
             // Default instance for descriptions (comments)
-            var descriptions = includeDescriptions ? definition.GetVariableDescriptions() : null;
+            var descriptions = includeDescriptions ? definitionMain.GetVariableDescriptions() : null;
             
             
             // Main scalars/lists BEFORE the first nested parent
@@ -190,7 +190,7 @@ namespace MarcoZechner.ConfigAPI.Main.Core.XmlConverter
 
             // Main section header: [TypeName]
             sb.Append('[')
-              .Append(definition.TypeName)
+              .Append(definitionMain.TypeName)
               .Append(']')
               .AppendLine();
 
@@ -211,7 +211,7 @@ namespace MarcoZechner.ConfigAPI.Main.Core.XmlConverter
 
                 sb.AppendLine();
                 sb.Append('[')
-                  .Append(definition.TypeName)
+                  .Append(definitionMain.TypeName)
                   .Append('.')
                   .Append(parentName)
                   .Append("-dictionary]")
@@ -253,7 +253,7 @@ namespace MarcoZechner.ConfigAPI.Main.Core.XmlConverter
 
                 sb.AppendLine();
                 sb.Append('[')
-                  .Append(definition.TypeName)
+                  .Append(definitionMain.TypeName)
                   .Append('.')
                   .Append(parentPath)
                   .Append(']')
@@ -299,7 +299,7 @@ namespace MarcoZechner.ConfigAPI.Main.Core.XmlConverter
             {
                 sb.AppendLine();
                 sb.Append('[')
-                  .Append(definition.TypeName)
+                  .Append(definitionMain.TypeName)
                   .Append(']')
                   .AppendLine();
 
@@ -467,14 +467,14 @@ namespace MarcoZechner.ConfigAPI.Main.Core.XmlConverter
             return tag == "int" || tag == "string" || tag == "float" || tag == "double" || tag == "bool";
         }
 
-        public string ToInternal(IConfigDefinition definition, string externalContent)
+        public string ToInternal(IConfigDefinitionMain definitionMain, string externalContent)
         {
-            if (definition == null)
-                throw new ArgumentNullException(nameof(definition));
+            if (definitionMain == null)
+                throw new ArgumentNullException(nameof(definitionMain));
 
             // Empty file => default instance XML
             if (string.IsNullOrEmpty(externalContent))
-                return definition.GetCurrentDefaultsInternalXml();
+                return definitionMain.GetCurrentDefaultsInternalXml();
 
             // Dictionary detection is now based purely on TOML sections (*-dictionary),
             // NOT on VariableDescriptions.
@@ -482,7 +482,7 @@ namespace MarcoZechner.ConfigAPI.Main.Core.XmlConverter
 
             // Parse TOML into key -> list of raw values,
             // and fill dictionaryParents from [TypeName.*-dictionary] sections.
-            var flat = ParseTomlToFlatMap(externalContent, definition.TypeName, dictionaryParents);
+            var flat = ParseTomlToFlatMap(externalContent, definitionMain.TypeName, dictionaryParents);
 
             // Split into:
             // - root scalars / arrays: key
@@ -584,7 +584,7 @@ namespace MarcoZechner.ConfigAPI.Main.Core.XmlConverter
 
             // XML declaration + namespaces so xsi:nil works correctly
             sb.Append("<?xml version=\"1.0\" encoding=\"utf-16\"?>\r\n");
-            sb.Append('<').Append(definition.TypeName)
+            sb.Append('<').Append(definitionMain.TypeName)
               .Append(" xmlns:xsd=\"http://www.w3.org/2001/XMLSchema\"")
               .Append(" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"")
               .Append('>');
@@ -755,7 +755,7 @@ namespace MarcoZechner.ConfigAPI.Main.Core.XmlConverter
                 sb.Append("</").Append(parentName).Append('>');
             }
 
-            sb.Append("</").Append(definition.TypeName).Append('>');
+            sb.Append("</").Append(definitionMain.TypeName).Append('>');
             return sb.ToString();
         }
 

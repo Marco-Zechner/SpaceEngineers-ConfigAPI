@@ -16,7 +16,7 @@
     public interface IConfigLayoutMigrator
     {
         ConfigLayoutResult Normalize(
-            IConfigDefinition definition,
+            string typeName,
             string xmlCurrentFromFile,
             string xmlOldDefaultsFromFile,
             string xmlCurrentDefaults);

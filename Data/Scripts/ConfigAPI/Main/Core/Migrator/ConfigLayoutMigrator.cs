@@ -17,13 +17,11 @@ namespace MarcoZechner.ConfigAPI.Main.Core.Migrator
     public sealed class ConfigLayoutMigrator : IConfigLayoutMigrator
     {
         public ConfigLayoutResult Normalize(
-                IConfigDefinition definition,
+                string typeName,
                 string xmlCurrentFromFile,
                 string xmlOldDefaultsFromFile,
                 string xmlCurrentDefaults)
         {
-            if (definition == null)
-                throw new ArgumentNullException(nameof(definition));
 
             // Defensive: treat null as empty
             if (xmlCurrentFromFile == null) xmlCurrentFromFile = string.Empty;
@@ -45,7 +43,7 @@ namespace MarcoZechner.ConfigAPI.Main.Core.Migrator
                 var newDefaultChildren = LayoutXml.ParseChildren(xmlCurrentDefaults, out rootNewDefaults);
 
                 // Use the config's type name as canonical root name (matches serializer)
-                var rootName = definition.TypeName;
+                var rootName = typeName;
 
                 var requiresBackup = false;
                 var normalizedCurrentOrdered = new List<LayoutXml.Child>();

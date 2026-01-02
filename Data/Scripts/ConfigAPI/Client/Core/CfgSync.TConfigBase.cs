@@ -82,7 +82,10 @@ namespace MarcoZechner.ConfigAPI.Client.Core
             {
                 // API not ready yet; keep returning defaults.
                 // We intentionally do not throw here.
-                return null; //TODO: maybe return a "no-op" or "no-api" update instead?
+                return new CfgUpdate()
+                {
+                    WorldOpKind = WorldOpKind.NoUpdate
+                };
             }
 
             // Ensure init once API is ready.
@@ -93,9 +96,10 @@ namespace MarcoZechner.ConfigAPI.Client.Core
                 
             if (update == null)
             {
-                // Keep references fresh (auth always, draft optionally)
-                // RefreshAuthDraft(service, refreshDraft: false); //TODO: check if needed?
-                return null;
+                return new CfgUpdate()
+                {
+                    WorldOpKind = WorldOpKind.NoUpdate
+                };
             }
 
             if (update.WorldOpKind == WorldOpKind.NoUpdate) return update;

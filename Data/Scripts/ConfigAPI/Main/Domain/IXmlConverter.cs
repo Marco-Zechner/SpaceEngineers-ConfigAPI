@@ -21,12 +21,12 @@
         /// Convert an internal XML document (for a single config instance)
         /// to the external format that is written to disk.
         /// </summary>
-        string ToExternal(IConfigDefinition definition, string xmlContent, bool includeDescriptions);
+        string ToExternal(IConfigDefinitionMain definitionMain, string xmlContent, bool includeDescriptions);
 
         /// <summary>
         /// Convert external format (read from disk) back into the internal XML
         /// document for a single config instance.
         /// </summary>
-        string ToInternal(IConfigDefinition definition, string externalContent);
+        string ToInternal(IConfigDefinitionMain definitionMain, string externalContent);
     }
 }

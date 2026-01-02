@@ -1,5 +1,6 @@
 using System;
 using System.Text.RegularExpressions;
+using MarcoZechner.ConfigAPI.Scripts.ConfigAPI.Shared;
 using Sandbox.ModAPI;
 
 namespace MarcoZechner.ConfigAPI.Client.Core
@@ -27,16 +28,13 @@ namespace MarcoZechner.ConfigAPI.Client.Core
                 var match = Regex.Match(message, INVALID_ENUM_PATTERN);
                 if (!match.Success)
                 {
-                    //TODO: add logging
-                    // ConfigStorage.Debug?.Log(
-                    // $"Deserialization error in ConfigType {typeof(T).Name}: {message}");
+                    CfgLogWorld.Warning($"Unknown deserialization error in ConfigType {typeof(T).Name}: {message}");
                     return null;
                 }
                 
                 var enumName = match.Groups["enum"].Value;
                 var attemptedValue = match.Groups["value"].Value;
-                // ConfigStorage.Debug?.Log(
-                // $"Deserialization error in ConfigType {typeof(T).Name}: '{attemptedValue}' is not a valid value for enum '{enumName}'.");
+                CfgLogWorld.Warning($"Deserialization error in ConfigType {typeof(T).Name}: '{attemptedValue}' is not a valid value for enum '{enumName}'.");
                 return null;
             }
         }

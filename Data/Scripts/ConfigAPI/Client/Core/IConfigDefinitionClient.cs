@@ -2,7 +2,7 @@
 
 namespace MarcoZechner.ConfigAPI.Client.Core
 {
-    internal interface IConfigDefinition
+    public interface IConfigDefinitionClient
     {
         ConfigBase NewDefault();
         string SerializeToInternalXml(ConfigBase instance);

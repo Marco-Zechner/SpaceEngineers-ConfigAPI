@@ -189,7 +189,7 @@ namespace MarcoZechner.ConfigAPI.Main.Core
         {
             filename = EnsureFileExtension(filename);
             
-            var def = new HooksDefinition(_configUserHooks, typeKey);
+            var def = new HooksDefinitionMain(_configUserHooks, typeKey);
 
             // External TOML content
             var externalCurrent = _configUserHooks.LoadFile(locationType, filename);
@@ -249,7 +249,7 @@ namespace MarcoZechner.ConfigAPI.Main.Core
 
             // Migrate/normalize layout
             var layout = _migrator.Normalize(
-                def,
+                def.TypeName,
                 xmlCurrentFromFile,
                 xmlOldDefaultsFromFile,
                 xmlCurrentDefaultsFromCode);
@@ -294,7 +294,7 @@ namespace MarcoZechner.ConfigAPI.Main.Core
         {
             filename = EnsureFileExtension(filename);
 
-            var def = new HooksDefinition(_configUserHooks, typeKey);
+            var def = new HooksDefinitionMain(_configUserHooks, typeKey);
 
             var internalXml = xmlOverride;
             if (xmlOverride == null)
@@ -309,7 +309,6 @@ namespace MarcoZechner.ConfigAPI.Main.Core
             {
                 instance = _configUserHooks.DeserializeFromInternalXml(typeKey, internalXml);
             }
-            // TODO: if the file exists we also need to check if the typeKey of the file matches the instance
 
             // current defaults XML (code)
             var xmlCurrentDefaults = def.GetCurrentDefaultsInternalXml();
@@ -318,6 +317,16 @@ namespace MarcoZechner.ConfigAPI.Main.Core
             var external = _converter.ToExternal(def, internalXml, true);
             var externalDefaults = _converter.ToExternal(def, xmlCurrentDefaults, true);
 
+            var loadedFile = _configUserHooks.LoadFile(locationType, filename);
+            if (loadedFile != null)
+            {
+                if (loadedFile.Split(new[] {'\n'}, 2)[0] != external.Split(new[] {'\n'}, 2)[0])
+                {
+                    _configUserHooks.BackupFile(locationType, filename);
+                    CfgLogWorld.Warning($"Potentially overwritten config file from another mod: {filename}.\nA backup was created as '{filename}.bak'.");
+                }
+            }
+            
             _configUserHooks.SaveFile(locationType, filename, external);
             _configUserHooks.SaveFile(locationType, DefaultSidecar(filename), externalDefaults);
         }
@@ -326,7 +335,7 @@ namespace MarcoZechner.ConfigAPI.Main.Core
         {
             // The robust way is: ToInternal + check root name == definition.TypeName (or typeKey)
             // We keep this cheap and deterministic.
-            var def = new HooksDefinition(_configUserHooks, typeKey);
+            var def = new HooksDefinitionMain(_configUserHooks, typeKey);
             try
             {
                 var xml = _converter.ToInternal(def, existingExternal);

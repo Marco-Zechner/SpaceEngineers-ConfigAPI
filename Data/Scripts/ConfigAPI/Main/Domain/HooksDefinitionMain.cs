@@ -4,12 +4,12 @@ using MarcoZechner.ConfigAPI.Main.Api;
 
 namespace MarcoZechner.ConfigAPI.Main.Domain
 {
-    public sealed class HooksDefinition : IConfigDefinition
+    public sealed class HooksDefinitionMain : IConfigDefinitionMain
     {
         private readonly ConfigUserHooks _hooks;
         private readonly string _typeKey;
 
-        public HooksDefinition(ConfigUserHooks hooks, string typeKey)
+        public HooksDefinitionMain(ConfigUserHooks hooks, string typeKey)
         {
             _hooks = hooks;
             _typeKey = typeKey;

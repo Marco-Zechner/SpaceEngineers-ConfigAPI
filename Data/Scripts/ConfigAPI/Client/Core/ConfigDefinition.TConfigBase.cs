@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 namespace MarcoZechner.ConfigAPI.Client.Core
 {
-    internal sealed class ConfigDefinition<T> : IConfigDefinition where T : ConfigBase, new()
+    public sealed class ConfigDefinitionClient<T> : IConfigDefinitionClient where T : ConfigBase, new()
     {
         public ConfigBase NewDefault()
         {

@@ -2,7 +2,7 @@
 
 namespace MarcoZechner.ConfigAPI.Main.Domain
 {
-    public interface IConfigDefinition
+    public interface IConfigDefinitionMain
     {
         string TypeName { get; }
         string GetCurrentDefaultsInternalXml();

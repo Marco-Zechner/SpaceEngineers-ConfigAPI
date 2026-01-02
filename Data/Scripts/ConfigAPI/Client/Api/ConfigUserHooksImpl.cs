@@ -21,8 +21,8 @@ namespace MarcoZechner.ConfigAPI.Client.Api
     internal sealed class ConfigUserHooksImpl : IConfigUserHooks, IApiProvider
     {
         // typeKey -> definition (new default + xml serializer + descriptions)
-        private static readonly Dictionary<string, IConfigDefinition> _defs
-            = new Dictionary<string, IConfigDefinition>();
+        private static readonly Dictionary<string, IConfigDefinitionClient> _defs
+            = new Dictionary<string, IConfigDefinitionClient>();
 
         // --------------------------------------------------------------------
         // Registration API (call from your boilerplate when the mod loads)
@@ -37,7 +37,7 @@ namespace MarcoZechner.ConfigAPI.Client.Api
             if (key == null)
                 throw new Exception("Type.FullName is null (unexpected in SE).");
 
-            _defs[key] = new ConfigDefinition<T>();
+            _defs[key] = new ConfigDefinitionClient<T>();
         }
         
         public object NewDefault(string typeKey)
@@ -204,12 +204,12 @@ namespace MarcoZechner.ConfigAPI.Client.Api
         // Internals
         // --------------------------------------------------------------------
 
-        private static IConfigDefinition GetDef(string typeKey)
+        private static IConfigDefinitionClient GetDef(string typeKey)
         {
             if (string.IsNullOrEmpty(typeKey))
                 throw new Exception("ConfigUserHooksImpl: typeKey is null/empty.");
 
-            IConfigDefinition def;
+            IConfigDefinitionClient def;
             if (_defs.TryGetValue(typeKey, out def))
                 return def;
 

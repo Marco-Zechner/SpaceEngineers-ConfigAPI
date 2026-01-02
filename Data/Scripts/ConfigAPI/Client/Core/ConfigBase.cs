@@ -49,7 +49,7 @@ namespace MarcoZechner.ConfigAPI.Client.Core
         [XmlIgnore]
         private LocationType _location;
 
-        internal void __Bind(string typeKey, LocationType location) //TODO: :/ __Bind???
+        internal void __Bind(string typeKey, LocationType location)
         {
             _typeKey = typeKey;
             _location = location;

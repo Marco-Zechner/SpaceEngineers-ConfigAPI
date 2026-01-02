@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
-using mz.Config.Core;
+using MarcoZechner.ConfigAPI.Main.Core.Migrator;
 using NUnit.Framework;
+using Children = MarcoZechner.ConfigAPI.Main.Core.Migrator.LayoutXml.Children;
 
 namespace NewTemplateMod.Tests.XmlLayoutTests
 {
@@ -22,7 +23,7 @@ namespace NewTemplateMod.Tests.XmlLayoutTests
                 { "SomeText",      "<SomeText>Default text</SomeText>" }
             };
 
-            var xml = LayoutXml.Build("SimpleConfig", children);
+            var xml = LayoutXml.Build("SimpleConfig", new Children(children));
 
             var normalized = NormalizeNewlines(xml);
 
@@ -128,7 +129,7 @@ namespace NewTemplateMod.Tests.XmlLayoutTests
                 }
             };
 
-            var xml = LayoutXml.Build("CollectionConfig", children);
+            var xml = LayoutXml.Build("CollectionConfig", new Children(children));
             var normalized = NormalizeNewlines(xml);
 
             // We do not enforce exact indent count per line, but we do enforce structure
@@ -180,7 +181,7 @@ namespace NewTemplateMod.Tests.XmlLayoutTests
                 }
             };
 
-            var xml = LayoutXml.Build("IntermediateConfig", children);
+            var xml = LayoutXml.Build("IntermediateConfig", new Children(children));
             var normalized = NormalizeNewlines(xml);
 
             Assert.Multiple(() =>

@@ -10,12 +10,12 @@ namespace MarcoZechner.ConfigAPI.Main.Core.XmlConverter
     {
         public string GetExtension => ".xml";
 
-        public string ToExternal(IConfigDefinition definition, string xmlContent, bool includeDescriptions)
+        public string ToExternal(IConfigDefinitionMain definitionMain, string xmlContent, bool includeDescriptions)
         {
             return xmlContent ?? string.Empty;
         }
 
-        public string ToInternal(IConfigDefinition definition, string externalContent)
+        public string ToInternal(IConfigDefinitionMain definitionMain, string externalContent)
         {
             return externalContent ?? string.Empty;
         }
