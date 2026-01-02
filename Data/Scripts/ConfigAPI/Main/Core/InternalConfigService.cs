@@ -14,7 +14,7 @@ namespace MarcoZechner.ConfigAPI.Main.Core
     /// - IXmlConverter for TOML &lt;-> internal XML
     /// - IConfigLayoutMigrator for default/layout migration
     /// </summary>
-    public sealed class InternalConfigService
+    public sealed class InternalConfigService : IInternalConfigService
     {
         private readonly ConfigUserHooks _configUserHooks;
         private readonly IXmlConverter _converter;

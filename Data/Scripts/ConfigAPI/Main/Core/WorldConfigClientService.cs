@@ -379,8 +379,9 @@ namespace MarcoZechner.ConfigAPI.Main.Core
                 var xml = _hooks.SerializeToInternalXml(typeKey, draftObj);
                 return xml ?? fallbackXml ?? string.Empty;
             }
-            catch
+            catch (Exception ex)
             {
+                CfgLogWorld.Error($"{nameof(WorldConfigClientService)}.{nameof(DeserializeOrFallback)}: {typeKey}", ex);
                 return fallbackXml ?? string.Empty;
             }
         }
@@ -389,11 +390,12 @@ namespace MarcoZechner.ConfigAPI.Main.Core
         {
             try
             {
-                var obj = _hooks.DeserializeFromInternalXml(typeKey, xml); //TODO: check this out later again. should we throw?, does the backup mechanics work?
-                return obj ?? fallback;
+                var obj = _hooks.DeserializeFromInternalXml(typeKey, xml); 
+                return obj ?? fallback; // shouldn't be possible to be null. if the xml is empty or invalid we throw.
             }
-            catch
+            catch (Exception ex)
             {
+                CfgLogWorld.Error($"{nameof(WorldConfigClientService)}.{nameof(DeserializeOrFallback)}: {typeKey}", ex);
                 return fallback;
             }
         }

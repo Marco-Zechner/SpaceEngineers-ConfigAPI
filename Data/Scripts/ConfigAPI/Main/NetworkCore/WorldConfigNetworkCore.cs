@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Digi.NetworkLib;
 using MarcoZechner.ConfigAPI.Main.Core;
+using MarcoZechner.ConfigAPI.Main.Domain;
 using MarcoZechner.ConfigAPI.Scripts.ConfigAPI.Shared;
 using MarcoZechner.ConfigAPI.Shared.Api;
 using Sandbox.ModAPI;
@@ -21,8 +22,8 @@ namespace MarcoZechner.ConfigAPI.Main.NetworkCore
 
         private readonly Dictionary<ulong, IWorldConfigClientSink> _sinks
             = new Dictionary<ulong, IWorldConfigClientSink>();        
-        private readonly Dictionary<ulong, InternalConfigService> _configServices
-            = new Dictionary<ulong, InternalConfigService>();        
+        private readonly Dictionary<ulong, IInternalConfigService> _configServices
+            = new Dictionary<ulong, IInternalConfigService>();        
         private readonly Dictionary<ulong, IConfigUserHooks> _userHooks
             = new Dictionary<ulong, IConfigUserHooks>();
         private readonly Dictionary<ulong, Dictionary<string, ulong>> _currentIterationsPerMod
@@ -47,7 +48,7 @@ namespace MarcoZechner.ConfigAPI.Main.NetworkCore
             _currentIterationsPerMod.Clear();
         }
 
-        public void RegisterConsumer(ulong consumerModId, IWorldConfigClientSink sink, InternalConfigService configService, IConfigUserHooks userHooks)
+        public void RegisterConsumer(ulong consumerModId, IWorldConfigClientSink sink, IInternalConfigService configService, IConfigUserHooks userHooks)
         {
             if (sink == null) throw new ArgumentNullException(nameof(sink));
             if (configService == null) throw new ArgumentNullException(nameof(configService));
@@ -77,12 +78,6 @@ namespace MarcoZechner.ConfigAPI.Main.NetworkCore
             if (p == null)
                 return;
             
-            CfgLog.Info("WorldConfigPacket received: " +
-                        $"ModId={p.ConsumerModId}, TypeKey={p.TypeKey}, Op={p.Op}, " +
-                        $"BaseIteration={p.BaseIteration}, FileName={p.FileName}, " +
-                        $"SenderSteamId={senderSteamId}, IsRelayPacket={p.IsRelayPacket}, " +
-                        $"Error={p.Error}, TriggeredBy={p.TriggeredBy}, ServerIteration={p.ServerIteration}");
-
             if (MyAPIGateway.Multiplayer == null)
                 return;
 
@@ -101,8 +96,6 @@ namespace MarcoZechner.ConfigAPI.Main.NetworkCore
 
         private void HandleOnServer(WorldConfigPacket req, ref PacketInfo packetInfo, ulong senderSteamId)
         {
-            CfgLog.Info("Handle on server");
-            
             // check if sender is admin via IMyPlayer.PromoteLevel
             var player = GetPlayerBySteamId(senderSteamId);
             if (player == null || player.PromoteLevel < MyPromoteLevel.Admin)
@@ -119,11 +112,13 @@ namespace MarcoZechner.ConfigAPI.Main.NetworkCore
                     return;
                 }
             }
-            
-            if (!_configServices.ContainsKey(req.ConsumerModId))
+
+            var consumerModId = req.ConsumerModId;
+            IInternalConfigService cfgService;
+            if (!_configServices.TryGetValue(consumerModId, out cfgService))
             {
                 req.Op = WorldOpKind.Error;
-                req.Error = $"No config service registered for ConsumerModId {req.ConsumerModId}";
+                req.Error = $"No config service registered for ConsumerModId {consumerModId}";
                 CfgLogWorld.Error(req.Error);
                 req.TriggeredBy = senderSteamId;
 
@@ -137,9 +132,6 @@ namespace MarcoZechner.ConfigAPI.Main.NetworkCore
 
             // Broadcast authoritative snapshot to everyone (including sender)
             packetInfo.Reserialize = true;
-
-            var consumerModId = req.ConsumerModId;
-            var cfgService = _configServices[consumerModId]; //TODO tryGetvalue & error message
             var typeKey = req.TypeKey;
             var fileName = req.FileName;
             const LocationType location = LocationType.World;
@@ -179,7 +171,6 @@ namespace MarcoZechner.ConfigAPI.Main.NetworkCore
                             return;
                         }
                         req.ServerIteration = ++currentIterations[typeKey];
-                        CfgLogWorld.Info($"Stale request, config was not cached, sending updated snapshot and incrementing iteration. {currentIterations[typeKey]}");
                         packetInfo.Relay = RelayMode.ToEveryone;
                         VariableStorage.Persist(consumerModId, req);
                         return;
@@ -206,7 +197,6 @@ namespace MarcoZechner.ConfigAPI.Main.NetworkCore
                             return;
                         }
                         req.ServerIteration = ++currentIterations[typeKey];
-                        CfgLogWorld.Info($"Get request, config was not cached, sending updated snapshot and incrementing iteration. {currentIterations[typeKey]}");
                         req.Op = WorldOpKind.WorldUpdate;
                         packetInfo.Relay = RelayMode.ToEveryone;
                         VariableStorage.Persist(consumerModId, req);
@@ -220,7 +210,6 @@ namespace MarcoZechner.ConfigAPI.Main.NetworkCore
                     {
                         req.XmlData = _userHooks[consumerModId].SerializeToInternalXml(req.TypeKey, newInstance);
                         req.ServerIteration = ++currentIterations[typeKey];
-                        CfgLogWorld.Info($"Load Request, loaded file {fileName} sending updated snapshot and incrementing iteration. {currentIterations[typeKey]}");
                         req.Op = WorldOpKind.WorldUpdate;
                         packetInfo.Relay = RelayMode.ToEveryone;
                         VariableStorage.Persist(consumerModId, req);
@@ -234,7 +223,6 @@ namespace MarcoZechner.ConfigAPI.Main.NetworkCore
                     {
                         req.XmlData = _userHooks[consumerModId].SerializeToInternalXml(req.TypeKey, newInstance);
                         req.ServerIteration = ++currentIterations[typeKey];
-                        CfgLogWorld.Info($"Reload Request, reloaded file {req.FileName} sending updated snapshot and incrementing iteration. {currentIterations[typeKey]}");
                         req.Op = WorldOpKind.WorldUpdate;
                         packetInfo.Relay = RelayMode.ToEveryone;
                         VariableStorage.Persist(consumerModId, req);
@@ -248,7 +236,6 @@ namespace MarcoZechner.ConfigAPI.Main.NetworkCore
                     {
                         req.XmlData = _userHooks[consumerModId].SerializeToInternalXml(req.TypeKey, newInstance);
                         req.ServerIteration = ++currentIterations[typeKey];
-                        CfgLogWorld.Info($"Save Request, saved file {fileName} sending updated snapshot and incrementing iteration. {currentIterations[typeKey]}");
                         req.Op = WorldOpKind.WorldUpdate;
                         packetInfo.Relay = RelayMode.ToEveryone;
                         VariableStorage.Persist(consumerModId, req);
@@ -257,7 +244,6 @@ namespace MarcoZechner.ConfigAPI.Main.NetworkCore
                     req.Error = $"ConfigSaveAndSwitch returned null for typeKey {typeKey} at location {location} with fileName {fileName}";
                     break;
                 case WorldOpKind.Save:
-                    CfgLogWorld.Debug(() => $"Save Request received for typeKey {typeKey} at location {location} with fileName {fileName} and XmlData:\n{req.XmlData}\n");
                     if (cfgService.ConfigSave(typeKey, location, req.XmlData))
                     {
                         req.FileName = cfgService.ConfigGetCurrentFileName(typeKey, location);
@@ -267,7 +253,6 @@ namespace MarcoZechner.ConfigAPI.Main.NetworkCore
                             req.XmlData = _userHooks[consumerModId].SerializeToInternalXml(typeKey, inst);
 
                         req.ServerIteration = ++currentIterations[typeKey];
-                        CfgLogWorld.Info($"Save Request, saved file {fileName} sending updated snapshot \n{req.XmlData}\n and incrementing iteration. {currentIterations[typeKey]}");
                         req.Op = WorldOpKind.WorldUpdate;
                         packetInfo.Relay = RelayMode.ToEveryone;
                         VariableStorage.Persist(consumerModId, req);
@@ -298,7 +283,6 @@ namespace MarcoZechner.ConfigAPI.Main.NetworkCore
 
         private void HandleOnClient(WorldConfigPacket msg)
         {
-            CfgLog.Info("Handle on client");
             IWorldConfigClientSink sink;
             if (!_sinks.TryGetValue(msg.ConsumerModId, out sink))
                 return;
@@ -334,7 +318,6 @@ namespace MarcoZechner.ConfigAPI.Main.NetworkCore
                     XmlData = req.XmlData,
                     FileName = req.FileName
                 };
-                CfgLog.Info($"Constructed WorldConfigPacket request: ModId={p.ConsumerModId}, TypeKey={p.TypeKey}, Op={p.Op}, BaseIteration={p.BaseIteration}, FileName={p.FileName}");
 
                 _core._net.SendToServer(p);
                 return true;
