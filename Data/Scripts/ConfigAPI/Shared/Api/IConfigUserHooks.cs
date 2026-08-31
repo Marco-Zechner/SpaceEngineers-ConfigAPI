@@ -24,6 +24,10 @@ namespace MarcoZechner.ConfigAPI.Shared.Api
         /// Must call ApplyDefaults() internally for collection defaults.
         /// </summary>
         object NewDefault(string typeKey);
+        /// <summary>
+        /// Return the default name for the config identified by typeKey.
+        /// </summary>
+        string DefaultName(string typeKey);
         
         /// <summary>
         /// Check if the given instance matches the typeKey.

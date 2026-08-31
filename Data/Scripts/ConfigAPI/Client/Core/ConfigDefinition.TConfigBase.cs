@@ -12,6 +12,11 @@ namespace MarcoZechner.ConfigAPI.Client.Core
             return t;
         }
 
+        public string DefaultName()
+        {
+            return typeof(T).Name;
+        }
+
         public string SerializeToInternalXml(ConfigBase instance)
         {
             var t = instance as T;

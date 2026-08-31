@@ -13,7 +13,9 @@ namespace MarcoZechner.ConfigAPI.Client.Core
         private static readonly Dictionary<string, object> _worldCache
             = new Dictionary<string, object>(StringComparer.Ordinal);
 
-        private static string TypeKey<T>() where T : ConfigBase => typeof(T).FullName;
+        private static string _modName = "UnknownMod";
+        
+        private static string TypeKey<T>() where T : ConfigBase => $"{_modName}:{typeof(T).FullName}";
 
         private static void EnsureApiLoaded()
         {
@@ -36,6 +38,7 @@ namespace MarcoZechner.ConfigAPI.Client.Core
 
         public static void Init(IMyModContext modContext)
         {
+            _modName = modContext.ModName;
             ServiceLoader.Init(modContext.ModItem.PublishedFileId, modContext.ModName);
         }
 

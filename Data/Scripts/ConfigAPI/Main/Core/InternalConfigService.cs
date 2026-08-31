@@ -36,12 +36,12 @@ namespace MarcoZechner.ConfigAPI.Main.Core
             _migrator = migrator;
         }
         
-        private static string DefaultFile(string typeKey, string filename)
+        private string DefaultFile(string typeKey, string filename)
         {
             if (!string.IsNullOrEmpty(filename))
                 return filename;
 
-            return typeKey + ".toml";
+            return _configUserHooks.DefaultName(typeKey) + ".toml";
         }
         
         private static string EnsureFileExtension(string filename)

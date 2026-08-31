@@ -9,6 +9,7 @@ namespace MarcoZechner.ConfigAPI.Main.Api
     public class ConfigUserHooks : IConfigUserHooks
     {
         private Func<string, object> _newDefault;
+        private Func<string, string> _defaultName;
         private Func<string, object, bool> _isInstanceOf;
         private Func<string, object, string> _serializeToInternalXml;
         private Func<string, string, object> _deserializeFromInternalXml;
@@ -26,6 +27,7 @@ namespace MarcoZechner.ConfigAPI.Main.Api
             var assignments = new Dictionary<string, Action<Delegate>>
             {
                 [nameof(NewDefault)] = d => _newDefault = (Func<string, object>)d,
+                [nameof(DefaultName)] = d => _defaultName = (Func<string, string>)d,
                 [nameof(IsInstanceOf)] = d => _isInstanceOf = (Func<string, object, bool>)d,
                 [nameof(SerializeToInternalXml)] = d => _serializeToInternalXml = (Func<string, object, string>)d,
                 [nameof(DeserializeFromInternalXml)] = d => _deserializeFromInternalXml = (Func<string, string, object>)d,
@@ -51,6 +53,9 @@ namespace MarcoZechner.ConfigAPI.Main.Api
         
         public object NewDefault(string typeKey) 
             => _newDefault?.Invoke(typeKey);
+
+        public string DefaultName(string typeKey)
+            => _defaultName?.Invoke(typeKey);
 
         public bool IsInstanceOf(string typeKey, object instance)
             => _isInstanceOf?.Invoke(typeKey, instance) ?? false;

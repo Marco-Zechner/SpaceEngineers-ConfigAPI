@@ -102,6 +102,8 @@ namespace MarcoZechner.ConfigAPI.Main.Core
                 st.DraftObj = DeserializeOrFallback(typeKey, st.DraftXml, defObj);
                 CfgLogWorld.Debug(() => $"State: read variable for {typeKey}: {st}\nAuth:{st.AuthObj}\nDraft:{st.DraftObj}");
             }
+
+            var fileName = !string.IsNullOrEmpty(defaultFile) ? defaultFile : _hooks.DefaultName(typeKey);
             
             _net.SendRequest(new WorldNetRequest
             {
@@ -109,7 +111,7 @@ namespace MarcoZechner.ConfigAPI.Main.Core
                 TypeKey = typeKey,
                 Op = WorldOpKind.Get,
                 BaseIteration = st.ServerIteration,
-                FileName = !string.IsNullOrEmpty(defaultFile) ? defaultFile : typeKey + ".toml", //TODO: ensure valid extension
+                FileName = fileName,
                 Overwrite = false,
                 XmlData = null
             });
@@ -225,7 +227,9 @@ namespace MarcoZechner.ConfigAPI.Main.Core
             if (!_states.TryGetValue(k, out st))
                 return false;
 
+            CfgLog.Debug(() => $"DraftXML before save: {st.DraftXml}");
             st.DraftXml = SafeSerializeDraft(typeKey, st.DraftObj, st.DraftXml);
+            CfgLog.Debug(() => $"DraftXML before save: {st.DraftXml}");
 
             return _net.SendRequest(new WorldNetRequest
             {

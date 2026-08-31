@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using MarcoZechner.ApiLib;
 using MarcoZechner.ConfigAPI.Client.Core;
 using MarcoZechner.ConfigAPI.Scripts.ConfigAPI.Shared;
@@ -47,12 +48,18 @@ namespace MarcoZechner.ConfigAPI.Client.Api
             return obj;
         }
 
+        public string DefaultName(string typeKey)
+        {
+            var def = GetDef(typeKey);
+            return def.DefaultName();
+        }
+ 
         public bool IsInstanceOf(string typeKey, object instance)
         {
             if (instance == null)
                 return false;
 
-            return instance.GetType().FullName == typeKey; //TODO: maybe add modID check to prevent cross assembly issues?
+            return instance.GetType().FullName == typeKey.Split(':').Last(); //TODO: maybe add modID check to prevent cross assembly issues?
         }
 
         public string SerializeToInternalXml(string typeKey, object instance)
@@ -177,6 +184,7 @@ namespace MarcoZechner.ConfigAPI.Client.Api
             return new Dictionary<string, Delegate>
             {
                 { nameof(NewDefault), new Func<string, object>(NewDefault) },
+                { nameof(DefaultName), new Func<string, string>(DefaultName) },
                 { nameof(IsInstanceOf), new Func<string, object, bool>(IsInstanceOf) },
                 { nameof(SerializeToInternalXml), new Func<string, object, string>(SerializeToInternalXml) },
                 { nameof(DeserializeFromInternalXml), new Func<string, string, object>(DeserializeFromInternalXml) },
