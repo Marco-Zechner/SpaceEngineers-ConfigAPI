@@ -21,3 +21,4 @@ bin
 /httpRequests/
 
 *.DotSettings.user
+.agent/
