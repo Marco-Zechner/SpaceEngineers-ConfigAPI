@@ -6,7 +6,9 @@ namespace MarcoZechner.ConfigAPI.V2.Domain
     {
         AppliedChangedDefault = 0,
         PendingChangedDefault = 1,
-        AddedDefault = 2
+        AddedDefault = 2,
+        RemovedValue = 3,
+        ResetIncompatibleStructure = 4
     }
 
     public sealed class ConfigDefaultChange
@@ -27,7 +29,7 @@ namespace MarcoZechner.ConfigAPI.V2.Domain
             if (path == null)
                 throw new ArgumentNullException(nameof(path));
 
-            if (currentDefault == null)
+            if (currentDefault == null && kind != ConfigDefaultChangeKind.RemovedValue)
                 throw new ArgumentNullException(nameof(currentDefault));
 
             Kind = kind;

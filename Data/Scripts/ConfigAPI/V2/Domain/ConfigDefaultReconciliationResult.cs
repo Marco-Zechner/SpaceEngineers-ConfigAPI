@@ -11,11 +11,13 @@ namespace MarcoZechner.ConfigAPI.V2.Domain
         public ConfigDocument BaselineDefaults { get; }
         public ConfigDocument PlayerValues { get; }
         public IReadOnlyList<ConfigDefaultChange> Changes => _readOnlyChanges;
+        public bool RequiresBackup { get; }
 
         internal ConfigDefaultReconciliationResult(
             ConfigDocument baselineDefaults,
             ConfigDocument playerValues,
-            IList<ConfigDefaultChange> changes)
+            IList<ConfigDefaultChange> changes,
+            bool requiresBackup)
         {
             if (baselineDefaults == null)
                 throw new ArgumentNullException(nameof(baselineDefaults));
@@ -28,6 +30,7 @@ namespace MarcoZechner.ConfigAPI.V2.Domain
 
             BaselineDefaults = baselineDefaults;
             PlayerValues = playerValues;
+            RequiresBackup = requiresBackup;
 
             _changes = new ConfigDefaultChange[changes.Count];
 

@@ -21,18 +21,21 @@ namespace MarcoZechner.ConfigAPI.V2.Domain
 
             var changes = new List<ConfigDefaultChange>();
             var path = new List<string>();
+            var requiresBackup = false;
 
             var reconciled = ReconcileObject(
                 baselineDefaults.Root,
                 playerValues.Root,
                 currentDefaults.Root,
                 path,
-                changes);
+                changes,
+                ref requiresBackup);
 
             return new ConfigDefaultReconciliationResult(
                 new ConfigDocument(reconciled.Baseline),
                 new ConfigDocument(reconciled.Player),
-                changes);
+                changes,
+                requiresBackup);
         }
 
         private static ObjectReconciliation ReconcileObject(
@@ -40,10 +43,11 @@ namespace MarcoZechner.ConfigAPI.V2.Domain
             ConfigObjectNode player,
             ConfigObjectNode currentDefaults,
             List<string> path,
-            IList<ConfigDefaultChange> changes)
+            IList<ConfigDefaultChange> changes,
+            ref bool requiresBackup)
         {
-            var reconciledBaseline = baseline;
-            var reconciledPlayer = player;
+            var baselineEntries = new List<ConfigObjectEntry>(currentDefaults.Entries.Count);
+            var playerEntries = new List<ConfigObjectEntry>(currentDefaults.Entries.Count);
 
             foreach (var entry in currentDefaults.Entries)
             {
@@ -57,8 +61,8 @@ namespace MarcoZechner.ConfigAPI.V2.Domain
 
                 if (!hasBaseline && !hasPlayer)
                 {
-                    reconciledBaseline = ReplaceOrAppend(reconciledBaseline, entry.Name, entry.Value);
-                    reconciledPlayer = ReplaceOrAppend(reconciledPlayer, entry.Name, entry.Value);
+                    baselineEntries.Add(new ConfigObjectEntry(entry.Name, entry.Value));
+                    playerEntries.Add(new ConfigObjectEntry(entry.Name, entry.Value));
                     AddNewDefaultChanges(entry.Value, path, changes);
                     path.RemoveAt(path.Count - 1);
                     continue;
@@ -66,9 +70,20 @@ namespace MarcoZechner.ConfigAPI.V2.Domain
 
                 if (hasBaseline != hasPlayer)
                 {
-                    throw new InvalidOperationException(
-                        "Baseline defaults and player values have inconsistent structure at " +
-                        FormatPath(path) + ".");
+                    requiresBackup = true;
+
+                    changes.Add(
+                        new ConfigDefaultChange(
+                            ConfigDefaultChangeKind.ResetIncompatibleStructure,
+                            CreatePath(path),
+                            baselineValue,
+                            playerValue,
+                            entry.Value));
+
+                    baselineEntries.Add(new ConfigObjectEntry(entry.Name, entry.Value));
+                    playerEntries.Add(new ConfigObjectEntry(entry.Name, entry.Value));
+                    path.RemoveAt(path.Count - 1);
+                    continue;
                 }
 
                 var valueResult = ReconcileValue(
@@ -76,22 +91,26 @@ namespace MarcoZechner.ConfigAPI.V2.Domain
                     playerValue,
                     entry.Value,
                     path,
-                    changes);
+                    changes,
+                    ref requiresBackup);
 
-                reconciledBaseline = ReplaceOrAppend(
-                    reconciledBaseline,
-                    entry.Name,
-                    valueResult.Baseline);
-
-                reconciledPlayer = ReplaceOrAppend(
-                    reconciledPlayer,
-                    entry.Name,
-                    valueResult.Player);
+                baselineEntries.Add(new ConfigObjectEntry(entry.Name, valueResult.Baseline));
+                playerEntries.Add(new ConfigObjectEntry(entry.Name, valueResult.Player));
 
                 path.RemoveAt(path.Count - 1);
             }
 
-            return new ObjectReconciliation(reconciledBaseline, reconciledPlayer);
+            ReportRemovedEntries(
+                baseline,
+                player,
+                currentDefaults,
+                path,
+                changes,
+                ref requiresBackup);
+
+            return new ObjectReconciliation(
+                new ConfigObjectNode(baselineEntries.ToArray()),
+                new ConfigObjectNode(playerEntries.ToArray()));
         }
 
         private static ValueReconciliation ReconcileValue(
@@ -99,8 +118,24 @@ namespace MarcoZechner.ConfigAPI.V2.Domain
             ConfigNode player,
             ConfigNode currentDefault,
             List<string> path,
-            IList<ConfigDefaultChange> changes)
+            IList<ConfigDefaultChange> changes,
+            ref bool requiresBackup)
         {
+            if (HasIncompatibleStructure(baseline, player, currentDefault))
+            {
+                requiresBackup = true;
+
+                changes.Add(
+                    new ConfigDefaultChange(
+                        ConfigDefaultChangeKind.ResetIncompatibleStructure,
+                        CreatePath(path),
+                        baseline,
+                        player,
+                        currentDefault));
+
+                return new ValueReconciliation(currentDefault, currentDefault);
+            }
+
             var baselineObject = baseline as ConfigObjectNode;
             var playerObject = player as ConfigObjectNode;
             var currentObject = currentDefault as ConfigObjectNode;
@@ -112,7 +147,8 @@ namespace MarcoZechner.ConfigAPI.V2.Domain
                     playerObject,
                     currentObject,
                     path,
-                    changes);
+                    changes,
+                    ref requiresBackup);
 
                 return new ValueReconciliation(
                     reconciledObject.Baseline,
@@ -148,6 +184,126 @@ namespace MarcoZechner.ConfigAPI.V2.Domain
             return new ValueReconciliation(baseline, player);
         }
 
+        private static void ReportRemovedEntries(
+            ConfigObjectNode baseline,
+            ConfigObjectNode player,
+            ConfigObjectNode currentDefaults,
+            List<string> path,
+            IList<ConfigDefaultChange> changes,
+            ref bool requiresBackup)
+        {
+            foreach (var entry in baseline.Entries)
+            {
+                ConfigNode ignored;
+                if (currentDefaults.TryGet(entry.Name, out ignored))
+                    continue;
+
+                ConfigNode playerValue;
+                player.TryGet(entry.Name, out playerValue);
+
+                path.Add(entry.Name);
+
+                changes.Add(
+                    new ConfigDefaultChange(
+                        ConfigDefaultChangeKind.RemovedValue,
+                        CreatePath(path),
+                        entry.Value,
+                        playerValue,
+                        null));
+
+                path.RemoveAt(path.Count - 1);
+                requiresBackup = true;
+            }
+
+            foreach (var entry in player.Entries)
+            {
+                ConfigNode ignored;
+                if (currentDefaults.TryGet(entry.Name, out ignored))
+                    continue;
+
+                if (baseline.TryGet(entry.Name, out ignored))
+                    continue;
+
+                path.Add(entry.Name);
+
+                changes.Add(
+                    new ConfigDefaultChange(
+                        ConfigDefaultChangeKind.RemovedValue,
+                        CreatePath(path),
+                        null,
+                        entry.Value,
+                        null));
+
+                path.RemoveAt(path.Count - 1);
+                requiresBackup = true;
+            }
+        }
+
+        private static bool HasIncompatibleStructure(
+            ConfigNode baseline,
+            ConfigNode player,
+            ConfigNode currentDefault)
+        {
+            var shape = ConfigNodeShape.None;
+
+            if (!AcceptShape(baseline, ref shape))
+                return true;
+
+            if (!AcceptShape(player, ref shape))
+                return true;
+
+            if (!AcceptShape(currentDefault, ref shape))
+                return true;
+
+            ConfigScalarKind? scalarKind = null;
+
+            if (!AcceptScalarKind(baseline, ref scalarKind))
+                return true;
+
+            if (!AcceptScalarKind(player, ref scalarKind))
+                return true;
+
+            return !AcceptScalarKind(currentDefault, ref scalarKind);
+        }
+
+        private static bool AcceptShape(ConfigNode node, ref ConfigNodeShape shape)
+        {
+            if (node is ConfigNullNode)
+                return true;
+
+            ConfigNodeShape nodeShape;
+
+            if (node is ConfigObjectNode)
+                nodeShape = ConfigNodeShape.Object;
+            else if (node is ConfigArrayNode)
+                nodeShape = ConfigNodeShape.Array;
+            else
+                nodeShape = ConfigNodeShape.Scalar;
+
+            if (shape == ConfigNodeShape.None)
+            {
+                shape = nodeShape;
+                return true;
+            }
+
+            return shape == nodeShape;
+        }
+
+        private static bool AcceptScalarKind(ConfigNode node, ref ConfigScalarKind? kind)
+        {
+            var scalar = node as ConfigScalarNode;
+            if (scalar == null)
+                return true;
+
+            if (!kind.HasValue)
+            {
+                kind = scalar.Kind;
+                return true;
+            }
+
+            return kind.Value == scalar.Kind;
+        }
+
         private static void AddNewDefaultChanges(
             ConfigNode currentDefault,
             List<string> path,
@@ -175,54 +331,17 @@ namespace MarcoZechner.ConfigAPI.V2.Domain
             }
         }
 
-        private static ConfigObjectNode ReplaceOrAppend(
-            ConfigObjectNode source,
-            string name,
-            ConfigNode value)
-        {
-            var entries = new ConfigObjectEntry[source.Entries.Count + 1];
-            var found = false;
-            var writeIndex = 0;
-
-            for (var i = 0; i < source.Entries.Count; i++)
-            {
-                var entry = source.Entries[i];
-
-                if (string.Equals(entry.Name, name, StringComparison.Ordinal))
-                {
-                    entries[writeIndex] = new ConfigObjectEntry(entry.Name, value);
-                    found = true;
-                }
-                else
-                {
-                    entries[writeIndex] = entry;
-                }
-
-                writeIndex++;
-            }
-
-            if (!found)
-            {
-                entries[writeIndex] = new ConfigObjectEntry(name, value);
-                writeIndex++;
-            }
-
-            if (writeIndex == entries.Length)
-                return new ConfigObjectNode(entries);
-
-            var exactEntries = new ConfigObjectEntry[writeIndex];
-            Array.Copy(entries, exactEntries, writeIndex);
-            return new ConfigObjectNode(exactEntries);
-        }
-
         private static ConfigValuePath CreatePath(List<string> path)
         {
             return new ConfigValuePath(path.ToArray());
         }
 
-        private static string FormatPath(List<string> path)
+        private enum ConfigNodeShape
         {
-            return string.Join(".", path.ToArray());
+            None = 0,
+            Scalar = 1,
+            Object = 2,
+            Array = 3
         }
 
         private struct ObjectReconciliation
