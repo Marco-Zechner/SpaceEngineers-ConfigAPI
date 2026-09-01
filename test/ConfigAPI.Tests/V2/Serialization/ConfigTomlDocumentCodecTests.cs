@@ -155,16 +155,48 @@ namespace MarcoZechner.ConfigAPI.Tests.V2.Serialization
         }
 
         [Test]
-        public void FromTomlDocument_Rejects_Temporal_Values_Explicitly()
+        public void Temporal_Values_RoundTrip_Without_String_Coercion()
         {
-            var toml = Toml.Parse("When = 1979-05-27T07:32:00Z\n");
+            var parsed = Toml.Parse(
+                "Offset = 1979-05-27T07:32:00.123-00:00\n" +
+                "LocalDateTime = 1979-05-27T07:32:00.456\n" +
+                "LocalDate = 1979-05-27\n" +
+                "LocalTime = 07:32:00.789\n");
 
-            var exception = Assert.Throws<NotSupportedException>(() =>
-                ConfigTomlDocumentCodec.FromTomlDocument(toml));
+            var config = ConfigTomlDocumentCodec.FromTomlDocument(parsed);
+            var generated = ConfigTomlDocumentCodec.ToTomlDocument(config);
+            var text = Toml.Write(generated);
+            var roundTripped = ConfigTomlDocumentCodec.FromTomlDocument(Toml.Parse(text));
 
-            Assert.That(exception.Message, Does.Contain("OffsetDateTime"));
+            ConfigNode offsetNode;
+            ConfigNode localDateTimeNode;
+            ConfigNode localDateNode;
+            ConfigNode localTimeNode;
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(config.TryGet(new ConfigValuePath("Offset"), out offsetNode), Is.True);
+                Assert.That(((ConfigScalarNode)offsetNode).Kind, Is.EqualTo(ConfigScalarKind.OffsetDateTime));
+
+                var offset = (ConfigOffsetDateTime)((ConfigScalarNode)offsetNode).Value;
+                Assert.That(offset.Date.Equals(new ConfigLocalDate(1979, 5, 27)), Is.True);
+                Assert.That(offset.Time.Equals(new ConfigLocalTime(7, 32, 0, "123")), Is.True);
+                Assert.That(offset.OffsetMinutes, Is.EqualTo(0));
+                Assert.That(offset.IsUnknownLocalOffset, Is.True);
+
+                Assert.That(config.TryGet(new ConfigValuePath("LocalDateTime"), out localDateTimeNode), Is.True);
+                Assert.That(((ConfigScalarNode)localDateTimeNode).Kind, Is.EqualTo(ConfigScalarKind.LocalDateTime));
+
+                Assert.That(config.TryGet(new ConfigValuePath("LocalDate"), out localDateNode), Is.True);
+                Assert.That(((ConfigScalarNode)localDateNode).Kind, Is.EqualTo(ConfigScalarKind.LocalDate));
+
+                Assert.That(config.TryGet(new ConfigValuePath("LocalTime"), out localTimeNode), Is.True);
+                Assert.That(((ConfigScalarNode)localTimeNode).Kind, Is.EqualTo(ConfigScalarKind.LocalTime));
+
+                Assert.That(text, Does.Contain("1979-05-27T07:32:00.123-00:00"));
+                Assert.That(roundTripped.Equals(config), Is.True);
+            });
         }
-
         [Test]
         public void FromTomlDocument_Rejects_Keys_That_Cannot_Form_Config_Value_Paths()
         {

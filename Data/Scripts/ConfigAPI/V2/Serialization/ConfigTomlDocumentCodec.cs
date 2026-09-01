@@ -59,6 +59,14 @@ namespace MarcoZechner.ConfigAPI.V2.Serialization
                     return TomlValue.FromFloat((double)scalar.Value);
                 case ConfigScalarKind.String:
                     return TomlValue.FromString((string)scalar.Value);
+                case ConfigScalarKind.OffsetDateTime:
+                    return TomlValue.FromOffsetDateTime(ToTomlOffsetDateTime((ConfigOffsetDateTime)scalar.Value));
+                case ConfigScalarKind.LocalDateTime:
+                    return TomlValue.FromLocalDateTime(ToTomlLocalDateTime((ConfigLocalDateTime)scalar.Value));
+                case ConfigScalarKind.LocalDate:
+                    return TomlValue.FromLocalDate(ToTomlLocalDate((ConfigLocalDate)scalar.Value));
+                case ConfigScalarKind.LocalTime:
+                    return TomlValue.FromLocalTime(ToTomlLocalTime((ConfigLocalTime)scalar.Value));
                 default:
                     throw new NotSupportedException(
                         "Unsupported ConfigAPI scalar kind: " + scalar.Kind);
@@ -117,12 +125,13 @@ namespace MarcoZechner.ConfigAPI.V2.Serialization
                 case TomlValueKind.String:
                     return ConfigScalarNode.String(value.AsString());
                 case TomlValueKind.OffsetDateTime:
+                    return ConfigScalarNode.OffsetDateTime(ToConfigOffsetDateTime(value.AsOffsetDateTime()));
                 case TomlValueKind.LocalDateTime:
+                    return ConfigScalarNode.LocalDateTime(ToConfigLocalDateTime(value.AsLocalDateTime()));
                 case TomlValueKind.LocalDate:
+                    return ConfigScalarNode.LocalDate(ToConfigLocalDate(value.AsLocalDate()));
                 case TomlValueKind.LocalTime:
-                    throw new NotSupportedException(
-                        "TOML temporal value kind requires a dedicated ConfigAPI semantic kind: " +
-                        value.ValueKind);
+                    return ConfigScalarNode.LocalTime(ToConfigLocalTime(value.AsLocalTime()));
                 default:
                     throw new NotSupportedException(
                         "Unsupported TOML scalar kind: " + value.ValueKind);
@@ -155,6 +164,66 @@ namespace MarcoZechner.ConfigAPI.V2.Serialization
                 items[i] = ToConfigNode(array[i]);
 
             return new ConfigArrayNode(items);
+        }
+
+        private static TomlOffsetDateTime ToTomlOffsetDateTime(ConfigOffsetDateTime value)
+        {
+            return new TomlOffsetDateTime(
+                ToTomlLocalDate(value.Date),
+                ToTomlLocalTime(value.Time),
+                value.OffsetMinutes,
+                value.IsUnknownLocalOffset);
+        }
+
+        private static TomlLocalDateTime ToTomlLocalDateTime(ConfigLocalDateTime value)
+        {
+            return new TomlLocalDateTime(
+                ToTomlLocalDate(value.Date),
+                ToTomlLocalTime(value.Time));
+        }
+
+        private static TomlLocalDate ToTomlLocalDate(ConfigLocalDate value)
+        {
+            return new TomlLocalDate(value.Year, value.Month, value.Day);
+        }
+
+        private static TomlLocalTime ToTomlLocalTime(ConfigLocalTime value)
+        {
+            return new TomlLocalTime(
+                value.Hour,
+                value.Minute,
+                value.Second,
+                value.FractionalSeconds);
+        }
+
+        private static ConfigOffsetDateTime ToConfigOffsetDateTime(TomlOffsetDateTime value)
+        {
+            return new ConfigOffsetDateTime(
+                ToConfigLocalDate(value.Date),
+                ToConfigLocalTime(value.Time),
+                value.OffsetMinutes,
+                value.IsUnknownLocalOffset);
+        }
+
+        private static ConfigLocalDateTime ToConfigLocalDateTime(TomlLocalDateTime value)
+        {
+            return new ConfigLocalDateTime(
+                ToConfigLocalDate(value.Date),
+                ToConfigLocalTime(value.Time));
+        }
+
+        private static ConfigLocalDate ToConfigLocalDate(TomlLocalDate value)
+        {
+            return new ConfigLocalDate(value.Year, value.Month, value.Day);
+        }
+
+        private static ConfigLocalTime ToConfigLocalTime(TomlLocalTime value)
+        {
+            return new ConfigLocalTime(
+                value.Hour,
+                value.Minute,
+                value.Second,
+                value.FractionalSeconds);
         }
     }
 }
