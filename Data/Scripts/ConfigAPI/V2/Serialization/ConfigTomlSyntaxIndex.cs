@@ -25,6 +25,35 @@ namespace MarcoZechner.ConfigAPI.V2.Serialization
         }
     }
 
+    internal sealed class ConfigTomlSyntaxTable
+    {
+        private readonly string[] _path;
+        private readonly IReadOnlyList<string> _readOnlyPath;
+
+        public IReadOnlyList<string> Path => _readOnlyPath;
+        public TomlSyntaxNode Node { get; }
+        public bool IsAddressable { get; }
+
+        public ConfigTomlSyntaxTable(
+            string[] path,
+            TomlSyntaxNode node,
+            bool isAddressable)
+        {
+            if (path == null)
+                throw new ArgumentNullException(nameof(path));
+
+            if (node == null)
+                throw new ArgumentNullException(nameof(node));
+
+            _path = new string[path.Length];
+            Array.Copy(path, _path, path.Length);
+            _readOnlyPath = Array.AsReadOnly(_path);
+
+            Node = node;
+            IsAddressable = isAddressable;
+        }
+    }
+
     public sealed class ConfigTomlSyntaxIndex
     {
         private const string PROBE_KEY = "__configapi_path_probe__";
@@ -34,13 +63,17 @@ namespace MarcoZechner.ConfigAPI.V2.Serialization
         private readonly IReadOnlyList<ConfigTomlSyntaxAssignment> _readOnlyAssignments;
         private readonly TomlSyntaxNode[] _unaddressableAssignments;
         private readonly IReadOnlyList<TomlSyntaxNode> _readOnlyUnaddressableAssignments;
+        private readonly ConfigTomlSyntaxTable[] _tables;
+        private readonly IReadOnlyList<ConfigTomlSyntaxTable> _readOnlyTables;
 
         public IReadOnlyList<ConfigTomlSyntaxAssignment> Assignments => _readOnlyAssignments;
         public IReadOnlyList<TomlSyntaxNode> UnaddressableAssignments => _readOnlyUnaddressableAssignments;
+        internal IReadOnlyList<ConfigTomlSyntaxTable> Tables => _readOnlyTables;
 
         private ConfigTomlSyntaxIndex(
             IList<ConfigTomlSyntaxAssignment> assignments,
-            IList<TomlSyntaxNode> unaddressableAssignments)
+            IList<TomlSyntaxNode> unaddressableAssignments,
+            IList<ConfigTomlSyntaxTable> tables)
         {
             _assignments = new ConfigTomlSyntaxAssignment[assignments.Count];
             for (var i = 0; i < assignments.Count; i++)
@@ -53,6 +86,12 @@ namespace MarcoZechner.ConfigAPI.V2.Serialization
                 _unaddressableAssignments[i] = unaddressableAssignments[i];
 
             _readOnlyUnaddressableAssignments = Array.AsReadOnly(_unaddressableAssignments);
+
+            _tables = new ConfigTomlSyntaxTable[tables.Count];
+            for (var i = 0; i < tables.Count; i++)
+                _tables[i] = tables[i];
+
+            _readOnlyTables = Array.AsReadOnly(_tables);
         }
 
         public static ConfigTomlSyntaxIndex Create(TomlParseResult parseResult)
@@ -69,6 +108,7 @@ namespace MarcoZechner.ConfigAPI.V2.Serialization
 
             var assignments = new List<ConfigTomlSyntaxAssignment>();
             var unaddressableAssignments = new List<TomlSyntaxNode>();
+            var tables = new List<ConfigTomlSyntaxTable>();
             var arrayTablePaths = new List<string[]>();
 
             var currentTablePath = new string[0];
@@ -84,12 +124,26 @@ namespace MarcoZechner.ConfigAPI.V2.Serialization
                     case TomlSyntaxNodeKind.TableHeader:
                         currentTablePath = ReadHeaderPath(syntax, node);
                         currentTableTraversesArray = TraversesArrayTable(currentTablePath, arrayTablePaths);
+
+                        tables.Add(
+                            new ConfigTomlSyntaxTable(
+                                currentTablePath,
+                                node,
+                                !currentTableTraversesArray));
+
                         break;
 
                     case TomlSyntaxNodeKind.ArrayTableHeader:
                         currentTablePath = ReadHeaderPath(syntax, node);
                         arrayTablePaths.Add(Copy(currentTablePath));
                         currentTableTraversesArray = true;
+
+                        tables.Add(
+                            new ConfigTomlSyntaxTable(
+                                currentTablePath,
+                                node,
+                                false));
+
                         break;
 
                     case TomlSyntaxNodeKind.Assignment:
@@ -111,7 +165,10 @@ namespace MarcoZechner.ConfigAPI.V2.Serialization
                 }
             }
 
-            return new ConfigTomlSyntaxIndex(assignments, unaddressableAssignments);
+            return new ConfigTomlSyntaxIndex(
+                assignments,
+                unaddressableAssignments,
+                tables);
         }
 
         private static ConfigValuePath CreateConfigValuePath(string[] segments)

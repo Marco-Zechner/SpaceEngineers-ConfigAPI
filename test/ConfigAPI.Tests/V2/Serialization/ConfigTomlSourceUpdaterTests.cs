@@ -139,6 +139,155 @@ namespace MarcoZechner.ConfigAPI.Tests.V2.Serialization
         }
 
         [Test]
+        public void SetOrInsertValue_Inserts_Missing_Root_Field_Before_First_Table()
+        {
+            var source =
+                "existing = 1\r\n" +
+                "# keep section comment\r\n" +
+                "[section]\r\n" +
+                "value = 2\r\n";
+
+            var edited = ConfigTomlSourceUpdater.SetOrInsertValue(
+                source,
+                new ConfigValuePath("new.key"),
+                ConfigScalarNode.String("added"));
+
+            Assert.That(
+                edited,
+                Is.EqualTo(
+                    "existing = 1\r\n" +
+                    "\"new.key\" = \"added\"\r\n" +
+                    "# keep section comment\r\n" +
+                    "[section]\r\n" +
+                    "value = 2\r\n"));
+        }
+
+        [Test]
+        public void SetOrInsertValue_Inserts_Inside_Existing_Table_After_Complete_Assignment_Line()
+        {
+            var source =
+                "[section]\n" +
+                "existing = 1 # keep inline\n" +
+                "# keep before next section\n" +
+                "\n" +
+                "[next]\n" +
+                "value = 2\n";
+
+            var edited = ConfigTomlSourceUpdater.SetOrInsertValue(
+                source,
+                new ConfigValuePath("section", "added"),
+                ConfigScalarNode.Boolean(true));
+
+            Assert.That(
+                edited,
+                Is.EqualTo(
+                    "[section]\n" +
+                    "existing = 1 # keep inline\n" +
+                    "added = true\n" +
+                    "# keep before next section\n" +
+                    "\n" +
+                    "[next]\n" +
+                    "value = 2\n"));
+        }
+
+        [Test]
+        public void SetOrInsertValue_Appends_New_Quoted_Nested_Table()
+        {
+            var source = "root = 1\n";
+
+            var edited = ConfigTomlSourceUpdater.SetOrInsertValue(
+                source,
+                new ConfigValuePath(
+                    "section.name",
+                    "child table",
+                    "new-value"),
+                new ConfigArrayNode(
+                    ConfigScalarNode.Integer(1),
+                    ConfigScalarNode.Integer(2)));
+
+            Assert.That(
+                edited,
+                Is.EqualTo(
+                    "root = 1\n" +
+                    "\n" +
+                    "[\"section.name\".\"child table\"]\n" +
+                    "new-value = [1, 2]\n"));
+
+            var parsed = Toml.Parse(edited);
+            var config =
+                ConfigTomlDocumentCodec.FromTomlDocument(
+                    parsed);
+
+            ConfigNode actual;
+
+            Assert.That(
+                config.TryGet(
+                    new ConfigValuePath(
+                        "section.name",
+                        "child table",
+                        "new-value"),
+                    out actual),
+                Is.True);
+
+            Assert.That(
+                actual,
+                Is.EqualTo(
+                    new ConfigArrayNode(
+                        ConfigScalarNode.Integer(1),
+                        ConfigScalarNode.Integer(2))));
+        }
+
+        [Test]
+        public void SetOrInsertValue_Uses_Existing_Update_When_Field_Already_Exists()
+        {
+            var source =
+                "value   = 1   # keep\n";
+
+            var edited = ConfigTomlSourceUpdater.SetOrInsertValue(
+                source,
+                new ConfigValuePath("value"),
+                ConfigScalarNode.Integer(5));
+
+            Assert.That(
+                edited,
+                Is.EqualTo(
+                    "value   = 5   # keep\n"));
+        }
+
+        [Test]
+        public void SetOrInsertValue_Rejects_New_Null_And_Array_Table_Context()
+        {
+            Assert.Multiple(() =>
+            {
+                Assert.Throws<NotSupportedException>(() =>
+                    ConfigTomlSourceUpdater.SetOrInsertValue(
+                        "value = 1\n",
+                        new ConfigValuePath("optional"),
+                        ConfigNullNode.Instance));
+
+                Assert.Throws<NotSupportedException>(() =>
+                    ConfigTomlSourceUpdater.SetOrInsertValue(
+                        "[[items]]\n" +
+                        "name = \"first\"\n",
+                        new ConfigValuePath(
+                            "items",
+                            "weight"),
+                        ConfigScalarNode.Float(2.5)));
+            });
+        }
+
+        [Test]
+        public void SetOrInsertValue_Rejects_Dotted_Table_Conflict_Instead_Of_Rewriting_Source()
+        {
+            Assert.Throws<NotSupportedException>(() =>
+                ConfigTomlSourceUpdater.SetOrInsertValue(
+                    "section.old = 1\n",
+                    new ConfigValuePath(
+                        "section",
+                        "added"),
+                    ConfigScalarNode.Integer(2)));
+        }
+        [Test]
         public void SetValue_Rejects_Missing_Or_Ambiguous_Assignment()
         {
             Assert.Multiple(() =>
