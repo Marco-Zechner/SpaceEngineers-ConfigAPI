@@ -1,0 +1,10 @@
+{
+    "schemaVersion":  1,
+    "librariesPath":  "Data/Scripts/ConfigAPI/Libraries",
+    "dependencies":  {
+                         "Mz.ApiProtocol":  "0.2.5",
+                         "Mz.Logging":  "0.1.1",
+                         "Mz.Networking":  "0.2.0",
+                         "Mz.Toml":  "0.2.0"
+                     }
+}
