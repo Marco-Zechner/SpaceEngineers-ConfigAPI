@@ -287,6 +287,101 @@ namespace MarcoZechner.ConfigAPI.Tests.V2.Serialization
                         "added"),
                     ConfigScalarNode.Integer(2)));
         }
+
+        [Test]
+        public void RemoveValue_Removes_Complete_Assignment_Line_And_Preserves_Surrounding_Source()
+        {
+            var source =
+                "# before\r\n" +
+                "  obsolete = 5   # remove with field\r\n" +
+                "# after\r\n" +
+                "keep = 1\r\n";
+
+            var edited = ConfigTomlSourceUpdater.RemoveValue(
+                source,
+                new ConfigValuePath("obsolete"));
+
+            Assert.That(
+                edited,
+                Is.EqualTo(
+                    "# before\r\n" +
+                    "# after\r\n" +
+                    "keep = 1\r\n"));
+        }
+
+        [Test]
+        public void RemoveValue_Removes_Disabled_Assignment_And_Rejects_Missing_Or_Ambiguous_Path()
+        {
+            Assert.Multiple(() =>
+            {
+                Assert.That(
+                    ConfigTomlSourceUpdater.RemoveValue(
+                        "#!optional = \"old\"\nkeep = 1\n",
+                        new ConfigValuePath("optional")),
+                    Is.EqualTo("keep = 1\n"));
+
+                Assert.Throws<KeyNotFoundException>(() =>
+                    ConfigTomlSourceUpdater.RemoveValue(
+                        "value = 1\n",
+                        new ConfigValuePath("missing")));
+
+                Assert.Throws<InvalidOperationException>(() =>
+                    ConfigTomlSourceUpdater.RemoveValue(
+                        "#!value = 1\n#!value = 2\n",
+                        new ConfigValuePath("value")));
+            });
+        }
+
+        [Test]
+        public void SetOrInsertNullValue_Inserts_Disabled_Assignment_With_Truthful_Retained_Value()
+        {
+            var edited =
+                ConfigTomlSourceUpdater.SetOrInsertNullValue(
+                    "value = 1\n",
+                    new ConfigValuePath("optional"),
+                    ConfigScalarNode.String("previous"));
+
+            Assert.That(
+                edited,
+                Is.EqualTo(
+                    "value = 1\n" +
+                    "#!optional = \"previous\"\n"));
+        }
+
+        [Test]
+        public void SetOrInsertNullValue_Preserves_Existing_Assignment_Value()
+        {
+            var edited =
+                ConfigTomlSourceUpdater.SetOrInsertNullValue(
+                    "optional   = \"custom\"   # keep\n",
+                    new ConfigValuePath("optional"),
+                    ConfigScalarNode.String("fallback"));
+
+            Assert.That(
+                edited,
+                Is.EqualTo(
+                    "#!optional   = \"custom\"   # keep\n"));
+        }
+
+        [Test]
+        public void SetOrInsertNullValue_Rejects_Missing_Or_Null_Retained_Concrete_Value()
+        {
+            Assert.Multiple(() =>
+            {
+                Assert.Throws<ArgumentNullException>(() =>
+                    ConfigTomlSourceUpdater.SetOrInsertNullValue(
+                        "value = 1\n",
+                        new ConfigValuePath("optional"),
+                        null));
+
+                Assert.Throws<ArgumentException>(() =>
+                    ConfigTomlSourceUpdater.SetOrInsertNullValue(
+                        "value = 1\n",
+                        new ConfigValuePath("optional"),
+                        ConfigNullNode.Instance));
+            });
+        }
+
         [Test]
         public void SetValue_Rejects_Missing_Or_Ambiguous_Assignment()
         {

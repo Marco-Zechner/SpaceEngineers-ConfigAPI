@@ -138,6 +138,99 @@ namespace MarcoZechner.ConfigAPI.V2.Serialization
                 lineEnding);
         }
 
+        public static string RemoveValue(
+            string source,
+            ConfigValuePath path)
+        {
+            if (source == null)
+                throw new ArgumentNullException(nameof(source));
+
+            if (path == null)
+                throw new ArgumentNullException(nameof(path));
+
+            if (path.Segments.Count == 0)
+            {
+                throw new ArgumentException(
+                    "Value path must contain at least one segment.",
+                    nameof(path));
+            }
+
+            var parsed = ParseSource(source);
+            var assignment = FindUniqueAssignment(
+                ConfigTomlSyntaxIndex.Create(parsed),
+                path);
+
+            var start = GetCompleteLineStart(
+                source,
+                assignment.Node);
+
+            var end = GetCompleteLineEnd(
+                source,
+                assignment.Node);
+
+            var edited = source.Remove(
+                start,
+                end - start);
+
+            ParseSource(edited);
+            return edited;
+        }
+
+        public static string SetOrInsertNullValue(
+            string source,
+            ConfigValuePath path,
+            ConfigNode retainedConcreteValue)
+        {
+            if (source == null)
+                throw new ArgumentNullException(nameof(source));
+
+            if (path == null)
+                throw new ArgumentNullException(nameof(path));
+
+            if (retainedConcreteValue == null)
+            {
+                throw new ArgumentNullException(
+                    nameof(retainedConcreteValue));
+            }
+
+            if (path.Segments.Count == 0)
+            {
+                throw new ArgumentException(
+                    "Value path must contain at least one segment.",
+                    nameof(path));
+            }
+
+            if (retainedConcreteValue is ConfigNullNode)
+            {
+                throw new ArgumentException(
+                    "Retained null source value must be concrete.",
+                    nameof(retainedConcreteValue));
+            }
+
+            var parsed = ParseSource(source);
+            var existing = TryFindUniqueAssignment(
+                ConfigTomlSyntaxIndex.Create(parsed),
+                path);
+
+            if (existing != null)
+            {
+                return SetValue(
+                    source,
+                    path,
+                    ConfigNullNode.Instance);
+            }
+
+            var inserted = SetOrInsertValue(
+                source,
+                path,
+                retainedConcreteValue);
+
+            return SetValue(
+                inserted,
+                path,
+                ConfigNullNode.Instance);
+        }
+
         private static TomlParseResult ParseSource(string source)
         {
             var parsed = Toml.TryParse(source);
@@ -393,6 +486,22 @@ namespace MarcoZechner.ConfigAPI.V2.Serialization
 
             throw new InvalidOperationException(
                 "TOML syntax table node is not owned by the current syntax document.");
+        }
+
+        private static int GetCompleteLineStart(
+            string source,
+            TomlSyntaxNode node)
+        {
+            var offset = node.Span.Start;
+
+            while (offset > 0 &&
+                source[offset - 1] != '\r' &&
+                source[offset - 1] != '\n')
+            {
+                offset--;
+            }
+
+            return offset;
         }
 
         private static int GetCompleteLineEnd(
