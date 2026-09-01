@@ -148,6 +148,7 @@ namespace MarcoZechner.ConfigAPI.Tests.V2.Persistence
                         new[]
                         {
                             "READ|World|settings.toml",
+                            "READ|World|settings.toml.20260901T190000.0000000Z.bak",
                             "WRITE|World|settings.toml.20260901T190000.0000000Z.bak",
                             "WRITE|World|settings.toml",
                             "WRITE|World|settings.toml.configapi.provenance"

@@ -52,7 +52,8 @@ namespace MarcoZechner.ConfigAPI.V2.Persistence
 
                 if (original != null)
                 {
-                    backupFile = ConfigBackupName.Create(
+                    backupFile = FindAvailableBackupFile(
+                        location,
                         file,
                         _clock.UtcNow);
 
@@ -69,6 +70,38 @@ namespace MarcoZechner.ConfigAPI.V2.Persistence
                 content);
 
             return new ConfigTextWriteResult(backupFile);
+        }
+
+        private string FindAvailableBackupFile(
+            ConfigLocation location,
+            string file,
+            DateTime timestampUtc)
+        {
+            var collisionIndex = 0;
+
+            while (true)
+            {
+                var candidate =
+                    ConfigBackupName.Create(
+                        file,
+                        timestampUtc,
+                        collisionIndex);
+
+                if (_storage.Read(
+                    location,
+                    candidate) == null)
+                {
+                    return candidate;
+                }
+
+                if (collisionIndex == int.MaxValue)
+                {
+                    throw new InvalidOperationException(
+                        "No available ConfigAPI backup file name could be found.");
+                }
+
+                collisionIndex++;
+            }
         }
     }
 }

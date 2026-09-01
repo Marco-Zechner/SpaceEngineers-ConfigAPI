@@ -25,9 +25,19 @@ namespace MarcoZechner.ConfigAPI.Tests.V2.Persistence
                 "server.toml",
                 timestamp);
 
-            Assert.That(
-                backup,
-                Is.EqualTo("server.toml.20260831T205307.0000000Z.bak"));
+            Assert.Multiple(() =>
+            {
+                Assert.That(
+                    backup,
+                    Is.EqualTo("server.toml.20260831T205307.0000000Z.bak"));
+
+                Assert.That(
+                    ConfigBackupName.Create(
+                        "server.toml",
+                        timestamp,
+                        2),
+                    Is.EqualTo("server.toml.20260831T205307.0000000Z.2.bak"));
+            });
         }
 
         [Test]
@@ -64,7 +74,7 @@ namespace MarcoZechner.ConfigAPI.Tests.V2.Persistence
                     result.BackupFile,
                     Is.EqualTo("server.toml.20260831T205307.0000000Z.bak"));
 
-                Assert.That(storage.Operations.Count, Is.EqualTo(3));
+                Assert.That(storage.Operations.Count, Is.EqualTo(4));
                 Assert.That(
                     storage.Operations[0],
                     Is.EqualTo("READ|World|server.toml"));
@@ -72,12 +82,68 @@ namespace MarcoZechner.ConfigAPI.Tests.V2.Persistence
                 Assert.That(
                     storage.Operations[1],
                     Is.EqualTo(
-                        "WRITE|World|server.toml.20260831T205307.0000000Z.bak|original config text"));
+                        "READ|World|server.toml.20260831T205307.0000000Z.bak"));
 
                 Assert.That(
                     storage.Operations[2],
                     Is.EqualTo(
+                        "WRITE|World|server.toml.20260831T205307.0000000Z.bak|original config text"));
+
+                Assert.That(
+                    storage.Operations[3],
+                    Is.EqualTo(
                         "WRITE|World|server.toml|regenerated config text"));
+            });
+        }
+
+        [Test]
+        public void Lossy_Write_Uses_Numbered_Backup_When_Timestamp_Name_Already_Exists()
+        {
+            var storage = new RecordingStorage
+            {
+                ReadContent = "original config text"
+            };
+
+            storage.ReadContentByFile[
+                "server.toml.20260831T205307.0000000Z.bak"] =
+                "existing backup";
+
+            var writer = new ConfigTextWriteCoordinator(
+                storage,
+                new FixedClock(
+                    new DateTime(
+                        2026,
+                        8,
+                        31,
+                        20,
+                        53,
+                        7,
+                        DateTimeKind.Utc)));
+
+            var result = writer.Write(
+                ConfigLocation.World,
+                "server.toml",
+                "regenerated config text",
+                true);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(
+                    result.BackupFile,
+                    Is.EqualTo(
+                        "server.toml.20260831T205307.0000000Z.1.bak"));
+
+                Assert.That(
+                    storage.Operations,
+                    Is.EqualTo(
+                        new[]
+                        {
+                            "READ|World|server.toml",
+                            "READ|World|server.toml.20260831T205307.0000000Z.bak",
+                            "READ|World|server.toml.20260831T205307.0000000Z.1.bak",
+                            "WRITE|World|server.toml.20260831T205307.0000000Z.1.bak|original config text",
+                            "WRITE|World|server.toml|regenerated config text"
+                        }));
             });
         }
 
@@ -191,6 +257,11 @@ namespace MarcoZechner.ConfigAPI.Tests.V2.Persistence
 
                 Assert.That(
                     storage.Operations[1],
+                    Is.EqualTo(
+                        "READ|Local|settings.toml.20260831T205307.0000000Z.bak"));
+
+                Assert.That(
+                    storage.Operations[2],
                     Does.StartWith("WRITE|Local|settings.toml."));
             });
         }
@@ -248,6 +319,10 @@ namespace MarcoZechner.ConfigAPI.Tests.V2.Persistence
         {
             public readonly List<string> Operations = new List<string>();
 
+            public readonly Dictionary<string, string> ReadContentByFile =
+                new Dictionary<string, string>(
+                    StringComparer.Ordinal);
+
             public string ReadContent;
 
             public string Read(
@@ -256,6 +331,21 @@ namespace MarcoZechner.ConfigAPI.Tests.V2.Persistence
             {
                 Operations.Add(
                     "READ|" + location + "|" + file);
+
+                string content;
+                if (ReadContentByFile.TryGetValue(
+                    file,
+                    out content))
+                {
+                    return content;
+                }
+
+                if (file.EndsWith(
+                    ".bak",
+                    StringComparison.Ordinal))
+                {
+                    return null;
+                }
 
                 return ReadContent;
             }
