@@ -42,6 +42,20 @@ namespace Mz.ConfigApi
             Value = value;
         }
 
+        public T SwitchFile(
+            string file)
+        {
+            if (string.IsNullOrWhiteSpace(file))
+            {
+                throw new ArgumentException(
+                    "Config file must not be empty.",
+                    nameof(file));
+            }
+
+            CurrentFile = file;
+            return Reload();
+        }
+
         public T Reload()
         {
             T value =

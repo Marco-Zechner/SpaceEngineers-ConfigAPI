@@ -955,6 +955,92 @@ namespace MarcoZechner.ConfigAPI.Tests.V2.Consumer
             client.Dispose();
             provider.Dispose();
         }
+
+        [Test]
+        public void Typed_Handle_SwitchFile_Loads_New_Current_File()
+        {
+            var bus = new RecordingModMessageBus();
+            var registry = new ConfigConsumerRegistrationRegistry();
+
+            var provider =
+                new ConfigApiProvider(
+                    bus,
+                    registry,
+                    new FixedClock(
+                        new DateTime(
+                            2026,
+                            9,
+                            2,
+                            2,
+                            30,
+                            0,
+                            DateTimeKind.Utc)),
+                    new SemanticVersion(0, 1, 0));
+
+            provider.Start();
+
+            var storage =
+                new MemoryConsumerStorage();
+
+            var client =
+                new ConfigApiClient(
+                    bus,
+                    "Example.Typed.Mod",
+                    "Example Typed Mod",
+                    new SemanticVersion(1, 0, 0),
+                    true,
+                    "Uses typed ConfigAPI.",
+                    storage.Read,
+                    storage.Write);
+
+            client.Start();
+
+            var definition =
+                new ConfigDefinition<PropertyConfig>(
+                    "TypedSettings",
+                    "typed-settings.toml",
+                    CreatePropertyDefaults);
+
+            ConfigHandle<PropertyConfig> handle =
+                client.OpenHandle(
+                    definition,
+                    Mz.ConfigApi.ConfigLocation.Local);
+
+            PropertyConfig alternate =
+                CreatePropertyDefaults();
+
+            alternate.Count = 77;
+
+            client.Save(
+                "TypedSettings",
+                Mz.ConfigApi.ConfigLocation.Local,
+                "alternate-settings.toml",
+                CreatePropertyDefaults(),
+                alternate);
+
+            PropertyConfig switched =
+                handle.SwitchFile(
+                    "alternate-settings.toml");
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(
+                    handle.CurrentFile,
+                    Is.EqualTo("alternate-settings.toml"));
+
+                Assert.That(
+                    handle.Value,
+                    Is.SameAs(switched));
+
+                Assert.That(
+                    switched.Count,
+                    Is.EqualTo(77));
+            });
+
+            client.Dispose();
+            provider.Dispose();
+        }
+
         private static PropertyConfig CreatePropertyDefaults()
         {
             return new PropertyConfig
