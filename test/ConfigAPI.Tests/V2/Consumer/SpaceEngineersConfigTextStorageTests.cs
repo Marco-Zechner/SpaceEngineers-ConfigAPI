@@ -192,6 +192,29 @@ namespace MarcoZechner.ConfigAPI.Tests.V2.Consumer
                             {
                                 return playerValues;
                             })
+                    },
+                    {
+                        "LoadAndSwitchConfig",
+                        new Func<
+                            string,
+                            Guid,
+                            string,
+                            int,
+                            string,
+                            string,
+                            object,
+                            object>(
+                            delegate(
+                                string consumerId,
+                                Guid registrationId,
+                                string configKey,
+                                int location,
+                                string currentFile,
+                                string targetFile,
+                                object defaults)
+                            {
+                                return defaults;
+                            })
                     }
                 };
 

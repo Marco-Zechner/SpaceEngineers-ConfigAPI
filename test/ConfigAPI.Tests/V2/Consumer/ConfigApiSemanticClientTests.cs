@@ -310,6 +310,29 @@ namespace MarcoZechner.ConfigAPI.Tests.V2.Consumer
                         return playerValues;
                     }));
 
+            endpoints.Add(
+                "LoadAndSwitchConfig",
+                new Func<
+                    string,
+                    Guid,
+                    string,
+                    int,
+                    string,
+                    string,
+                    object,
+                    object>(
+                    delegate(
+                        string consumerId,
+                        Guid registrationId,
+                        string configKey,
+                        int location,
+                        string currentFile,
+                        string targetFile,
+                        object defaults)
+                    {
+                        return defaults;
+                    }));
+
             var provider =
                 CreateDiscoveryProvider(
                     bus,
@@ -424,6 +447,29 @@ namespace MarcoZechner.ConfigAPI.Tests.V2.Consumer
                             {
                                 saveCount++;
                                 return playerValues;
+                            })
+                    },
+                    {
+                        "LoadAndSwitchConfig",
+                        new Func<
+                            string,
+                            Guid,
+                            string,
+                            int,
+                            string,
+                            string,
+                            object,
+                            object>(
+                            delegate(
+                                string consumerId,
+                                Guid registrationId,
+                                string configKey,
+                                int location,
+                                string currentFile,
+                                string targetFile,
+                                object defaults)
+                            {
+                                return defaults;
                             })
                     }
                 };

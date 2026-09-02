@@ -129,6 +129,48 @@ namespace MarcoZechner.ConfigAPI.V2.Api
             return ConfigDocumentWireCodec.Encode(playerValues);
         }
 
+        public object LoadAndSwitch(
+            string consumerId,
+            Guid registrationId,
+            string configKey,
+            int location,
+            string currentFile,
+            string targetFile,
+            object currentDefaultsPayload)
+        {
+            if (string.IsNullOrWhiteSpace(targetFile))
+                throw new ArgumentException("Config file must not be empty.", nameof(targetFile));
+
+            IConfigTextStorage storage = _registry.GetStorage(
+                consumerId,
+                registrationId);
+
+            ConfigLocation configLocation = ParseLocation(location);
+            ConfigDocument currentDefaults =
+                ConfigDocumentWireCodec.Decode(currentDefaultsPayload);
+
+            var identity = new ConfigIdentity(
+                consumerId.Trim(),
+                configKey);
+
+            ConfigPersistedLoadResult loadResult =
+                new ConfigPersistedStateLoader(storage).Load(
+                    configLocation,
+                    targetFile,
+                    identity,
+                    currentDefaults);
+
+            if (NeedsPersistence(loadResult))
+            {
+                new ConfigPersistedStateWriter(storage, _clock).Write(
+                    configLocation,
+                    loadResult,
+                    currentDefaults);
+            }
+
+            return ConfigDocumentWireCodec.Encode(
+                loadResult.State.PlayerValues);
+        }
         private static bool NeedsPersistence(
             ConfigPersistedLoadResult loadResult)
         {

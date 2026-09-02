@@ -52,8 +52,19 @@ namespace Mz.ConfigApi
                     nameof(file));
             }
 
+            T value =
+                ConfigClrMapper.FromDocument<T>(
+                    _client.LoadAndSwitch(
+                        _definition.ConfigKey,
+                        Location,
+                        CurrentFile,
+                        file,
+                        ConfigClrMapper.ToDocument(
+                            _definition.CreateDefaults())));
+
             CurrentFile = file;
-            return Reload();
+            Value = value;
+            return value;
         }
 
         public T Reload()
@@ -68,5 +79,6 @@ namespace Mz.ConfigApi
             Value = value;
             return value;
         }
+
     }
 }
