@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using MarcoZechner.ConfigAPI.V2.Persistence;
 using Mz.ApiProtocol;
 using Mz.ApiProtocol.SpaceEngineers;
 using Mz.SemanticVersioning;
@@ -11,6 +12,8 @@ namespace MarcoZechner.ConfigAPI.V2.Api
         public const long DiscoveryChannelId = ApiProtocolChannels.Discovery;
         public const string ApiId = "MarcoZechner.ConfigAPI";
         public const string RegisterConsumerEndpoint = "RegisterConsumer";
+        public const string OpenConfigEndpoint = "OpenConfig";
+        public const string SaveConfigEndpoint = "SaveConfig";
 
         private readonly ApiDiscoveryProvider _provider;
 
@@ -26,6 +29,19 @@ namespace MarcoZechner.ConfigAPI.V2.Api
             IModMessageBus messageBus,
             ConfigConsumerRegistrationRegistry registry,
             SemanticVersion modVersion)
+            : this(
+                messageBus,
+                registry,
+                new SystemConfigClock(),
+                modVersion)
+        {
+        }
+
+        public ConfigApiProvider(
+            IModMessageBus messageBus,
+            ConfigConsumerRegistrationRegistry registry,
+            IConfigClock clock,
+            SemanticVersion modVersion)
         {
             if (messageBus == null)
                 throw new ArgumentNullException(nameof(messageBus));
@@ -33,8 +49,16 @@ namespace MarcoZechner.ConfigAPI.V2.Api
             if (registry == null)
                 throw new ArgumentNullException(nameof(registry));
 
+            if (clock == null)
+                throw new ArgumentNullException(nameof(clock));
+
             if (modVersion == null)
                 throw new ArgumentNullException(nameof(modVersion));
+
+            var persistence =
+                new ConfigApiPersistenceService(
+                    registry,
+                    clock);
 
             Func<
                 string,
@@ -62,12 +86,41 @@ namespace MarcoZechner.ConfigAPI.V2.Api
                         };
                     };
 
+            Func<
+                string,
+                Guid,
+                string,
+                int,
+                string,
+                object,
+                object> openConfig =
+                    persistence.Open;
+
+            Func<
+                string,
+                Guid,
+                string,
+                int,
+                string,
+                object,
+                object,
+                object> saveConfig =
+                    persistence.Save;
+
             var endpoints =
                 new Dictionary<string, Delegate>(StringComparer.Ordinal)
                 {
                     {
                         RegisterConsumerEndpoint,
                         registerConsumer
+                    },
+                    {
+                        OpenConfigEndpoint,
+                        openConfig
+                    },
+                    {
+                        SaveConfigEndpoint,
+                        saveConfig
                     }
                 };
 
@@ -102,6 +155,17 @@ namespace MarcoZechner.ConfigAPI.V2.Api
         public void Dispose()
         {
             _provider.Dispose();
+        }
+
+        private sealed class SystemConfigClock : IConfigClock
+        {
+            public DateTime UtcNow
+            {
+                get
+                {
+                    return DateTime.UtcNow;
+                }
+            }
         }
     }
 }
