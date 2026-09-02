@@ -24,8 +24,9 @@ namespace Mz.ConfigApi
                         new[]
                         {
                             "Introduced the typed ConfigAPI consumer facade.",
-                            "Added automatic provider discovery and exact RegisterConsumer endpoint validation.",
-                            "Added consumer-owned storage callback registration with reconnect-safe registration identifiers.",
+                            "Added consumer-owned semantic config documents and values without provider-domain dependencies.",
+                            "Added provider-backed Open and Save operations with exact endpoint validation.",
+                            "Added automatic provider discovery and consumer-owned storage callback registration with reconnect-safe registration identifiers.",
                             "Accepted newer provider API versions without a hardcoded upper version ceiling."
                         })
                 });

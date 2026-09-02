@@ -385,6 +385,50 @@ namespace MarcoZechner.ConfigAPI.Tests.V2.Consumer
                 {
                     "RegisterConsumer",
                     registerConsumer
+                },
+                {
+                    "OpenConfig",
+                    new Func<
+                        string,
+                        Guid,
+                        string,
+                        int,
+                        string,
+                        object,
+                        object>(
+                        delegate(
+                            string consumerId,
+                            Guid registrationId,
+                            string configKey,
+                            int location,
+                            string file,
+                            object defaults)
+                        {
+                            return defaults;
+                        })
+                },
+                {
+                    "SaveConfig",
+                    new Func<
+                        string,
+                        Guid,
+                        string,
+                        int,
+                        string,
+                        object,
+                        object,
+                        object>(
+                        delegate(
+                            string consumerId,
+                            Guid registrationId,
+                            string configKey,
+                            int location,
+                            string file,
+                            object defaults,
+                            object playerValues)
+                        {
+                            return playerValues;
+                        })
                 }
             };
         }

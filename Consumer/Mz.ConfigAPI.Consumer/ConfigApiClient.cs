@@ -9,6 +9,8 @@ namespace Mz.ConfigApi
     {
         public const string ProviderApiId = "MarcoZechner.ConfigAPI";
         public const string RegisterConsumerEndpoint = "RegisterConsumer";
+        public const string OpenConfigEndpoint = "OpenConfig";
+        public const string SaveConfigEndpoint = "SaveConfig";
 
         private readonly string _consumerId;
         private readonly Func<int, string, string> _read;
@@ -16,6 +18,9 @@ namespace Mz.ConfigApi
         private readonly ApiDiscoveryConsumer _consumer;
 
         private Action _providerUnregister;
+        private Func<string, Guid, string, int, string, object, object> _openConfig;
+        private Func<string, Guid, string, int, string, object, object, object> _saveConfig;
+        private Guid _registrationId;
         private bool _isDisposed;
         private Exception _lastError;
 
@@ -145,6 +150,71 @@ namespace Mz.ConfigApi
             return _consumer.Rediscover();
         }
 
+        public ConfigDocument Open(
+            string configKey,
+            ConfigLocation location,
+            string file,
+            ConfigDocument currentDefaults)
+        {
+            ThrowIfDisposed();
+            EnsureConnected();
+
+            if (string.IsNullOrWhiteSpace(configKey))
+                throw new ArgumentException("Config key must not be empty.", nameof(configKey));
+
+            if (string.IsNullOrWhiteSpace(file))
+                throw new ArgumentException("Config file must not be empty.", nameof(file));
+
+            if (currentDefaults == null)
+                throw new ArgumentNullException(nameof(currentDefaults));
+
+            object payload =
+                _openConfig(
+                    _consumerId,
+                    _registrationId,
+                    configKey.Trim(),
+                    ValidateLocation(location),
+                    file,
+                    ConfigDocumentWireCodec.Encode(currentDefaults));
+
+            return ConfigDocumentWireCodec.Decode(payload);
+        }
+
+        public ConfigDocument Save(
+            string configKey,
+            ConfigLocation location,
+            string file,
+            ConfigDocument currentDefaults,
+            ConfigDocument playerValues)
+        {
+            ThrowIfDisposed();
+            EnsureConnected();
+
+            if (string.IsNullOrWhiteSpace(configKey))
+                throw new ArgumentException("Config key must not be empty.", nameof(configKey));
+
+            if (string.IsNullOrWhiteSpace(file))
+                throw new ArgumentException("Config file must not be empty.", nameof(file));
+
+            if (currentDefaults == null)
+                throw new ArgumentNullException(nameof(currentDefaults));
+
+            if (playerValues == null)
+                throw new ArgumentNullException(nameof(playerValues));
+
+            object payload =
+                _saveConfig(
+                    _consumerId,
+                    _registrationId,
+                    configKey.Trim(),
+                    ValidateLocation(location),
+                    file,
+                    ConfigDocumentWireCodec.Encode(currentDefaults),
+                    ConfigDocumentWireCodec.Encode(playerValues));
+
+            return ConfigDocumentWireCodec.Decode(payload);
+        }
+
         public void Stop()
         {
             ThrowIfDisposed();
@@ -181,15 +251,46 @@ namespace Mz.ConfigApi
                     Action<int, string, string>,
                     Action> registerConsumer;
 
+                Func<
+                    string,
+                    Guid,
+                    string,
+                    int,
+                    string,
+                    object,
+                    object> openConfig;
+
+                Func<
+                    string,
+                    Guid,
+                    string,
+                    int,
+                    string,
+                    object,
+                    object,
+                    object> saveConfig;
+
                 if (!eventArgs.Connection.TryGetEndpoint(
                     RegisterConsumerEndpoint,
                     out registerConsumer))
                 {
-                    _lastError =
-                        new InvalidOperationException(
-                            "The ConfigAPI provider is missing the exact RegisterConsumer endpoint.");
+                    RejectConnection(RegisterConsumerEndpoint);
+                    return;
+                }
 
-                    _consumer.Disconnect();
+                if (!eventArgs.Connection.TryGetEndpoint(
+                    OpenConfigEndpoint,
+                    out openConfig))
+                {
+                    RejectConnection(OpenConfigEndpoint);
+                    return;
+                }
+
+                if (!eventArgs.Connection.TryGetEndpoint(
+                    SaveConfigEndpoint,
+                    out saveConfig))
+                {
+                    RejectConnection(SaveConfigEndpoint);
                     return;
                 }
 
@@ -206,6 +307,9 @@ namespace Mz.ConfigApi
                     throw new InvalidOperationException("The ConfigAPI provider returned no unregister action.");
 
                 _providerUnregister = unregister;
+                _openConfig = openConfig;
+                _saveConfig = saveConfig;
+                _registrationId = registrationId;
                 ProviderModVersion = eventArgs.Connection.Provider.Version;
                 ProviderApiVersion = eventArgs.Connection.Descriptor.Version;
                 _lastError = null;
@@ -249,8 +353,52 @@ namespace Mz.ConfigApi
         private void ClearConnection()
         {
             _providerUnregister = null;
+            _openConfig = null;
+            _saveConfig = null;
+            _registrationId = Guid.Empty;
             ProviderModVersion = null;
             ProviderApiVersion = null;
+        }
+
+        private void RejectConnection(string endpoint)
+        {
+            _lastError =
+                new InvalidOperationException(
+                    "The ConfigAPI provider is missing the exact " +
+                    endpoint +
+                    " endpoint.");
+
+            _consumer.Disconnect();
+        }
+
+        private void EnsureConnected()
+        {
+            if (!IsConnected ||
+                _openConfig == null ||
+                _saveConfig == null ||
+                _registrationId == Guid.Empty)
+            {
+                throw new InvalidOperationException(
+                    "The ConfigAPI client is not connected.");
+            }
+        }
+
+        private static int ValidateLocation(
+            ConfigLocation location)
+        {
+            switch (location)
+            {
+                case ConfigLocation.Local:
+                case ConfigLocation.Global:
+                case ConfigLocation.World:
+                    return (int)location;
+
+                default:
+                    throw new ArgumentException(
+                        "Unsupported ConfigAPI storage location: " +
+                        location,
+                        nameof(location));
+            }
         }
 
         private void RaiseConnected()
