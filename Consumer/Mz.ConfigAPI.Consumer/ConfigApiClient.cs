@@ -151,6 +151,21 @@ namespace Mz.ConfigApi
         }
 
         public T Open<T>(
+            ConfigDefinition<T> definition,
+            ConfigLocation location)
+            where T : class
+        {
+            if (definition == null)
+                throw new ArgumentNullException(nameof(definition));
+
+            return Open(
+                definition.ConfigKey,
+                location,
+                definition.DefaultFile,
+                definition.CreateDefaults());
+        }
+
+        public T Open<T>(
             string configKey,
             ConfigLocation location,
             string file,
@@ -190,6 +205,23 @@ namespace Mz.ConfigApi
                     ConfigDocumentWireCodec.Encode(currentDefaults));
 
             return ConfigDocumentWireCodec.Decode(payload);
+        }
+
+        public T Save<T>(
+            ConfigDefinition<T> definition,
+            ConfigLocation location,
+            T playerValues)
+            where T : class
+        {
+            if (definition == null)
+                throw new ArgumentNullException(nameof(definition));
+
+            return Save(
+                definition.ConfigKey,
+                location,
+                definition.DefaultFile,
+                definition.CreateDefaults(),
+                playerValues);
         }
 
         public T Save<T>(

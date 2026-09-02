@@ -741,7 +741,7 @@ namespace MarcoZechner.ConfigAPI.Tests.V2.Consumer
         }
 
         [Test]
-        public void Typed_Client_Open_And_Save_RoundTrip_Through_Real_Provider()
+        public void Typed_Definition_Open_And_Save_RoundTrip_Through_Real_Provider()
         {
             var bus = new RecordingModMessageBus();
             var registry = new ConfigConsumerRegistrationRegistry();
@@ -779,49 +779,22 @@ namespace MarcoZechner.ConfigAPI.Tests.V2.Consumer
 
             client.Start();
 
-            var defaults =
-                new PropertyConfig
-                {
-                    Enabled = true,
-                    Count = 10,
-                    Ratio = 0.5f,
-                    Name = "default",
-                    CurrentMode = ExampleMode.Basic,
-                    OptionalValue = 5,
-                    Nested =
-                        new NestedConfig
-                        {
-                            Threshold = 20,
-                            Allowed = true
-                        },
-                    Tags =
-                        new List<string>
-                        {
-                            "alpha",
-                            "beta"
-                        },
-                    Levels =
-                        new[]
-                        {
-                            1,
-                            2,
-                            3
-                        },
-                    NamedValues =
-                        new Dictionary<string, int>(
-                            StringComparer.Ordinal)
-                        {
-                            { "start", 1 },
-                            { "end", 10 }
-                        }
-                };
+            var defaultsCreated = 0;
+
+            var definition =
+                new ConfigDefinition<PropertyConfig>(
+                    "TypedSettings",
+                    "typed-settings.toml",
+                    delegate
+                    {
+                        defaultsCreated++;
+                        return CreatePropertyDefaults();
+                    });
 
             PropertyConfig opened =
                 client.Open(
-                    "TypedSettings",
-                    Mz.ConfigApi.ConfigLocation.Local,
-                    "typed-settings.toml",
-                    defaults);
+                    definition,
+                    Mz.ConfigApi.ConfigLocation.Local);
 
             opened.Count = 25;
             opened.CurrentMode = ExampleMode.Expert;
@@ -832,21 +805,19 @@ namespace MarcoZechner.ConfigAPI.Tests.V2.Consumer
 
             PropertyConfig saved =
                 client.Save(
-                    "TypedSettings",
+                    definition,
                     Mz.ConfigApi.ConfigLocation.Local,
-                    "typed-settings.toml",
-                    defaults,
                     opened);
 
             PropertyConfig reopened =
                 client.Open(
-                    "TypedSettings",
-                    Mz.ConfigApi.ConfigLocation.Local,
-                    "typed-settings.toml",
-                    defaults);
+                    definition,
+                    Mz.ConfigApi.ConfigLocation.Local);
 
             Assert.Multiple(() =>
             {
+                Assert.That(defaultsCreated, Is.EqualTo(3));
+
                 Assert.That(saved.Count, Is.EqualTo(25));
                 Assert.That(saved.CurrentMode, Is.EqualTo(ExampleMode.Expert));
                 Assert.That(saved.OptionalValue, Is.Null);
@@ -864,6 +835,45 @@ namespace MarcoZechner.ConfigAPI.Tests.V2.Consumer
 
             client.Dispose();
             provider.Dispose();
+        }
+
+        private static PropertyConfig CreatePropertyDefaults()
+        {
+            return new PropertyConfig
+            {
+                Enabled = true,
+                Count = 10,
+                Ratio = 0.5f,
+                Name = "default",
+                CurrentMode = ExampleMode.Basic,
+                OptionalValue = 5,
+                Nested =
+                    new NestedConfig
+                    {
+                        Threshold = 20,
+                        Allowed = true
+                    },
+                Tags =
+                    new List<string>
+                    {
+                        "alpha",
+                        "beta"
+                    },
+                Levels =
+                    new[]
+                    {
+                        1,
+                        2,
+                        3
+                    },
+                NamedValues =
+                    new Dictionary<string, int>(
+                        StringComparer.Ordinal)
+                    {
+                        { "start", 1 },
+                        { "end", 10 }
+                    }
+            };
         }
 
         private enum ExampleMode
