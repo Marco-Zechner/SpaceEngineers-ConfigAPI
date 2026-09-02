@@ -91,6 +91,30 @@ namespace Mz.ConfigApi
             _consumer.Disconnected += OnDisconnected;
         }
 
+        public static ConfigApiClient CreateForSpaceEngineers(
+            IModMessageBus messageBus,
+            string consumerId,
+            string consumerDisplayName,
+            SemanticVersion consumerModVersion,
+            bool isRequired,
+            string featureDescription)
+        {
+            var storage =
+                new SpaceEngineersConfigTextStorage(
+                    new SpaceEngineersConfigApiStorageUtilities(),
+                    typeof(SpaceEngineersConfigTextStorage));
+
+            return new ConfigApiClient(
+                messageBus,
+                consumerId,
+                consumerDisplayName,
+                consumerModVersion,
+                isRequired,
+                featureDescription,
+                storage.Read,
+                storage.Write);
+        }
+
         public void Start()
         {
             ThrowIfDisposed();
