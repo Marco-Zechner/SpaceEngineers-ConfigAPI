@@ -150,6 +150,27 @@ namespace Mz.ConfigApi
             return _consumer.Rediscover();
         }
 
+        public ConfigHandle<T> OpenHandle<T>(
+            ConfigDefinition<T> definition,
+            ConfigLocation location)
+            where T : class
+        {
+            if (definition == null)
+                throw new ArgumentNullException(nameof(definition));
+
+            T value =
+                Open(
+                    definition,
+                    location);
+
+            return new ConfigHandle<T>(
+                this,
+                definition,
+                location,
+                definition.DefaultFile,
+                value);
+        }
+
         public T Open<T>(
             ConfigDefinition<T> definition,
             ConfigLocation location)

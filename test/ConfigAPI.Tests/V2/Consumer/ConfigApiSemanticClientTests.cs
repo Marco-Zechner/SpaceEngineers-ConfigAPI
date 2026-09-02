@@ -837,6 +837,124 @@ namespace MarcoZechner.ConfigAPI.Tests.V2.Consumer
             provider.Dispose();
         }
 
+        [Test]
+        public void Typed_Handle_Reload_ReReads_Externally_Edited_Current_File()
+        {
+            var bus = new RecordingModMessageBus();
+            var registry = new ConfigConsumerRegistrationRegistry();
+
+            var provider =
+                new ConfigApiProvider(
+                    bus,
+                    registry,
+                    new FixedClock(
+                        new DateTime(
+                            2026,
+                            9,
+                            2,
+                            2,
+                            30,
+                            0,
+                            DateTimeKind.Utc)),
+                    new SemanticVersion(0, 1, 0));
+
+            provider.Start();
+
+            var storage =
+                new MemoryConsumerStorage();
+
+            var client =
+                new ConfigApiClient(
+                    bus,
+                    "Example.Typed.Mod",
+                    "Example Typed Mod",
+                    new SemanticVersion(1, 0, 0),
+                    true,
+                    "Uses typed ConfigAPI.",
+                    storage.Read,
+                    storage.Write);
+
+            client.Start();
+
+            var defaultsCreated = 0;
+
+            var definition =
+                new ConfigDefinition<PropertyConfig>(
+                    "TypedSettings",
+                    "typed-settings.toml",
+                    delegate
+                    {
+                        defaultsCreated++;
+                        return CreatePropertyDefaults();
+                    });
+
+            ConfigHandle<PropertyConfig> handle =
+                client.OpenHandle(
+                    definition,
+                    Mz.ConfigApi.ConfigLocation.Local);
+
+            PropertyConfig opened =
+                handle.Value;
+
+            opened.Count = 25;
+            opened.CurrentMode = ExampleMode.Expert;
+            opened.OptionalValue = null;
+            opened.Nested.Allowed = false;
+            opened.Tags.Add("gamma");
+            opened.NamedValues["end"] = 99;
+
+            PropertyConfig saved =
+                client.Save(
+                    definition,
+                    Mz.ConfigApi.ConfigLocation.Local,
+                    opened);
+
+            string activeSource =
+                storage.Get(
+                    0,
+                    "typed-settings.toml");
+
+            Assert.That(
+                activeSource,
+                Does.Contain("Count = 25"));
+
+            storage.Write(
+                0,
+                "typed-settings.toml",
+                activeSource.Replace(
+                    "Count = 25",
+                    "Count = 41"));
+
+            PropertyConfig reloaded =
+                handle.Reload();
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(defaultsCreated, Is.EqualTo(3));
+
+                Assert.That(handle.Location, Is.EqualTo(Mz.ConfigApi.ConfigLocation.Local));
+                Assert.That(handle.CurrentFile, Is.EqualTo("typed-settings.toml"));
+                Assert.That(handle.Value, Is.SameAs(reloaded));
+
+                Assert.That(saved.Count, Is.EqualTo(25));
+                Assert.That(saved.CurrentMode, Is.EqualTo(ExampleMode.Expert));
+                Assert.That(saved.OptionalValue, Is.Null);
+                Assert.That(saved.Nested.Allowed, Is.False);
+                Assert.That(saved.Tags, Is.EqualTo(new[] { "alpha", "beta", "gamma" }));
+                Assert.That(saved.NamedValues["end"], Is.EqualTo(99));
+
+                Assert.That(reloaded, Is.Not.SameAs(opened));
+                Assert.That(reloaded.Count, Is.EqualTo(41));
+                Assert.That(reloaded.CurrentMode, Is.EqualTo(ExampleMode.Expert));
+                Assert.That(reloaded.OptionalValue, Is.Null);
+                Assert.That(reloaded.Nested.Allowed, Is.False);
+                Assert.That(reloaded.Tags, Is.EqualTo(new[] { "alpha", "beta", "gamma" }));
+                Assert.That(reloaded.NamedValues["end"], Is.EqualTo(99));
+            });
+
+            client.Dispose();
+            provider.Dispose();
+        }
         private static PropertyConfig CreatePropertyDefaults()
         {
             return new PropertyConfig
