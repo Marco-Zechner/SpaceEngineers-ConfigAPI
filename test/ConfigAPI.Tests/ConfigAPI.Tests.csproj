@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>net48</TargetFramework>
     <Platforms>x64</Platforms>
@@ -11,6 +11,11 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\Data\ConfigAPI.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile
+      Include="..\..\Consumer\Mz.ConfigAPI.Consumer\**\*.cs"
+      Link="Consumer\%(RecursiveDir)%(Filename)%(Extension)" />
   </ItemGroup>
 
   <ItemGroup>
