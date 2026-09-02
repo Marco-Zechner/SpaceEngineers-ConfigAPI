@@ -148,7 +148,8 @@ namespace MarcoZechner.ConfigAPI.V2.Api
                     return ConfigLocation.Global;
 
                 case 2:
-                    return ConfigLocation.World;
+                    throw new InvalidOperationException(
+                        "World configs require the server-authoritative ConfigAPI path and cannot use direct persistence.");
 
                 default:
                     throw new ArgumentException(

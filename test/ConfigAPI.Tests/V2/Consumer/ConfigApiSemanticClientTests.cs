@@ -476,6 +476,21 @@ namespace MarcoZechner.ConfigAPI.Tests.V2.Consumer
                     document,
                     document));
 
+            Assert.Throws<InvalidOperationException>(
+                () => client.Open(
+                    "Settings",
+                    Mz.ConfigApi.ConfigLocation.World,
+                    "settings.toml",
+                    document));
+
+            Assert.Throws<InvalidOperationException>(
+                () => client.Save(
+                    "Settings",
+                    Mz.ConfigApi.ConfigLocation.World,
+                    "settings.toml",
+                    document,
+                    document));
+
             Assert.Multiple(() =>
             {
                 Assert.That(openCount, Is.EqualTo(0));
@@ -558,6 +573,367 @@ namespace MarcoZechner.ConfigAPI.Tests.V2.Consumer
 
             client.Dispose();
             provider.Dispose();
+        }
+
+        [Test]
+        public void Clr_Mapper_RoundTrips_Property_Config_Shapes()
+        {
+            var original =
+                new PropertyConfig
+                {
+                    Enabled = true,
+                    Count = 17,
+                    Ratio = 0.75f,
+                    Name = "example",
+                    CurrentMode = ExampleMode.Advanced,
+                    OptionalValue = null,
+                    Nested =
+                        new NestedConfig
+                        {
+                            Threshold = 42,
+                            Allowed = false
+                        },
+                    Tags =
+                        new List<string>
+                        {
+                            "alpha",
+                            "beta"
+                        },
+                    Levels =
+                        new[]
+                        {
+                            2,
+                            4,
+                            8
+                        },
+                    NamedValues =
+                        new Dictionary<string, int>(
+                            StringComparer.Ordinal)
+                        {
+                            { "start", 1 },
+                            { "end", 10 }
+                        }
+                };
+
+            Mz.ConfigApi.ConfigDocument document =
+                ConfigClrMapper.ToDocument(original);
+
+            ConfigValue optional;
+            Assert.That(
+                document.TryGet(
+                    "OptionalValue",
+                    out optional),
+                Is.True);
+
+            PropertyConfig roundTrip =
+                ConfigClrMapper.FromDocument<PropertyConfig>(
+                    document);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(optional.Kind, Is.EqualTo(ConfigValueKind.Null));
+                Assert.That(roundTrip.Enabled, Is.True);
+                Assert.That(roundTrip.Count, Is.EqualTo(17));
+                Assert.That(roundTrip.Ratio, Is.EqualTo(0.75f));
+                Assert.That(roundTrip.Name, Is.EqualTo("example"));
+                Assert.That(roundTrip.CurrentMode, Is.EqualTo(ExampleMode.Advanced));
+                Assert.That(roundTrip.OptionalValue, Is.Null);
+                Assert.That(roundTrip.Nested, Is.Not.Null);
+                Assert.That(roundTrip.Nested.Threshold, Is.EqualTo(42));
+                Assert.That(roundTrip.Nested.Allowed, Is.False);
+                Assert.That(roundTrip.Tags, Is.EqualTo(new[] { "alpha", "beta" }));
+                Assert.That(roundTrip.Levels, Is.EqualTo(new[] { 2, 4, 8 }));
+                Assert.That(
+                    roundTrip.NamedValues,
+                    Is.EqualTo(
+                        new Dictionary<string, int>(
+                            StringComparer.Ordinal)
+                        {
+                            { "start", 1 },
+                            { "end", 10 }
+                        }));
+            });
+        }
+
+        [Test]
+        public void Clr_Mapper_RoundTrips_Public_Field_Config()
+        {
+            var original =
+                new FieldConfig
+                {
+                    Count = 12,
+                    Name = "field-config"
+                };
+
+            Mz.ConfigApi.ConfigDocument document =
+                ConfigClrMapper.ToDocument(original);
+
+            FieldConfig roundTrip =
+                ConfigClrMapper.FromDocument<FieldConfig>(
+                    document);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(roundTrip.Count, Is.EqualTo(12));
+                Assert.That(roundTrip.Name, Is.EqualTo("field-config"));
+            });
+        }
+
+        [Test]
+        public void Clr_Mapper_Rejects_Ambiguous_Or_Unwritable_Schemas()
+        {
+            Assert.Multiple(() =>
+            {
+                Assert.Throws<NotSupportedException>(
+                    () => ConfigClrMapper.ToDocument(
+                        new MixedMemberConfig { Count = 1, Value = 2 }));
+
+                Assert.Throws<NotSupportedException>(
+                    () => ConfigClrMapper.ToDocument(
+                        new ReadOnlyPropertyConfig()));
+            });
+        }
+
+        [Test]
+        public void Clr_Mapper_Rejects_Object_Cycles()
+        {
+            var value =
+                new CyclicConfig();
+
+            value.Next = value;
+
+            Assert.Throws<NotSupportedException>(
+                () => ConfigClrMapper.ToDocument(value));
+        }
+
+        [Test]
+        public void Clr_Mapper_Rejects_Numeric_Overflow_And_Unknown_Enum()
+        {
+            var oversizedInteger =
+                new Mz.ConfigApi.ConfigDocument(
+                    new ConfigEntry(
+                        "Value",
+                        ConfigValue.Integer(long.MaxValue)));
+
+            var unknownEnum =
+                new Mz.ConfigApi.ConfigDocument(
+                    new ConfigEntry(
+                        "CurrentMode",
+                        ConfigValue.String("Unknown")));
+
+            Assert.Multiple(() =>
+            {
+                Assert.Throws<NotSupportedException>(
+                    () => ConfigClrMapper.ToDocument(
+                        new UnsignedConfig
+                        {
+                            Value = ulong.MaxValue
+                        }));
+
+                Assert.Throws<ArgumentException>(
+                    () => ConfigClrMapper.FromDocument<IntRangeConfig>(
+                        oversizedInteger));
+
+                Assert.Throws<ArgumentException>(
+                    () => ConfigClrMapper.FromDocument<EnumOnlyConfig>(
+                        unknownEnum));
+            });
+        }
+
+        [Test]
+        public void Typed_Client_Open_And_Save_RoundTrip_Through_Real_Provider()
+        {
+            var bus = new RecordingModMessageBus();
+            var registry = new ConfigConsumerRegistrationRegistry();
+
+            var provider =
+                new ConfigApiProvider(
+                    bus,
+                    registry,
+                    new FixedClock(
+                        new DateTime(
+                            2026,
+                            9,
+                            2,
+                            2,
+                            30,
+                            0,
+                            DateTimeKind.Utc)),
+                    new SemanticVersion(0, 1, 0));
+
+            provider.Start();
+
+            var storage =
+                new MemoryConsumerStorage();
+
+            var client =
+                new ConfigApiClient(
+                    bus,
+                    "Example.Typed.Mod",
+                    "Example Typed Mod",
+                    new SemanticVersion(1, 0, 0),
+                    true,
+                    "Uses typed ConfigAPI.",
+                    storage.Read,
+                    storage.Write);
+
+            client.Start();
+
+            var defaults =
+                new PropertyConfig
+                {
+                    Enabled = true,
+                    Count = 10,
+                    Ratio = 0.5f,
+                    Name = "default",
+                    CurrentMode = ExampleMode.Basic,
+                    OptionalValue = 5,
+                    Nested =
+                        new NestedConfig
+                        {
+                            Threshold = 20,
+                            Allowed = true
+                        },
+                    Tags =
+                        new List<string>
+                        {
+                            "alpha",
+                            "beta"
+                        },
+                    Levels =
+                        new[]
+                        {
+                            1,
+                            2,
+                            3
+                        },
+                    NamedValues =
+                        new Dictionary<string, int>(
+                            StringComparer.Ordinal)
+                        {
+                            { "start", 1 },
+                            { "end", 10 }
+                        }
+                };
+
+            PropertyConfig opened =
+                client.Open(
+                    "TypedSettings",
+                    Mz.ConfigApi.ConfigLocation.Local,
+                    "typed-settings.toml",
+                    defaults);
+
+            opened.Count = 25;
+            opened.CurrentMode = ExampleMode.Expert;
+            opened.OptionalValue = null;
+            opened.Nested.Allowed = false;
+            opened.Tags.Add("gamma");
+            opened.NamedValues["end"] = 99;
+
+            PropertyConfig saved =
+                client.Save(
+                    "TypedSettings",
+                    Mz.ConfigApi.ConfigLocation.Local,
+                    "typed-settings.toml",
+                    defaults,
+                    opened);
+
+            PropertyConfig reopened =
+                client.Open(
+                    "TypedSettings",
+                    Mz.ConfigApi.ConfigLocation.Local,
+                    "typed-settings.toml",
+                    defaults);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(saved.Count, Is.EqualTo(25));
+                Assert.That(saved.CurrentMode, Is.EqualTo(ExampleMode.Expert));
+                Assert.That(saved.OptionalValue, Is.Null);
+                Assert.That(saved.Nested.Allowed, Is.False);
+                Assert.That(saved.Tags, Is.EqualTo(new[] { "alpha", "beta", "gamma" }));
+                Assert.That(saved.NamedValues["end"], Is.EqualTo(99));
+
+                Assert.That(reopened.Count, Is.EqualTo(25));
+                Assert.That(reopened.CurrentMode, Is.EqualTo(ExampleMode.Expert));
+                Assert.That(reopened.OptionalValue, Is.Null);
+                Assert.That(reopened.Nested.Allowed, Is.False);
+                Assert.That(reopened.Tags, Is.EqualTo(new[] { "alpha", "beta", "gamma" }));
+                Assert.That(reopened.NamedValues["end"], Is.EqualTo(99));
+            });
+
+            client.Dispose();
+            provider.Dispose();
+        }
+
+        private enum ExampleMode
+        {
+            Basic,
+            Advanced,
+            Expert
+        }
+
+        private sealed class PropertyConfig
+        {
+            public bool Enabled { get; set; }
+            public int Count { get; set; }
+            public float Ratio { get; set; }
+            public string Name { get; set; }
+            public ExampleMode CurrentMode { get; set; }
+            public int? OptionalValue { get; set; }
+            public NestedConfig Nested { get; set; }
+            public List<string> Tags { get; set; }
+            public int[] Levels { get; set; }
+            public Dictionary<string, int> NamedValues { get; set; }
+        }
+
+        private sealed class NestedConfig
+        {
+            public int Threshold { get; set; }
+            public bool Allowed { get; set; }
+        }
+
+        private sealed class FieldConfig
+        {
+            public int Count;
+            public string Name;
+        }
+
+        private sealed class MixedMemberConfig
+        {
+            public int Count;
+            public int Value { get; set; }
+        }
+
+        private sealed class ReadOnlyPropertyConfig
+        {
+            public int Value
+            {
+                get
+                {
+                    return 10;
+                }
+            }
+        }
+
+        private sealed class UnsignedConfig
+        {
+            public ulong Value { get; set; }
+        }
+
+        private sealed class IntRangeConfig
+        {
+            public int Value { get; set; }
+        }
+
+        private sealed class EnumOnlyConfig
+        {
+            public ExampleMode CurrentMode { get; set; }
+        }
+
+        private sealed class CyclicConfig
+        {
+            public CyclicConfig Next { get; set; }
         }
 
         private static ConfigApiClient CreateClient(

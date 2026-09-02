@@ -150,6 +150,18 @@ namespace Mz.ConfigApi
             return _consumer.Rediscover();
         }
 
+        public T Open<T>(
+            string configKey,
+            ConfigLocation location,
+            string file,
+            T currentDefaults)
+            where T : class
+        {
+            var defaults = ConfigClrMapper.ToDocument(currentDefaults);
+            var opened = Open(configKey, location, file, defaults);
+            return ConfigClrMapper.FromDocument<T>(opened);
+        }
+
         public ConfigDocument Open(
             string configKey,
             ConfigLocation location,
@@ -178,6 +190,20 @@ namespace Mz.ConfigApi
                     ConfigDocumentWireCodec.Encode(currentDefaults));
 
             return ConfigDocumentWireCodec.Decode(payload);
+        }
+
+        public T Save<T>(
+            string configKey,
+            ConfigLocation location,
+            string file,
+            T currentDefaults,
+            T playerValues)
+            where T : class
+        {
+            var defaults = ConfigClrMapper.ToDocument(currentDefaults);
+            var values = ConfigClrMapper.ToDocument(playerValues);
+            var saved = Save(configKey, location, file, defaults, values);
+            return ConfigClrMapper.FromDocument<T>(saved);
         }
 
         public ConfigDocument Save(
@@ -390,8 +416,11 @@ namespace Mz.ConfigApi
             {
                 case ConfigLocation.Local:
                 case ConfigLocation.Global:
-                case ConfigLocation.World:
                     return (int)location;
+
+                case ConfigLocation.World:
+                    throw new InvalidOperationException(
+                        "World configs require the server-authoritative ConfigAPI path and cannot use direct Open or Save.");
 
                 default:
                     throw new ArgumentException(

@@ -230,6 +230,42 @@ namespace MarcoZechner.ConfigAPI.Tests.V2.Api
         }
 
         [Test]
+        public void Direct_Open_And_Save_Reject_World_Location()
+        {
+            var registrationId = Guid.NewGuid();
+            var storage = new ConsumerStorage();
+            var registry = RegisteredRegistry("Example.Mod", registrationId, storage);
+            var service = new ConfigApiPersistenceService(registry, Clock());
+            object defaults = ConfigDocumentWireCodec.Encode(
+                Document(Entry("Value", Integer(10))));
+
+            Assert.Multiple(() =>
+            {
+                Assert.Throws<InvalidOperationException>(() =>
+                    service.Open(
+                        "Example.Mod",
+                        registrationId,
+                        "Settings",
+                        2,
+                        "settings.toml",
+                        defaults));
+
+                Assert.Throws<InvalidOperationException>(() =>
+                    service.Save(
+                        "Example.Mod",
+                        registrationId,
+                        "Settings",
+                        2,
+                        "settings.toml",
+                        defaults,
+                        defaults));
+
+                Assert.That(storage.WriteCount(2), Is.EqualTo(0));
+                Assert.That(storage.Get(2, "settings.toml"), Is.Null);
+            });
+        }
+
+        [Test]
         public void Provider_Publishes_Exact_Open_And_Save_Endpoints()
         {
             var bus = new RecordingModMessageBus();
