@@ -17,31 +17,11 @@ namespace MarcoZechner.ConfigAPI.V2.Api
 
         private readonly ApiDiscoveryProvider _provider;
 
-        public bool IsStarted
-        {
-            get
-            {
-                return _provider.IsStarted;
-            }
-        }
+        public ConfigApiProvider(IModMessageBus messageBus, ConfigConsumerRegistrationRegistry registry, SemanticVersion modVersion)
+            : this(messageBus, registry, new SystemConfigClock(), modVersion) { }
 
-        public ConfigApiProvider(
-            IModMessageBus messageBus,
-            ConfigConsumerRegistrationRegistry registry,
-            SemanticVersion modVersion)
-            : this(
-                messageBus,
-                registry,
-                new SystemConfigClock(),
-                modVersion)
-        {
-        }
-
-        public ConfigApiProvider(
-            IModMessageBus messageBus,
-            ConfigConsumerRegistrationRegistry registry,
-            IConfigClock clock,
-            SemanticVersion modVersion)
+        public ConfigApiProvider(IModMessageBus messageBus, ConfigConsumerRegistrationRegistry registry, 
+                                 IConfigClock clock, SemanticVersion modVersion)
         {
             if (messageBus == null)
                 throw new ArgumentNullException(nameof(messageBus));
@@ -55,117 +35,54 @@ namespace MarcoZechner.ConfigAPI.V2.Api
             if (modVersion == null)
                 throw new ArgumentNullException(nameof(modVersion));
 
-            var persistence =
-                new ConfigApiPersistenceService(
-                    registry,
-                    clock);
+            var persistence = new ConfigApiPersistenceService(registry, clock);
 
-            Func<
-                string,
-                Guid,
-                Func<int, string, string>,
-                Action<int, string, string>,
-                Action> registerConsumer =
-                    delegate(
-                        string consumerId,
-                        Guid registrationId,
-                        Func<int, string, string> read,
-                        Action<int, string, string> write)
-                    {
-                        registry.Register(
-                            consumerId,
-                            registrationId,
-                            read,
-                            write);
+            Func<string, Guid, Func<int, string, string>, Action<int, string, string>,
+                Action> registerConsumer = delegate(string consumerId, Guid registrationId, 
+                                                    Func<int, string, string> read, 
+                                                    Action<int, string, string> write
+                )
+            {
+                registry.Register(consumerId, registrationId, read, write);
 
-                        return delegate
-                        {
-                            registry.Unregister(
-                                consumerId,
-                                registrationId);
-                        };
-                    };
-
-            Func<
-                string,
-                Guid,
-                string,
-                int,
-                string,
-                object,
-                object> openConfig =
-                    persistence.Open;
-
-            Func<
-                string,
-                Guid,
-                string,
-                int,
-                string,
-                object,
-                object,
-                object> saveConfig =
-                    persistence.Save;
-
-            var endpoints =
-                new Dictionary<string, Delegate>(StringComparer.Ordinal)
+                return delegate
                 {
-                    {
-                        RegisterConsumerEndpoint,
-                        registerConsumer
-                    },
-                    {
-                        OpenConfigEndpoint,
-                        openConfig
-                    },
-                    {
-                        SaveConfigEndpoint,
-                        saveConfig
-                    }
+                    registry.Unregister(consumerId, registrationId);
                 };
+            };
 
-            _provider =
-                new ApiDiscoveryProvider(
-                    messageBus,
-                    new ApiModIdentity(
-                        ApiId,
-                        "ConfigAPI",
-                        modVersion),
-                    new ApiDescriptor(
-                        ApiId,
-                        new SemanticVersion(2, 0, 0)),
-                    endpoints);
+            Func<string, Guid, string, int, string, object, object> openConfig = persistence.Open;
+
+            Func<string, Guid, string, int, string, object, object, object> saveConfig = persistence.Save;
+
+            var endpoints = new Dictionary<string, Delegate>(StringComparer.Ordinal)
+            {
+                { RegisterConsumerEndpoint, registerConsumer },
+                { OpenConfigEndpoint, openConfig },
+                { SaveConfigEndpoint, saveConfig },
+            };
+
+            _provider = new ApiDiscoveryProvider(
+                messageBus,
+                new ApiModIdentity(ApiId, "ConfigAPI", modVersion),
+                new ApiDescriptor(ApiId, new SemanticVersion(2, 0, 0)),
+                endpoints
+            );
         }
 
-        public void Start()
-        {
-            _provider.Start();
-        }
+        public bool IsStarted => _provider.IsStarted;
 
-        public void Announce()
-        {
-            _provider.Announce();
-        }
+        public void Dispose() => _provider.Dispose();
 
-        public void Stop()
-        {
-            _provider.Stop();
-        }
+        public void Start() => _provider.Start();
 
-        public void Dispose()
-        {
-            _provider.Dispose();
-        }
+        public void Announce() => _provider.Announce();
+
+        public void Stop() => _provider.Stop();
 
         private sealed class SystemConfigClock : IConfigClock
         {
-            public DateTime UtcNow
-            {
-                get
-                {
-                    return DateTime.UtcNow;
-                }
-            }
+            public DateTime UtcNow => DateTime.UtcNow;
         }
     }
 }

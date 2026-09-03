@@ -6,28 +6,11 @@ namespace MarcoZechner.ConfigAPI.V2.Api
 {
     public sealed class ConfigConsumerRegistrationRegistry
     {
-        private sealed class Registration
+        private readonly Dictionary<string, Registration> _registrations = new Dictionary<string, Registration>(StringComparer.Ordinal);
+
+        public void Register(string consumerId, Guid registrationId, Func<int, string, string> read, Action<int, string, string> write)
         {
-            public Guid RegistrationId { get; }
-            public IConfigTextStorage Storage { get; }
-
-            public Registration(Guid registrationId, IConfigTextStorage storage)
-            {
-                RegistrationId = registrationId;
-                Storage = storage;
-            }
-        }
-
-        private readonly Dictionary<string, Registration> _registrations =
-            new Dictionary<string, Registration>(StringComparer.Ordinal);
-
-        public void Register(
-            string consumerId,
-            Guid registrationId,
-            Func<int, string, string> read,
-            Action<int, string, string> write)
-        {
-            var normalizedConsumerId = ValidateConsumerId(consumerId);
+            string normalizedConsumerId = ValidateConsumerId(consumerId);
 
             if (registrationId == Guid.Empty)
                 throw new ArgumentException("Registration ID must not be empty.", nameof(registrationId));
@@ -38,13 +21,12 @@ namespace MarcoZechner.ConfigAPI.V2.Api
             if (write == null)
                 throw new ArgumentNullException(nameof(write));
 
-            _registrations[normalizedConsumerId] =
-                new Registration(registrationId, new ConfigCallbackTextStorage(read, write));
+            _registrations[normalizedConsumerId] = new Registration(registrationId, new ConfigCallbackTextStorage(read, write));
         }
 
         public IConfigTextStorage GetStorage(string consumerId, Guid registrationId)
         {
-            var normalizedConsumerId = ValidateConsumerId(consumerId);
+            string normalizedConsumerId = ValidateConsumerId(consumerId);
 
             if (registrationId == Guid.Empty)
                 throw new ArgumentException("Registration ID must not be empty.", nameof(registrationId));
@@ -62,7 +44,7 @@ namespace MarcoZechner.ConfigAPI.V2.Api
 
         public bool Unregister(string consumerId, Guid registrationId)
         {
-            var normalizedConsumerId = ValidateConsumerId(consumerId);
+            string normalizedConsumerId = ValidateConsumerId(consumerId);
 
             if (registrationId == Guid.Empty)
                 throw new ArgumentException("Registration ID must not be empty.", nameof(registrationId));
@@ -84,6 +66,18 @@ namespace MarcoZechner.ConfigAPI.V2.Api
                 throw new ArgumentException("Consumer ID must not be empty.", nameof(consumerId));
 
             return consumerId.Trim();
+        }
+
+        private sealed class Registration
+        {
+            public Registration(Guid registrationId, IConfigTextStorage storage)
+            {
+                RegistrationId = registrationId;
+                Storage = storage;
+            }
+
+            public Guid RegistrationId { get; }
+            public IConfigTextStorage Storage { get; }
         }
     }
 }
