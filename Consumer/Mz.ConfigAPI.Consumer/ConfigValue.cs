@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 
 namespace Mz.ConfigApi
@@ -15,15 +16,11 @@ namespace Mz.ConfigApi
         OffsetDateTime = 7,
         LocalDateTime = 8,
         LocalDate = 9,
-        LocalTime = 10
+        LocalTime = 10,
     }
 
     public sealed class ConfigDate : IEquatable<ConfigDate>
     {
-        public int Year { get; }
-        public int Month { get; }
-        public int Day { get; }
-
         public ConfigDate(int year, int month, int day)
         {
             if (!IsValidDate(year, month, day))
@@ -34,26 +31,22 @@ namespace Mz.ConfigApi
             Day = day;
         }
 
-        public bool Equals(ConfigDate other)
-        {
-            return other != null &&
-                Year == other.Year &&
-                Month == other.Month &&
-                Day == other.Day;
-        }
+        public int Year { get; }
+        public int Month { get; }
+        public int Day { get; }
 
-        public override bool Equals(object obj)
-        {
-            return Equals(obj as ConfigDate);
-        }
+        public bool Equals(ConfigDate other) 
+            => other != null && Year == other.Year && Month == other.Month && Day == other.Day;
+
+        public override bool Equals(object obj) => Equals(obj as ConfigDate);
 
         public override int GetHashCode()
         {
             unchecked
             {
-                var hash = Year;
-                hash = (hash * 397) ^ Month;
-                hash = (hash * 397) ^ Day;
+                int hash = Year;
+                hash = ( hash * 397 ) ^ Month;
+                hash = ( hash * 397 ) ^ Day;
                 return hash;
             }
         }
@@ -96,21 +89,9 @@ namespace Mz.ConfigApi
 
     public sealed class ConfigTime : IEquatable<ConfigTime>
     {
-        public int Hour { get; }
-        public int Minute { get; }
-        public int Second { get; }
-        public string FractionalSeconds { get; }
+        public ConfigTime(int hour, int minute, int second) : this(hour, minute, second, string.Empty) { }
 
-        public ConfigTime(int hour, int minute, int second)
-            : this(hour, minute, second, string.Empty)
-        {
-        }
-
-        public ConfigTime(
-            int hour,
-            int minute,
-            int second,
-            string fractionalSeconds)
+        public ConfigTime(int hour, int minute, int second, string fractionalSeconds)
         {
             if (hour < 0 || hour > 23 || minute < 0 || minute > 59 || second < 0 || second > 60)
                 throw new ArgumentException("The supplied components do not form a valid local time.");
@@ -118,16 +99,10 @@ namespace Mz.ConfigApi
             if (fractionalSeconds == null)
                 throw new ArgumentNullException(nameof(fractionalSeconds));
 
-            for (var i = 0; i < fractionalSeconds.Length; i++)
+            foreach (char c in fractionalSeconds)
             {
-                var c = fractionalSeconds[i];
-
                 if (c < '0' || c > '9')
-                {
-                    throw new ArgumentException(
-                        "Fractional seconds must contain only digits.",
-                        nameof(fractionalSeconds));
-                }
+                    throw new ArgumentException("Fractional seconds must contain only digits.", nameof(fractionalSeconds));
             }
 
             Hour = hour;
@@ -136,53 +111,34 @@ namespace Mz.ConfigApi
             FractionalSeconds = fractionalSeconds;
         }
 
-        public bool Equals(ConfigTime other)
-        {
-            return other != null &&
-                Hour == other.Hour &&
-                Minute == other.Minute &&
-                Second == other.Second &&
-                string.Equals(
-                    FractionalSeconds,
-                    other.FractionalSeconds,
-                    StringComparison.Ordinal);
-        }
+        public int Hour { get; }
+        public int Minute { get; }
+        public int Second { get; }
+        public string FractionalSeconds { get; }
 
-        public override bool Equals(object obj)
-        {
-            return Equals(obj as ConfigTime);
-        }
+        public bool Equals(ConfigTime other) 
+            => other != null && Hour == other.Hour && Minute == other.Minute && Second == other.Second &&
+               string.Equals(FractionalSeconds, other.FractionalSeconds, StringComparison.Ordinal);
+
+        public override bool Equals(object obj) => Equals(obj as ConfigTime);
 
         public override int GetHashCode()
         {
             unchecked
             {
-                var hash = Hour;
-                hash = (hash * 397) ^ Minute;
-                hash = (hash * 397) ^ Second;
-                hash =
-                    (hash * 397) ^
-                    StringComparer.Ordinal.GetHashCode(
-                        FractionalSeconds);
+                int hash = Hour;
+                hash = ( hash * 397 ) ^ Minute;
+                hash = ( hash * 397 ) ^ Second;
+                hash = ( hash * 397 ) ^ StringComparer.Ordinal.GetHashCode(FractionalSeconds);
 
                 return hash;
             }
         }
     }
 
-    public sealed class ConfigOffsetDateTime :
-        IEquatable<ConfigOffsetDateTime>
+    public sealed class ConfigOffsetDateTime : IEquatable<ConfigOffsetDateTime>
     {
-        public ConfigDate Date { get; }
-        public ConfigTime Time { get; }
-        public int OffsetMinutes { get; }
-        public bool IsUnknownLocalOffset { get; }
-
-        public ConfigOffsetDateTime(
-            ConfigDate date,
-            ConfigTime time,
-            int offsetMinutes,
-            bool isUnknownLocalOffset = false)
+        public ConfigOffsetDateTime(ConfigDate date, ConfigTime time, int offsetMinutes, bool isUnknownLocalOffset = false)
         {
             if (date == null)
                 throw new ArgumentNullException(nameof(date));
@@ -202,46 +158,34 @@ namespace Mz.ConfigApi
             IsUnknownLocalOffset = isUnknownLocalOffset;
         }
 
-        public bool Equals(ConfigOffsetDateTime other)
-        {
-            return other != null &&
-                Date.Equals(other.Date) &&
-                Time.Equals(other.Time) &&
-                OffsetMinutes == other.OffsetMinutes &&
-                IsUnknownLocalOffset ==
-                    other.IsUnknownLocalOffset;
-        }
+        public ConfigDate Date { get; }
+        public ConfigTime Time { get; }
+        public int OffsetMinutes { get; }
+        public bool IsUnknownLocalOffset { get; }
 
-        public override bool Equals(object obj)
-        {
-            return Equals(obj as ConfigOffsetDateTime);
-        }
+        public bool Equals(ConfigOffsetDateTime other) 
+            => other != null && Date.Equals(other.Date) && Time.Equals(other.Time) &&
+               OffsetMinutes == other.OffsetMinutes && IsUnknownLocalOffset == other.IsUnknownLocalOffset;
+
+        public override bool Equals(object obj) => Equals(obj as ConfigOffsetDateTime);
 
         public override int GetHashCode()
         {
             unchecked
             {
-                var hash = Date.GetHashCode();
-                hash = (hash * 397) ^ Time.GetHashCode();
-                hash = (hash * 397) ^ OffsetMinutes;
-                hash =
-                    (hash * 397) ^
-                    IsUnknownLocalOffset.GetHashCode();
+                int hash = Date.GetHashCode();
+                hash = ( hash * 397 ) ^ Time.GetHashCode();
+                hash = ( hash * 397 ) ^ OffsetMinutes;
+                hash = ( hash * 397 ) ^ IsUnknownLocalOffset.GetHashCode();
 
                 return hash;
             }
         }
     }
 
-    public sealed class ConfigLocalDateTime :
-        IEquatable<ConfigLocalDateTime>
+    public sealed class ConfigLocalDateTime : IEquatable<ConfigLocalDateTime>
     {
-        public ConfigDate Date { get; }
-        public ConfigTime Time { get; }
-
-        public ConfigLocalDateTime(
-            ConfigDate date,
-            ConfigTime time)
+        public ConfigLocalDateTime(ConfigDate date, ConfigTime time)
         {
             if (date == null)
                 throw new ArgumentNullException(nameof(date));
@@ -253,44 +197,29 @@ namespace Mz.ConfigApi
             Time = time;
         }
 
-        public bool Equals(ConfigLocalDateTime other)
-        {
-            return other != null &&
-                Date.Equals(other.Date) &&
-                Time.Equals(other.Time);
-        }
+        public ConfigDate Date { get; }
+        public ConfigTime Time { get; }
 
-        public override bool Equals(object obj)
-        {
-            return Equals(obj as ConfigLocalDateTime);
-        }
+        public bool Equals(ConfigLocalDateTime other) 
+            => other != null && Date.Equals(other.Date) && Time.Equals(other.Time);
+
+        public override bool Equals(object obj) => Equals(obj as ConfigLocalDateTime);
 
         public override int GetHashCode()
         {
             unchecked
             {
-                return
-                    (Date.GetHashCode() * 397) ^
-                    Time.GetHashCode();
+                return ( Date.GetHashCode() * 397 ) ^ Time.GetHashCode();
             }
         }
     }
 
     public sealed class ConfigEntry : IEquatable<ConfigEntry>
     {
-        public string Name { get; }
-        public ConfigValue Value { get; }
-
-        public ConfigEntry(
-            string name,
-            ConfigValue value)
+        public ConfigEntry(string name, ConfigValue value)
         {
             if (string.IsNullOrWhiteSpace(name))
-            {
-                throw new ArgumentException(
-                    "Config entry name must not be empty.",
-                    nameof(name));
-            }
+                throw new ArgumentException("Config entry name must not be empty.", nameof(name));
 
             if (value == null)
                 throw new ArgumentNullException(nameof(value));
@@ -299,28 +228,19 @@ namespace Mz.ConfigApi
             Value = value;
         }
 
-        public bool Equals(ConfigEntry other)
-        {
-            return other != null &&
-                string.Equals(
-                    Name,
-                    other.Name,
-                    StringComparison.Ordinal) &&
-                Value.Equals(other.Value);
-        }
+        public string Name { get; }
+        public ConfigValue Value { get; }
 
-        public override bool Equals(object obj)
-        {
-            return Equals(obj as ConfigEntry);
-        }
+        public bool Equals(ConfigEntry other) 
+            => other != null && string.Equals(Name, other.Name, StringComparison.Ordinal) && Value.Equals(other.Value);
+
+        public override bool Equals(object obj) => Equals(obj as ConfigEntry);
 
         public override int GetHashCode()
         {
             unchecked
             {
-                return
-                    (StringComparer.Ordinal.GetHashCode(Name) * 397) ^
-                    Value.GetHashCode();
+                return ( StringComparer.Ordinal.GetHashCode(Name) * 397 ) ^ Value.GetHashCode();
             }
         }
     }
@@ -328,16 +248,6 @@ namespace Mz.ConfigApi
     internal sealed class MzReadOnlyList<T> : IReadOnlyList<T>
     {
         private readonly T[] _items;
-
-        public int Count
-        {
-            get { return _items.Length; }
-        }
-
-        public T this[int index]
-        {
-            get { return _items[index]; }
-        }
 
         public MzReadOnlyList(T[] items)
         {
@@ -348,212 +258,39 @@ namespace Mz.ConfigApi
             Array.Copy(items, _items, items.Length);
         }
 
-        public IEnumerator<T> GetEnumerator()
-        {
-            return ((IEnumerable<T>)_items).GetEnumerator();
-        }
+        public int Count => _items.Length;
 
-        System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator()
-        {
-            return _items.GetEnumerator();
-        }
+        public T this[int index] => _items[index];
+
+        public IEnumerator<T> GetEnumerator() => ( (IEnumerable<T>)_items ).GetEnumerator();
+
+        IEnumerator IEnumerable.GetEnumerator() => _items.GetEnumerator();
     }
+
     public sealed class ConfigValue : IEquatable<ConfigValue>
     {
-        private static readonly ConfigValue _nullInstance =
-            new ConfigValue(
-                ConfigValueKind.Null,
-                null,
-                null,
-                null);
-
-        private readonly object _scalarValue;
         private readonly MzReadOnlyList<ConfigEntry> _entries;
         private readonly MzReadOnlyList<ConfigValue> _items;
 
-        public ConfigValueKind Kind { get; }
-
-        public object ScalarValue
-        {
-            get
-            {
-                return _scalarValue;
-            }
-        }
-
-        public IReadOnlyList<ConfigEntry> Entries
-        {
-            get
-            {
-                return _entries;
-            }
-        }
-
-        public IReadOnlyList<ConfigValue> Items
-        {
-            get
-            {
-                return _items;
-            }
-        }
-
-        public static ConfigValue Null
-        {
-            get
-            {
-                return _nullInstance;
-            }
-        }
-
-        private ConfigValue(
-            ConfigValueKind kind,
-            object scalarValue,
-            ConfigEntry[] entries,
-            ConfigValue[] items)
+        private ConfigValue(ConfigValueKind kind, object scalarValue, ConfigEntry[] entries, ConfigValue[] items)
         {
             Kind = kind;
-            _scalarValue = scalarValue;
+            ScalarValue = scalarValue;
 
-            _entries =
-                entries == null
-                    ? null
-                    : new MzReadOnlyList<ConfigEntry>(entries);
+            _entries = entries == null ? null : new MzReadOnlyList<ConfigEntry>(entries);
 
-            _items =
-                items == null
-                    ? null
-                    : new MzReadOnlyList<ConfigValue>(items);
+            _items = items == null ? null : new MzReadOnlyList<ConfigValue>(items);
         }
 
-        public static ConfigValue Boolean(bool value)
-        {
-            return new ConfigValue(
-                ConfigValueKind.Boolean,
-                value,
-                null,
-                null);
-        }
+        public ConfigValueKind Kind { get; }
 
-        public static ConfigValue Integer(long value)
-        {
-            return new ConfigValue(
-                ConfigValueKind.Integer,
-                value,
-                null,
-                null);
-        }
+        public object ScalarValue { get; }
 
-        public static ConfigValue Float(double value)
-        {
-            return new ConfigValue(
-                ConfigValueKind.Float,
-                value,
-                null,
-                null);
-        }
+        public IReadOnlyList<ConfigEntry> Entries => _entries;
 
-        public static ConfigValue String(string value)
-        {
-            if (value == null)
-                throw new ArgumentNullException(nameof(value));
+        public IReadOnlyList<ConfigValue> Items => _items;
 
-            return new ConfigValue(
-                ConfigValueKind.String,
-                value,
-                null,
-                null);
-        }
-
-        public static ConfigValue Object(
-            params ConfigEntry[] entries)
-        {
-            ConfigEntry[] copy =
-                CopyEntries(entries);
-
-            ValidateUniqueEntryNames(copy);
-
-            return new ConfigValue(
-                ConfigValueKind.Object,
-                null,
-                copy,
-                null);
-        }
-
-        public static ConfigValue Array(
-            params ConfigValue[] items)
-        {
-            if (items == null)
-                throw new ArgumentNullException(nameof(items));
-
-            var copy =
-                new ConfigValue[items.Length];
-
-            for (var i = 0; i < items.Length; i++)
-            {
-                if (items[i] == null)
-                    throw new ArgumentNullException(nameof(items));
-
-                copy[i] = items[i];
-            }
-
-            return new ConfigValue(
-                ConfigValueKind.Array,
-                null,
-                null,
-                copy);
-        }
-
-        public static ConfigValue OffsetDateTime(
-            ConfigOffsetDateTime value)
-        {
-            if (value == null)
-                throw new ArgumentNullException(nameof(value));
-
-            return new ConfigValue(
-                ConfigValueKind.OffsetDateTime,
-                value,
-                null,
-                null);
-        }
-
-        public static ConfigValue LocalDateTime(
-            ConfigLocalDateTime value)
-        {
-            if (value == null)
-                throw new ArgumentNullException(nameof(value));
-
-            return new ConfigValue(
-                ConfigValueKind.LocalDateTime,
-                value,
-                null,
-                null);
-        }
-
-        public static ConfigValue LocalDate(
-            ConfigDate value)
-        {
-            if (value == null)
-                throw new ArgumentNullException(nameof(value));
-
-            return new ConfigValue(
-                ConfigValueKind.LocalDate,
-                value,
-                null,
-                null);
-        }
-
-        public static ConfigValue LocalTime(
-            ConfigTime value)
-        {
-            if (value == null)
-                throw new ArgumentNullException(nameof(value));
-
-            return new ConfigValue(
-                ConfigValueKind.LocalTime,
-                value,
-                null,
-                null);
-        }
+        public static ConfigValue Null { get; } = new ConfigValue(ConfigValueKind.Null, null, null, null);
 
         public bool Equals(ConfigValue other)
         {
@@ -566,108 +303,154 @@ namespace Mz.ConfigApi
             if (Kind != other.Kind)
                 return false;
 
-            if (Kind == ConfigValueKind.Object)
-                return ObjectEquals(other);
-
-            if (Kind == ConfigValueKind.Array)
-                return ArrayEquals(other);
-
-            return Equals(
-                _scalarValue,
-                other._scalarValue);
+            switch (Kind)
+            {
+                case ConfigValueKind.Object: return ObjectEquals(other);
+                case ConfigValueKind.Array:  return ArrayEquals(other);
+                default:                     return Equals(ScalarValue, other.ScalarValue);
+            }
         }
 
-        public override bool Equals(object obj)
+        public static ConfigValue Boolean(bool value) => new ConfigValue(ConfigValueKind.Boolean, value, null, null);
+
+        public static ConfigValue Integer(long value) => new ConfigValue(ConfigValueKind.Integer, value, null, null);
+
+        public static ConfigValue Float(double value) => new ConfigValue(ConfigValueKind.Float, value, null, null);
+
+        public static ConfigValue String(string value)
         {
-            return Equals(obj as ConfigValue);
+            if (value == null)
+                throw new ArgumentNullException(nameof(value));
+
+            return new ConfigValue(ConfigValueKind.String, value, null, null);
         }
+
+        public static ConfigValue Object(params ConfigEntry[] entries)
+        {
+            var copy = CopyEntries(entries);
+
+            ValidateUniqueEntryNames(copy);
+
+            return new ConfigValue(ConfigValueKind.Object, null, copy, null);
+        }
+
+        public static ConfigValue Array(params ConfigValue[] items)
+        {
+            if (items == null)
+                throw new ArgumentNullException(nameof(items));
+
+            var copy = new ConfigValue[items.Length];
+
+            for (var i = 0; i < items.Length; i++)
+            {
+                if (items[i] == null)
+                    throw new ArgumentNullException(nameof(items));
+
+                copy[i] = items[i];
+            }
+
+            return new ConfigValue(ConfigValueKind.Array, null, null, copy);
+        }
+
+        public static ConfigValue OffsetDateTime(ConfigOffsetDateTime value)
+        {
+            if (value == null)
+                throw new ArgumentNullException(nameof(value));
+
+            return new ConfigValue(ConfigValueKind.OffsetDateTime, value, null, null);
+        }
+
+        public static ConfigValue LocalDateTime(ConfigLocalDateTime value)
+        {
+            if (value == null)
+                throw new ArgumentNullException(nameof(value));
+
+            return new ConfigValue(ConfigValueKind.LocalDateTime, value, null, null);
+        }
+
+        public static ConfigValue LocalDate(ConfigDate value)
+        {
+            if (value == null)
+                throw new ArgumentNullException(nameof(value));
+
+            return new ConfigValue(ConfigValueKind.LocalDate, value, null, null);
+        }
+
+        public static ConfigValue LocalTime(ConfigTime value)
+        {
+            if (value == null)
+                throw new ArgumentNullException(nameof(value));
+
+            return new ConfigValue(ConfigValueKind.LocalTime, value, null, null);
+        }
+
+        public override bool Equals(object obj) => Equals(obj as ConfigValue);
 
         public override int GetHashCode()
         {
             unchecked
             {
-                var hash =
-                    (int)Kind;
+                var hash = (int)Kind;
 
-                if (Kind == ConfigValueKind.Object)
+                switch (Kind)
                 {
-                    for (var i = 0; i < _entries.Count; i++)
+                    case ConfigValueKind.Object:
                     {
-                        hash ^=
-                            _entries[i].GetHashCode();
+                        foreach (ConfigEntry entry in _entries)
+                            hash ^= entry.GetHashCode();
+
+                        return hash;
                     }
-
-                    return hash;
-                }
-
-                if (Kind == ConfigValueKind.Array)
-                {
-                    for (var i = 0; i < _items.Count; i++)
+                    case ConfigValueKind.Array:
                     {
-                        hash =
-                            (hash * 397) ^
-                            _items[i].GetHashCode();
+                        foreach (ConfigValue entry in _items)
+                            hash = ( hash * 397 ) ^ entry.GetHashCode();
+
+                        return hash;
                     }
-
-                    return hash;
+                    default:
+                        return ( hash * 397 ) ^ ( ScalarValue == null ? 0 : ScalarValue.GetHashCode() );
                 }
-
-                return
-                    (hash * 397) ^
-                    (_scalarValue == null
-                        ? 0
-                        : _scalarValue.GetHashCode());
             }
         }
 
-        private bool ObjectEquals(
-            ConfigValue other)
+        private bool ObjectEquals(ConfigValue other)
         {
             if (_entries.Count != other._entries.Count)
                 return false;
 
-            for (var i = 0; i < _entries.Count; i++)
+            foreach (ConfigEntry entry in _entries)
             {
                 ConfigValue otherValue;
 
-                if (!TryGetEntry(
-                    other._entries,
-                    _entries[i].Name,
-                    out otherValue))
-                {
+                if (!TryGetEntry(other._entries, entry.Name, out otherValue))
                     return false;
-                }
 
-                if (!_entries[i].Value.Equals(otherValue))
+                if (!entry.Value.Equals(otherValue))
                     return false;
             }
 
             return true;
         }
 
-        private bool ArrayEquals(
-            ConfigValue other)
+        private bool ArrayEquals(ConfigValue other)
         {
             if (_items.Count != other._items.Count)
                 return false;
 
             for (var i = 0; i < _items.Count; i++)
-            {
                 if (!_items[i].Equals(other._items[i]))
                     return false;
-            }
 
             return true;
         }
 
-        internal static ConfigEntry[] CopyEntries(
-            ConfigEntry[] entries)
+        internal static ConfigEntry[] CopyEntries(ConfigEntry[] entries)
         {
             if (entries == null)
                 throw new ArgumentNullException(nameof(entries));
 
-            var copy =
-                new ConfigEntry[entries.Length];
+            var copy = new ConfigEntry[entries.Length];
 
             for (var i = 0; i < entries.Length; i++)
             {
@@ -680,41 +463,23 @@ namespace Mz.ConfigApi
             return copy;
         }
 
-        internal static void ValidateUniqueEntryNames(
-            ConfigEntry[] entries)
+        internal static void ValidateUniqueEntryNames(ConfigEntry[] entries)
         {
-            var names =
-                new HashSet<string>(
-                    StringComparer.Ordinal);
+            var names = new HashSet<string>(StringComparer.Ordinal);
 
-            for (var i = 0; i < entries.Length; i++)
-            {
-                if (!names.Add(entries[i].Name))
-                {
-                    throw new ArgumentException(
-                        "Config object contains duplicate entry name: " +
-                        entries[i].Name,
-                        nameof(entries));
-                }
-            }
+            foreach (ConfigEntry entry in entries)
+                if (!names.Add(entry.Name))
+                    throw new ArgumentException($"Config object contains duplicate entry name: {entry.Name}", nameof(entries));
         }
 
-        private static bool TryGetEntry(
-            IReadOnlyList<ConfigEntry> entries,
-            string name,
-            out ConfigValue value)
+        private static bool TryGetEntry(IReadOnlyList<ConfigEntry> entries, string name, out ConfigValue value)
         {
-            for (var i = 0; i < entries.Count; i++)
+            foreach (ConfigEntry entry in entries)
             {
-                if (!string.Equals(
-                    entries[i].Name,
-                    name,
-                    StringComparison.Ordinal))
-                {
+                if (!string.Equals(entry.Name, name, StringComparison.Ordinal))
                     continue;
-                }
 
-                value = entries[i].Value;
+                value = entry.Value;
                 return true;
             }
 
@@ -723,54 +488,30 @@ namespace Mz.ConfigApi
         }
     }
 
-    public sealed class ConfigDocument :
-        IEquatable<ConfigDocument>
+    public sealed class ConfigDocument : IEquatable<ConfigDocument>
     {
-        private readonly ConfigValue _root;
-
-        public IReadOnlyList<ConfigEntry> Entries
+        public ConfigDocument(params ConfigEntry[] entries)
         {
-            get
-            {
-                return _root.Entries;
-            }
+            Root = ConfigValue.Object(entries);
         }
 
-        internal ConfigValue Root
-        {
-            get
-            {
-                return _root;
-            }
-        }
+        public IReadOnlyList<ConfigEntry> Entries => Root.Entries;
 
-        public ConfigDocument(
-            params ConfigEntry[] entries)
-        {
-            _root =
-                ConfigValue.Object(entries);
-        }
+        internal ConfigValue Root { get; }
 
-        public bool TryGet(
-            string name,
-            out ConfigValue value)
+        public bool Equals(ConfigDocument other) => other != null && Root.Equals(other.Root);
+
+        public bool TryGet(string name, out ConfigValue value)
         {
             if (string.IsNullOrWhiteSpace(name))
-                throw new ArgumentException(
-                    "Config entry name must not be empty.",
-                    nameof(name));
+                throw new ArgumentException("Config entry name must not be empty.", nameof(name));
 
-            for (var i = 0; i < Entries.Count; i++)
+            foreach (ConfigEntry entry in Entries)
             {
-                if (!string.Equals(
-                    Entries[i].Name,
-                    name,
-                    StringComparison.Ordinal))
-                {
+                if (!string.Equals(entry.Name, name, StringComparison.Ordinal))
                     continue;
-                }
 
-                value = Entries[i].Value;
+                value = entry.Value;
                 return true;
             }
 
@@ -778,20 +519,8 @@ namespace Mz.ConfigApi
             return false;
         }
 
-        public bool Equals(ConfigDocument other)
-        {
-            return other != null &&
-                _root.Equals(other._root);
-        }
+        public override bool Equals(object obj) => Equals(obj as ConfigDocument);
 
-        public override bool Equals(object obj)
-        {
-            return Equals(obj as ConfigDocument);
-        }
-
-        public override int GetHashCode()
-        {
-            return _root.GetHashCode();
-        }
+        public override int GetHashCode() => Root.GetHashCode();
     }
 }

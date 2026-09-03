@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using Sandbox.ModAPI;
 
 namespace Mz.ConfigApi
@@ -20,12 +21,10 @@ namespace Mz.ConfigApi
 
     public sealed class SpaceEngineersConfigTextStorage
     {
-        private readonly IConfigApiStorageUtilities _utilities;
         private readonly Type _scope;
+        private readonly IConfigApiStorageUtilities _utilities;
 
-        public SpaceEngineersConfigTextStorage(
-            IConfigApiStorageUtilities utilities,
-            Type scope)
+        public SpaceEngineersConfigTextStorage(IConfigApiStorageUtilities utilities, Type scope)
         {
             if (utilities == null)
                 throw new ArgumentNullException(nameof(utilities));
@@ -41,26 +40,16 @@ namespace Mz.ConfigApi
         {
             switch (location)
             {
-                case 0:
-                    if (!_utilities.FileExistsInLocalStorage(file, _scope))
-                        return null;
+                case 0: return _utilities.FileExistsInLocalStorage(file, _scope) 
+                                   ? _utilities.ReadFileInLocalStorage(file, _scope) : null;
 
-                    return _utilities.ReadFileInLocalStorage(file, _scope);
+                case 1: return _utilities.FileExistsInGlobalStorage(file) 
+                                   ? _utilities.ReadFileInGlobalStorage(file) : null;
 
-                case 1:
-                    if (!_utilities.FileExistsInGlobalStorage(file))
-                        return null;
+                case 2: return _utilities.FileExistsInWorldStorage(file, _scope) 
+                                   ? _utilities.ReadFileInWorldStorage(file, _scope) : null;
 
-                    return _utilities.ReadFileInGlobalStorage(file);
-
-                case 2:
-                    if (!_utilities.FileExistsInWorldStorage(file, _scope))
-                        return null;
-
-                    return _utilities.ReadFileInWorldStorage(file, _scope);
-
-                default:
-                    throw UnsupportedLocation(location);
+                default: throw UnsupportedLocation(location);
             }
         }
 
@@ -85,72 +74,64 @@ namespace Mz.ConfigApi
             }
         }
 
-        private static ArgumentException UnsupportedLocation(int location)
-        {
-            return new ArgumentException(
-                "Unsupported ConfigAPI storage location: " + location,
-                nameof(location));
-        }
+        private static ArgumentException UnsupportedLocation(int location) 
+            => new ArgumentException($"Unsupported ConfigAPI storage location: {location}", nameof(location));
     }
 
-    internal sealed class SpaceEngineersConfigApiStorageUtilities :
-        IConfigApiStorageUtilities
+    internal sealed class SpaceEngineersConfigApiStorageUtilities : IConfigApiStorageUtilities
     {
-        public bool FileExistsInLocalStorage(string file, Type scope)
-        {
-            return MyAPIGateway.Utilities.FileExistsInLocalStorage(file, scope);
-        }
+        public bool FileExistsInLocalStorage(string file, Type scope) => MyAPIGateway.Utilities.FileExistsInLocalStorage(file, scope);
 
         public string ReadFileInLocalStorage(string file, Type scope)
         {
-            using (var reader = MyAPIGateway.Utilities.ReadFileInLocalStorage(file, scope))
+            using (TextReader reader = MyAPIGateway.Utilities.ReadFileInLocalStorage(file, scope))
+            {
                 return reader.ReadToEnd();
+            }
         }
 
-        public void WriteFileInLocalStorage(
-            string file,
-            string content,
-            Type scope)
+        public void WriteFileInLocalStorage(string file, string content, Type scope)
         {
-            using (var writer = MyAPIGateway.Utilities.WriteFileInLocalStorage(file, scope))
+            using (TextWriter writer = MyAPIGateway.Utilities.WriteFileInLocalStorage(file, scope))
+            {
                 writer.Write(content);
+            }
         }
 
-        public bool FileExistsInGlobalStorage(string file)
-        {
-            return MyAPIGateway.Utilities.FileExistsInGlobalStorage(file);
-        }
+        public bool FileExistsInGlobalStorage(string file) => MyAPIGateway.Utilities.FileExistsInGlobalStorage(file);
 
         public string ReadFileInGlobalStorage(string file)
         {
-            using (var reader = MyAPIGateway.Utilities.ReadFileInGlobalStorage(file))
+            using (TextReader reader = MyAPIGateway.Utilities.ReadFileInGlobalStorage(file))
+            {
                 return reader.ReadToEnd();
+            }
         }
 
         public void WriteFileInGlobalStorage(string file, string content)
         {
-            using (var writer = MyAPIGateway.Utilities.WriteFileInGlobalStorage(file))
+            using (TextWriter writer = MyAPIGateway.Utilities.WriteFileInGlobalStorage(file))
+            {
                 writer.Write(content);
+            }
         }
 
-        public bool FileExistsInWorldStorage(string file, Type scope)
-        {
-            return MyAPIGateway.Utilities.FileExistsInWorldStorage(file, scope);
-        }
+        public bool FileExistsInWorldStorage(string file, Type scope) => MyAPIGateway.Utilities.FileExistsInWorldStorage(file, scope);
 
         public string ReadFileInWorldStorage(string file, Type scope)
         {
-            using (var reader = MyAPIGateway.Utilities.ReadFileInWorldStorage(file, scope))
+            using (TextReader reader = MyAPIGateway.Utilities.ReadFileInWorldStorage(file, scope))
+            {
                 return reader.ReadToEnd();
+            }
         }
 
-        public void WriteFileInWorldStorage(
-            string file,
-            string content,
-            Type scope)
+        public void WriteFileInWorldStorage(string file, string content, Type scope)
         {
-            using (var writer = MyAPIGateway.Utilities.WriteFileInWorldStorage(file, scope))
+            using (TextWriter writer = MyAPIGateway.Utilities.WriteFileInWorldStorage(file, scope))
+            {
                 writer.Write(content);
+            }
         }
     }
 }

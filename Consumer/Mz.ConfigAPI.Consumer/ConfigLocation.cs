@@ -4,6 +4,6 @@ namespace Mz.ConfigApi
     {
         Local = 0,
         Global = 1,
-        World = 2
+        World = 2,
     }
 }

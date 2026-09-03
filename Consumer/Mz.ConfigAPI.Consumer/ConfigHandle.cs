@@ -8,16 +8,7 @@ namespace Mz.ConfigApi
         private readonly ConfigApiClient _client;
         private readonly ConfigDefinition<T> _definition;
 
-        public ConfigLocation Location { get; private set; }
-        public string CurrentFile { get; private set; }
-        public T Value { get; private set; }
-
-        internal ConfigHandle(
-            ConfigApiClient client,
-            ConfigDefinition<T> definition,
-            ConfigLocation location,
-            string currentFile,
-            T value)
+        internal ConfigHandle(ConfigApiClient client, ConfigDefinition<T> definition, ConfigLocation location, string currentFile, T value)
         {
             if (client == null)
                 throw new ArgumentNullException(nameof(client));
@@ -26,11 +17,7 @@ namespace Mz.ConfigApi
                 throw new ArgumentNullException(nameof(definition));
 
             if (string.IsNullOrWhiteSpace(currentFile))
-            {
-                throw new ArgumentException(
-                    "Current config file must not be empty.",
-                    nameof(currentFile));
-            }
+                throw new ArgumentException("Current config file must not be empty.", nameof(currentFile));
 
             if (value == null)
                 throw new ArgumentNullException(nameof(value));
@@ -42,15 +29,14 @@ namespace Mz.ConfigApi
             Value = value;
         }
 
-        public T SwitchFile(
-            string file)
+        public ConfigLocation Location { get; }
+        public string CurrentFile { get; private set; }
+        public T Value { get; private set; }
+
+        public T SwitchFile(string file)
         {
             if (string.IsNullOrWhiteSpace(file))
-            {
-                throw new ArgumentException(
-                    "Config file must not be empty.",
-                    nameof(file));
-            }
+                throw new ArgumentException("Config file must not be empty.", nameof(file));
 
             CurrentFile = file;
             return Reload();
@@ -58,8 +44,7 @@ namespace Mz.ConfigApi
 
         public T Reload()
         {
-            T value =
-                _client.Open(_definition, Location);
+            T value = _client.Open(_definition, Location);
 
             Value = value;
             return value;

@@ -11,43 +11,22 @@ namespace Mz.ConfigApi
         public const string RegisterConsumerEndpoint = "RegisterConsumer";
         public const string OpenConfigEndpoint = "OpenConfig";
         public const string SaveConfigEndpoint = "SaveConfig";
+        private readonly ApiDiscoveryConsumer _consumer;
 
         private readonly string _consumerId;
         private readonly Func<int, string, string> _read;
         private readonly Action<int, string, string> _write;
-        private readonly ApiDiscoveryConsumer _consumer;
-
-        private Action _providerUnregister;
-        private Func<string, Guid, string, int, string, object, object> _openConfig;
-        private Func<string, Guid, string, int, string, object, object, object> _saveConfig;
-        private Guid _registrationId;
         private bool _isDisposed;
         private Exception _lastError;
+        private Func<string, Guid, string, int, string, object, object> _openConfig;
 
-        public event Action Connected;
-        public event Action Disconnected;
-
-        public bool IsStarted =>
-            _consumer.IsStarted;
-
-        public bool IsConnected =>
-            _providerUnregister != null;
-
-        public SemanticVersion ProviderModVersion { get; private set; }
-        public SemanticVersion ProviderApiVersion { get; private set; }
-
-        public Exception LastError =>
-            _lastError ?? _consumer.LastError;
+        private Action _providerUnregister;
+        private Guid _registrationId;
+        private Func<string, Guid, string, int, string, object, object, object> _saveConfig;
 
         public ConfigApiClient(
-            IModMessageBus messageBus,
-            string consumerId,
-            string consumerDisplayName,
-            SemanticVersion consumerModVersion,
-            bool isRequired,
-            string featureDescription,
-            Func<int, string, string> read,
-            Action<int, string, string> write)
+            IModMessageBus messageBus, string consumerId, string consumerDisplayName, SemanticVersion consumerModVersion,
+            bool isRequired, string featureDescription, Func<int, string, string> read, Action<int, string, string> write)
         {
             if (messageBus == null)
                 throw new ArgumentNullException(nameof(messageBus));
@@ -71,53 +50,67 @@ namespace Mz.ConfigApi
             _read = read;
             _write = write;
 
-            var dependency =
-                new ApiDependencyDescriptor(
-                    new ApiModIdentity(
-                        _consumerId,
-                        consumerDisplayName.Trim(),
-                        consumerModVersion),
-                    new ApiRequirement(
-                        ProviderApiId,
-                        new ApiVersionRange(
-                            ApiVersionFile.MinimumProviderApiVersion,
-                            null)),
-                    isRequired
-                        ? ApiDependencyKind.Required
-                        : ApiDependencyKind.Optional,
-                    featureDescription);
+            var dependency = new ApiDependencyDescriptor(
+                new ApiModIdentity(
+                    _consumerId,
+                    consumerDisplayName.Trim(),
+                    consumerModVersion
+                ),
+                new ApiRequirement(
+                    ProviderApiId,
+                    new ApiVersionRange(ApiVersionFile.MinimumProviderApiVersion, null)
+                ),
+                isRequired
+                    ? ApiDependencyKind.Required
+                    : ApiDependencyKind.Optional,
+                featureDescription
+            );
 
-            _consumer =
-                new ApiDiscoveryConsumer(
-                    messageBus,
-                    dependency);
+            _consumer = new ApiDiscoveryConsumer(messageBus, dependency);
 
             _consumer.Connected += OnConnected;
             _consumer.Disconnected += OnDisconnected;
         }
 
-        public static ConfigApiClient CreateForSpaceEngineers(
-            IModMessageBus messageBus,
-            string consumerId,
-            string consumerDisplayName,
-            SemanticVersion consumerModVersion,
-            bool isRequired,
-            string featureDescription)
-        {
-            var storage =
-                new SpaceEngineersConfigTextStorage(
-                    new SpaceEngineersConfigApiStorageUtilities(),
-                    typeof(SpaceEngineersConfigTextStorage));
+        public bool IsStarted => _consumer.IsStarted;
 
-            return new ConfigApiClient(
-                messageBus,
-                consumerId,
-                consumerDisplayName,
-                consumerModVersion,
-                isRequired,
-                featureDescription,
-                storage.Read,
-                storage.Write);
+        public bool IsConnected => _providerUnregister != null;
+
+        public SemanticVersion ProviderModVersion { get; private set; }
+        public SemanticVersion ProviderApiVersion { get; private set; }
+
+        public Exception LastError => _lastError ?? _consumer.LastError;
+
+        public void Dispose()
+        {
+            if (_isDisposed)
+                return;
+
+            _isDisposed = true;
+
+            ReleaseProviderRegistration();
+
+            _consumer.Connected -= OnConnected;
+            _consumer.Disconnected -= OnDisconnected;
+            _consumer.Dispose();
+
+            ClearConnection();
+        }
+
+        public event Action Connected;
+        public event Action Disconnected;
+
+        public static ConfigApiClient CreateForSpaceEngineers(
+            IModMessageBus messageBus, string consumerId, string consumerDisplayName, SemanticVersion consumerModVersion,
+            bool isRequired, string featureDescription)
+        {
+            var storage = new SpaceEngineersConfigTextStorage(
+                new SpaceEngineersConfigApiStorageUtilities(),
+                typeof(SpaceEngineersConfigTextStorage)
+            );
+
+            return new ConfigApiClient(messageBus, consumerId, consumerDisplayName, consumerModVersion,
+                                       isRequired, featureDescription, storage.Read, storage.Write);
         }
 
         public void Start()
@@ -150,47 +143,30 @@ namespace Mz.ConfigApi
             return _consumer.Rediscover();
         }
 
-        public ConfigHandle<T> OpenHandle<T>(
-            ConfigDefinition<T> definition,
-            ConfigLocation location)
-            where T : class
+        public ConfigHandle<T> OpenHandle<T>(ConfigDefinition<T> definition, ConfigLocation location) where T : class
         {
             if (definition == null)
                 throw new ArgumentNullException(nameof(definition));
 
-            T value =
-                Open(
-                    definition,
-                    location);
+            T value = Open(definition, location);
 
-            return new ConfigHandle<T>(
-                this,
-                definition,
-                location,
-                definition.DefaultFile,
-                value);
+            return new ConfigHandle<T>(this, definition, location, definition.DefaultFile, value);
         }
 
 
-        public T Open<T>(ConfigDefinition<T> definition, ConfigLocation location)
-            where T : class
+        public T Open<T>(ConfigDefinition<T> definition, ConfigLocation location) where T : class
         {
             if (definition == null)
                 throw new ArgumentNullException(nameof(definition));
 
             return definition.Deserialize(
-                Open(
-                    definition.ConfigKey,
-                    location,
-                    definition.DefaultFile,
-                    definition.Serialize(definition.CreateDefaults())));
+                Open(definition.ConfigKey, location, definition.DefaultFile, 
+                    definition.Serialize(definition.CreateDefaults())
+                )
+            );
         }
 
-        public ConfigDocument Open(
-            string configKey,
-            ConfigLocation location,
-            string file,
-            ConfigDocument currentDefaults)
+        public ConfigDocument Open(string configKey, ConfigLocation location, string file, ConfigDocument currentDefaults)
         {
             ThrowIfDisposed();
             EnsureConnected();
@@ -204,40 +180,28 @@ namespace Mz.ConfigApi
             if (currentDefaults == null)
                 throw new ArgumentNullException(nameof(currentDefaults));
 
-            object payload =
-                _openConfig(
-                    _consumerId,
-                    _registrationId,
-                    configKey.Trim(),
-                    ValidateLocation(location),
-                    file,
-                    ConfigDocumentWireCodec.Encode(currentDefaults));
+            object payload = _openConfig(_consumerId, _registrationId, configKey.Trim(), ValidateLocation(location), 
+                                         file, ConfigDocumentWireCodec.Encode(currentDefaults));
 
             return ConfigDocumentWireCodec.Decode(payload);
         }
 
 
-        public T Save<T>(ConfigDefinition<T> definition, ConfigLocation location, T playerValues)
-            where T : class
+        public T Save<T>(ConfigDefinition<T> definition, ConfigLocation location, T playerValues) where T : class
         {
             if (definition == null)
                 throw new ArgumentNullException(nameof(definition));
 
             return definition.Deserialize(
-                Save(
-                    definition.ConfigKey,
-                    location,
-                    definition.DefaultFile,
-                    definition.Serialize(definition.CreateDefaults()),
-                    definition.Serialize(playerValues)));
+                Save(definition.ConfigKey, location, definition.DefaultFile,
+                     definition.Serialize(definition.CreateDefaults()),
+                     definition.Serialize(playerValues)
+                )
+            );
         }
 
-        public ConfigDocument Save(
-            string configKey,
-            ConfigLocation location,
-            string file,
-            ConfigDocument currentDefaults,
-            ConfigDocument playerValues)
+        public ConfigDocument Save(string configKey, ConfigLocation location, string file, 
+                                   ConfigDocument currentDefaults, ConfigDocument playerValues)
         {
             ThrowIfDisposed();
             EnsureConnected();
@@ -254,15 +218,8 @@ namespace Mz.ConfigApi
             if (playerValues == null)
                 throw new ArgumentNullException(nameof(playerValues));
 
-            object payload =
-                _saveConfig(
-                    _consumerId,
-                    _registrationId,
-                    configKey.Trim(),
-                    ValidateLocation(location),
-                    file,
-                    ConfigDocumentWireCodec.Encode(currentDefaults),
-                    ConfigDocumentWireCodec.Encode(playerValues));
+            object payload = _saveConfig(_consumerId, _registrationId, configKey.Trim(), ValidateLocation(location), file,
+                                         ConfigDocumentWireCodec.Encode(currentDefaults), ConfigDocumentWireCodec.Encode(playerValues));
 
             return ConfigDocumentWireCodec.Decode(payload);
         }
@@ -276,71 +233,27 @@ namespace Mz.ConfigApi
             _consumer.Stop();
         }
 
-        public void Dispose()
-        {
-            if (_isDisposed)
-                return;
-
-            _isDisposed = true;
-
-            ReleaseProviderRegistration();
-
-            _consumer.Connected -= OnConnected;
-            _consumer.Disconnected -= OnDisconnected;
-            _consumer.Dispose();
-
-            ClearConnection();
-        }
-
         private void OnConnected(ApiConnectedEventArgs eventArgs)
         {
             try
             {
-                Func<
-                    string,
-                    Guid,
-                    Func<int, string, string>,
-                    Action<int, string, string>,
-                    Action> registerConsumer;
+                Func<string, Guid, Func<int, string, string>, Action<int, string, string>, Action> registerConsumer;
+                Func<string, Guid, string, int, string, object, object> openConfig;
+                Func<string, Guid, string, int, string, object, object, object> saveConfig;
 
-                Func<
-                    string,
-                    Guid,
-                    string,
-                    int,
-                    string,
-                    object,
-                    object> openConfig;
-
-                Func<
-                    string,
-                    Guid,
-                    string,
-                    int,
-                    string,
-                    object,
-                    object,
-                    object> saveConfig;
-
-                if (!eventArgs.Connection.TryGetEndpoint(
-                    RegisterConsumerEndpoint,
-                    out registerConsumer))
+                if (!eventArgs.Connection.TryGetEndpoint(RegisterConsumerEndpoint, out registerConsumer))
                 {
                     RejectConnection(RegisterConsumerEndpoint);
                     return;
                 }
 
-                if (!eventArgs.Connection.TryGetEndpoint(
-                    OpenConfigEndpoint,
-                    out openConfig))
+                if (!eventArgs.Connection.TryGetEndpoint(OpenConfigEndpoint, out openConfig))
                 {
                     RejectConnection(OpenConfigEndpoint);
                     return;
                 }
 
-                if (!eventArgs.Connection.TryGetEndpoint(
-                    SaveConfigEndpoint,
-                    out saveConfig))
+                if (!eventArgs.Connection.TryGetEndpoint(SaveConfigEndpoint, out saveConfig))
                 {
                     RejectConnection(SaveConfigEndpoint);
                     return;
@@ -348,12 +261,7 @@ namespace Mz.ConfigApi
 
                 var registrationId = Guid.NewGuid();
 
-                Action unregister =
-                    registerConsumer(
-                        _consumerId,
-                        registrationId,
-                        _read,
-                        _write);
+                Action unregister = registerConsumer(_consumerId, registrationId, _read, _write);
 
                 if (unregister == null)
                     throw new InvalidOperationException("The ConfigAPI provider returned no unregister action.");
@@ -414,29 +322,18 @@ namespace Mz.ConfigApi
 
         private void RejectConnection(string endpoint)
         {
-            _lastError =
-                new InvalidOperationException(
-                    "The ConfigAPI provider is missing the exact " +
-                    endpoint +
-                    " endpoint.");
+            _lastError = new InvalidOperationException($"The ConfigAPI provider is missing the exact {endpoint} endpoint.");
 
             _consumer.Disconnect();
         }
 
         private void EnsureConnected()
         {
-            if (!IsConnected ||
-                _openConfig == null ||
-                _saveConfig == null ||
-                _registrationId == Guid.Empty)
-            {
-                throw new InvalidOperationException(
-                    "The ConfigAPI client is not connected.");
-            }
+            if (!IsConnected || _openConfig == null || _saveConfig == null || _registrationId == Guid.Empty)
+                throw new InvalidOperationException("The ConfigAPI client is not connected.");
         }
 
-        private static int ValidateLocation(
-            ConfigLocation location)
+        private static int ValidateLocation(ConfigLocation location)
         {
             switch (location)
             {
@@ -446,13 +343,11 @@ namespace Mz.ConfigApi
 
                 case ConfigLocation.World:
                     throw new InvalidOperationException(
-                        "World configs require the server-authoritative ConfigAPI path and cannot use direct Open or Save.");
+                        "World configs require the server-authoritative ConfigAPI path and cannot use direct Open or Save."
+                    );
 
                 default:
-                    throw new ArgumentException(
-                        "Unsupported ConfigAPI storage location: " +
-                        location,
-                        nameof(location));
+                    throw new ArgumentException($"Unsupported ConfigAPI storage location: {location}", nameof(location));
             }
         }
 
@@ -464,7 +359,6 @@ namespace Mz.ConfigApi
                 return;
 
             foreach (Action subscriber in handler.GetInvocationList())
-            {
                 try
                 {
                     subscriber();
@@ -474,7 +368,6 @@ namespace Mz.ConfigApi
                     if (_lastError == null)
                         _lastError = exception;
                 }
-            }
         }
 
         private void RaiseDisconnected()
@@ -485,7 +378,6 @@ namespace Mz.ConfigApi
                 return;
 
             foreach (Action subscriber in handler.GetInvocationList())
-            {
                 try
                 {
                     subscriber();
@@ -495,7 +387,6 @@ namespace Mz.ConfigApi
                     if (_lastError == null)
                         _lastError = exception;
                 }
-            }
         }
 
         private void ThrowIfDisposed()

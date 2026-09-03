@@ -38,10 +38,10 @@ namespace Mz.ConfigApi
 
         public T CreateDefaults()
         {
-            var defaults = _createDefaults();
+            T defaults = _createDefaults();
 
             if (defaults == null)
-                throw new InvalidOperationException("The config default factory returned null for " + typeof(T).FullName + ".");
+                throw new InvalidOperationException($"The config default factory returned null for {typeof(T).FullName}.");
 
             return defaults;
         }
@@ -51,10 +51,10 @@ namespace Mz.ConfigApi
             if (value == null)
                 throw new ArgumentNullException(nameof(value));
 
-            var document = _serialize(value);
+            ConfigDocument document = _serialize(value);
 
             if (document == null)
-                throw new InvalidOperationException("The config serializer returned null for " + typeof(T).FullName + ".");
+                throw new InvalidOperationException($"The config serializer returned null for {typeof(T).FullName}.");
 
             return document;
         }
@@ -64,10 +64,10 @@ namespace Mz.ConfigApi
             if (document == null)
                 throw new ArgumentNullException(nameof(document));
 
-            var value = _deserialize(document);
+            T value = _deserialize(document);
 
             if (value == null)
-                throw new InvalidOperationException("The config deserializer returned null for " + typeof(T).FullName + ".");
+                throw new InvalidOperationException($"The config deserializer returned null for {typeof(T).FullName}.");
 
             return value;
         }
