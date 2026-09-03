@@ -9,8 +9,8 @@ namespace MarcoZechner.ConfigAPI.V2.Serialization
 {
     public static class ConfigProvenanceCodec
     {
-        private const string FORMAT_PREFIX = "CONFIGAPI-PROVENANCE:";
-        private const string FORMAT_HEADER = "CONFIGAPI-PROVENANCE:1;";
+        private const string FormatPrefix = "CONFIGAPI-PROVENANCE:";
+        private const string FormatHeader = "CONFIGAPI-PROVENANCE:1;";
 
         public static string Encode(ConfigProvenance provenance)
         {
@@ -19,7 +19,7 @@ namespace MarcoZechner.ConfigAPI.V2.Serialization
 
             var result = new StringBuilder();
 
-            result.Append(FORMAT_HEADER);
+            result.Append(FormatHeader);
             WriteString(result, provenance.Identity.OwnerId);
             WriteString(result, provenance.Identity.ConfigKey);
             WriteNode(result, provenance.BaselineDefaults.Root);
@@ -33,11 +33,11 @@ namespace MarcoZechner.ConfigAPI.V2.Serialization
                 throw new ArgumentNullException(nameof(source));
 
             if (!source.StartsWith(
-                FORMAT_HEADER,
+                FormatHeader,
                 StringComparison.Ordinal))
             {
                 if (source.StartsWith(
-                    FORMAT_PREFIX,
+                    FormatPrefix,
                     StringComparison.Ordinal))
                 {
                     throw new NotSupportedException(
@@ -52,7 +52,7 @@ namespace MarcoZechner.ConfigAPI.V2.Serialization
             {
                 var reader = new Reader(
                     source,
-                    FORMAT_HEADER.Length);
+                    FormatHeader.Length);
 
                 var ownerId = reader.ReadString();
                 var configKey = reader.ReadString();

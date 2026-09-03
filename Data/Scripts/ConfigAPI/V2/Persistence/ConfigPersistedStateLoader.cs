@@ -49,7 +49,7 @@ namespace MarcoZechner.ConfigAPI.V2.Persistence
 
     public sealed class ConfigPersistedStateLoader
     {
-        private const string PROVENANCE_SUFFIX =
+        private const string ProvenanceSuffix =
             ".configapi.provenance";
 
         private readonly IConfigTextStorage _storage;
@@ -73,7 +73,7 @@ namespace MarcoZechner.ConfigAPI.V2.Persistence
                     nameof(activeFile));
             }
 
-            return activeFile + PROVENANCE_SUFFIX;
+            return activeFile + ProvenanceSuffix;
         }
 
         public ConfigPersistedLoadResult Load(

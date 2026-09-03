@@ -7,7 +7,7 @@ namespace MarcoZechner.ConfigAPI.V2.Serialization
 {
     public static class ConfigTomlSourceDecoder
     {
-        private const string VALUE_WRAPPER_KEY = "__configapi_disabled_value__";
+        private const string ValueWrapperKey = "__configapi_disabled_value__";
 
         public static ConfigDocument Decode(
             string source,
@@ -135,7 +135,7 @@ namespace MarcoZechner.ConfigAPI.V2.Serialization
                 span.Length);
 
             var wrapperSource =
-                VALUE_WRAPPER_KEY +
+                ValueWrapperKey +
                 " = " +
                 valueSource +
                 "\n";
@@ -153,7 +153,7 @@ namespace MarcoZechner.ConfigAPI.V2.Serialization
 
             ConfigNode value;
             if (!document.TryGet(
-                new ConfigValuePath(VALUE_WRAPPER_KEY),
+                new ConfigValuePath(ValueWrapperKey),
                 out value))
             {
                 throw new InvalidOperationException(

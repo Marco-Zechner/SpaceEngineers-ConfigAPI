@@ -7,8 +7,8 @@ namespace MarcoZechner.ConfigAPI.V2.Serialization
 {
     public static class ConfigTomlSourceUpdater
     {
-        private const string VALUE_WRAPPER_KEY = "__configapi_value__";
-        private const string HEADER_PROBE_KEY = "__configapi_header_probe__";
+        private const string ValueWrapperKey = "__configapi_value__";
+        private const string HeaderProbeKey = "__configapi_header_probe__";
 
         public static string SetValue(
             string source,
@@ -696,7 +696,7 @@ namespace MarcoZechner.ConfigAPI.V2.Serialization
             ConfigNode current =
                 new ConfigObjectNode(
                     new ConfigObjectEntry(
-                        HEADER_PROBE_KEY,
+                        HeaderProbeKey,
                         ConfigScalarNode.Integer(0)));
 
             for (var i = path.Segments.Count - 1;
@@ -756,7 +756,7 @@ namespace MarcoZechner.ConfigAPI.V2.Serialization
             var wrapper = new ConfigDocument(
                 new ConfigObjectNode(
                     new ConfigObjectEntry(
-                        VALUE_WRAPPER_KEY,
+                        ValueWrapperKey,
                         new ConfigArrayNode(value))));
 
             var source = Toml.Write(

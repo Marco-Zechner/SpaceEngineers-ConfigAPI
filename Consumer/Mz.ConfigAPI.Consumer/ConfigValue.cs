@@ -360,7 +360,7 @@ namespace Mz.ConfigApi
     }
     public sealed class ConfigValue : IEquatable<ConfigValue>
     {
-        private static readonly ConfigValue NullInstance =
+        private static readonly ConfigValue _nullInstance =
             new ConfigValue(
                 ConfigValueKind.Null,
                 null,
@@ -401,7 +401,7 @@ namespace Mz.ConfigApi
         {
             get
             {
-                return NullInstance;
+                return _nullInstance;
             }
         }
 

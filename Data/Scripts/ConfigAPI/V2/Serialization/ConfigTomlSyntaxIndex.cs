@@ -56,8 +56,8 @@ namespace MarcoZechner.ConfigAPI.V2.Serialization
 
     public sealed class ConfigTomlSyntaxIndex
     {
-        private const string PROBE_KEY = "__configapi_path_probe__";
-        private const long PROBE_VALUE = 584321;
+        private const string ProbeKey = "__configapi_path_probe__";
+        private const long ProbeValue = 584321;
 
         private readonly ConfigTomlSyntaxAssignment[] _assignments;
         private readonly IReadOnlyList<ConfigTomlSyntaxAssignment> _readOnlyAssignments;
@@ -237,7 +237,7 @@ namespace MarcoZechner.ConfigAPI.V2.Serialization
         private static string[] ReadHeaderPath(TomlSyntaxDocument syntax, TomlSyntaxNode node)
         {
             var statement = syntax.Source.Substring(node.Span.Start, node.Span.Length);
-            var synthetic = statement + "\n" + PROBE_KEY + " = " + PROBE_VALUE + "\n";
+            var synthetic = statement + "\n" + ProbeKey + " = " + ProbeValue + "\n";
             var parsed = Toml.Parse(synthetic);
 
             string[] path;
@@ -253,10 +253,10 @@ namespace MarcoZechner.ConfigAPI.V2.Serialization
             {
                 var value = pair.Value as TomlValue;
 
-                if (string.Equals(pair.Key, PROBE_KEY, StringComparison.Ordinal) &&
+                if (string.Equals(pair.Key, ProbeKey, StringComparison.Ordinal) &&
                     value != null &&
                     value.ValueKind == TomlValueKind.Integer &&
-                    value.AsInteger() == PROBE_VALUE)
+                    value.AsInteger() == ProbeValue)
                 {
                     result = path.ToArray();
                     return true;
