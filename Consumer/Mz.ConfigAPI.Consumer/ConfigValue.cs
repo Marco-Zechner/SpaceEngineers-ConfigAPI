@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
 
 namespace Mz.ConfigApi
 {
@@ -326,6 +325,39 @@ namespace Mz.ConfigApi
         }
     }
 
+    internal sealed class MzReadOnlyList<T> : IReadOnlyList<T>
+    {
+        private readonly T[] _items;
+
+        public int Count
+        {
+            get { return _items.Length; }
+        }
+
+        public T this[int index]
+        {
+            get { return _items[index]; }
+        }
+
+        public MzReadOnlyList(T[] items)
+        {
+            if (items == null)
+                throw new ArgumentNullException(nameof(items));
+
+            _items = new T[items.Length];
+            Array.Copy(items, _items, items.Length);
+        }
+
+        public IEnumerator<T> GetEnumerator()
+        {
+            return ((IEnumerable<T>)_items).GetEnumerator();
+        }
+
+        System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator()
+        {
+            return _items.GetEnumerator();
+        }
+    }
     public sealed class ConfigValue : IEquatable<ConfigValue>
     {
         private static readonly ConfigValue NullInstance =
@@ -336,8 +368,8 @@ namespace Mz.ConfigApi
                 null);
 
         private readonly object _scalarValue;
-        private readonly ReadOnlyCollection<ConfigEntry> _entries;
-        private readonly ReadOnlyCollection<ConfigValue> _items;
+        private readonly MzReadOnlyList<ConfigEntry> _entries;
+        private readonly MzReadOnlyList<ConfigValue> _items;
 
         public ConfigValueKind Kind { get; }
 
@@ -385,12 +417,12 @@ namespace Mz.ConfigApi
             _entries =
                 entries == null
                     ? null
-                    : System.Array.AsReadOnly(entries);
+                    : new MzReadOnlyList<ConfigEntry>(entries);
 
             _items =
                 items == null
                     ? null
-                    : System.Array.AsReadOnly(items);
+                    : new MzReadOnlyList<ConfigValue>(items);
         }
 
         public static ConfigValue Boolean(bool value)

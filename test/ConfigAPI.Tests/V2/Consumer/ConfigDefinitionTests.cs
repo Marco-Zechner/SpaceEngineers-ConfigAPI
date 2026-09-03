@@ -8,7 +8,7 @@ namespace MarcoZechner.ConfigAPI.Tests.V2.Consumer
     public sealed class ConfigDefinitionTests
     {
         [Test]
-        public void Definition_Owns_Stable_Identity_And_Creates_Defaults_On_Demand()
+        public void Definition_Stores_Identity_And_Delegates_Serialization()
         {
             var createCount = 0;
 
@@ -24,27 +24,46 @@ namespace MarcoZechner.ConfigAPI.Tests.V2.Consumer
                         {
                             Value = createCount
                         };
+                    },
+                    value =>
+                        new ConfigDocument(
+                            new ConfigEntry(
+                                "Value",
+                                ConfigValue.Integer(value.Value))),
+                    document =>
+                    {
+                        ConfigValue value;
+
+                        if (!document.TryGet("Value", out value))
+                            throw new InvalidOperationException();
+
+                        return new ExampleConfig
+                        {
+                            Value = (int)(long)value.ScalarValue
+                        };
                     });
 
-            ExampleConfig first =
+            ExampleConfig defaults =
                 definition.CreateDefaults();
 
-            ExampleConfig second =
-                definition.CreateDefaults();
+            ConfigDocument serializedDocument =
+                definition.Serialize(defaults);
+
+            ExampleConfig restored =
+                definition.Deserialize(serializedDocument);
 
             Assert.Multiple(() =>
             {
                 Assert.That(definition.ConfigKey, Is.EqualTo("Settings"));
                 Assert.That(definition.DefaultFile, Is.EqualTo("settings.toml"));
-                Assert.That(first.Value, Is.EqualTo(1));
-                Assert.That(second.Value, Is.EqualTo(2));
-                Assert.That(first, Is.Not.SameAs(second));
-                Assert.That(createCount, Is.EqualTo(2));
+                Assert.That(defaults.Value, Is.EqualTo(1));
+                Assert.That(restored.Value, Is.EqualTo(1));
+                Assert.That(createCount, Is.EqualTo(1));
             });
         }
 
         [Test]
-        public void Definition_Rejects_Invalid_Identity_And_Null_Defaults()
+        public void Definition_Rejects_Invalid_Constructor_Arguments()
         {
             Assert.Multiple(() =>
             {
@@ -52,28 +71,102 @@ namespace MarcoZechner.ConfigAPI.Tests.V2.Consumer
                     () => new ConfigDefinition<ExampleConfig>(
                         " ",
                         "settings.toml",
-                        () => new ExampleConfig()));
+                        () => new ExampleConfig(),
+                        value => new ConfigDocument(),
+                        document => new ExampleConfig()));
 
                 Assert.Throws<ArgumentException>(
                     () => new ConfigDefinition<ExampleConfig>(
                         "Settings",
                         " ",
-                        () => new ExampleConfig()));
+                        () => new ExampleConfig(),
+                        value => new ConfigDocument(),
+                        document => new ExampleConfig()));
 
                 Assert.Throws<ArgumentNullException>(
                     () => new ConfigDefinition<ExampleConfig>(
                         "Settings",
                         "settings.toml",
-                        null));
+                        null,
+                        value => new ConfigDocument(),
+                        document => new ExampleConfig()));
 
-                var nullDefaults =
-                    new ConfigDefinition<ExampleConfig>(
+                Assert.Throws<ArgumentNullException>(
+                    () => new ConfigDefinition<ExampleConfig>(
                         "Settings",
                         "settings.toml",
-                        () => null);
+                        () => new ExampleConfig(),
+                        null,
+                        document => new ExampleConfig()));
 
+                Assert.Throws<ArgumentNullException>(
+                    () => new ConfigDefinition<ExampleConfig>(
+                        "Settings",
+                        "settings.toml",
+                        () => new ExampleConfig(),
+                        value => new ConfigDocument(),
+                        null));
+            });
+        }
+
+        [Test]
+        public void Definition_Rejects_Null_Delegates_Results()
+        {
+            var nullDefaults =
+                new ConfigDefinition<ExampleConfig>(
+                    "Settings",
+                    "settings.toml",
+                    () => null,
+                    value => new ConfigDocument(),
+                    document => new ExampleConfig());
+
+            var nullSerializer =
+                new ConfigDefinition<ExampleConfig>(
+                    "Settings",
+                    "settings.toml",
+                    () => new ExampleConfig(),
+                    value => null,
+                    document => new ExampleConfig());
+
+            var nullDeserializer =
+                new ConfigDefinition<ExampleConfig>(
+                    "Settings",
+                    "settings.toml",
+                    () => new ExampleConfig(),
+                    value => new ConfigDocument(),
+                    document => null);
+
+            Assert.Multiple(() =>
+            {
                 Assert.Throws<InvalidOperationException>(
                     () => nullDefaults.CreateDefaults());
+
+                Assert.Throws<InvalidOperationException>(
+                    () => nullSerializer.Serialize(new ExampleConfig()));
+
+                Assert.Throws<InvalidOperationException>(
+                    () => nullDeserializer.Deserialize(new ConfigDocument()));
+            });
+        }
+
+        [Test]
+        public void Definition_Rejects_Null_Serialization_Values()
+        {
+            var definition =
+                new ConfigDefinition<ExampleConfig>(
+                    "Settings",
+                    "settings.toml",
+                    () => new ExampleConfig(),
+                    value => new ConfigDocument(),
+                    document => new ExampleConfig());
+
+            Assert.Multiple(() =>
+            {
+                Assert.Throws<ArgumentNullException>(
+                    () => definition.Serialize(null));
+
+                Assert.Throws<ArgumentNullException>(
+                    () => definition.Deserialize(null));
             });
         }
 

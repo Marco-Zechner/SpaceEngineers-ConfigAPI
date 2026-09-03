@@ -12,11 +12,6 @@
   <ItemGroup>
     <ProjectReference Include="..\..\Data\ConfigAPI.csproj" />
   </ItemGroup>
-  <ItemGroup>
-    <Compile
-      Include="..\..\Consumer\Mz.ConfigAPI.Consumer\**\*.cs"
-      Link="Consumer\%(RecursiveDir)%(Filename)%(Extension)" />
-  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="coverlet.collector" Version="6.0.2" />

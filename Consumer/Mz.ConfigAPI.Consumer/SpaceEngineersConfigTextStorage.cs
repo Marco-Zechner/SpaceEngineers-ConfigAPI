@@ -3,7 +3,7 @@ using Sandbox.ModAPI;
 
 namespace Mz.ConfigApi
 {
-    internal interface IConfigApiStorageUtilities
+    public interface IConfigApiStorageUtilities
     {
         bool FileExistsInLocalStorage(string file, Type scope);
         string ReadFileInLocalStorage(string file, Type scope);
@@ -18,7 +18,7 @@ namespace Mz.ConfigApi
         void WriteFileInWorldStorage(string file, string content, Type scope);
     }
 
-    internal sealed class SpaceEngineersConfigTextStorage
+    public sealed class SpaceEngineersConfigTextStorage
     {
         private readonly IConfigApiStorageUtilities _utilities;
         private readonly Type _scope;

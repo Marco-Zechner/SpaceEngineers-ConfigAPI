@@ -52,33 +52,17 @@ namespace Mz.ConfigApi
                     nameof(file));
             }
 
-            T value =
-                ConfigClrMapper.FromDocument<T>(
-                    _client.LoadAndSwitch(
-                        _definition.ConfigKey,
-                        Location,
-                        CurrentFile,
-                        file,
-                        ConfigClrMapper.ToDocument(
-                            _definition.CreateDefaults())));
-
             CurrentFile = file;
-            Value = value;
-            return value;
+            return Reload();
         }
 
         public T Reload()
         {
             T value =
-                _client.Open(
-                    _definition.ConfigKey,
-                    Location,
-                    CurrentFile,
-                    _definition.CreateDefaults());
+                _client.Open(_definition, Location);
 
             Value = value;
             return value;
         }
-
     }
 }

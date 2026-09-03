@@ -11,7 +11,6 @@ namespace Mz.ConfigApi
         public const string RegisterConsumerEndpoint = "RegisterConsumer";
         public const string OpenConfigEndpoint = "OpenConfig";
         public const string SaveConfigEndpoint = "SaveConfig";
-        public const string LoadAndSwitchConfigEndpoint = "LoadAndSwitchConfig";
 
         private readonly string _consumerId;
         private readonly Func<int, string, string> _read;
@@ -21,7 +20,6 @@ namespace Mz.ConfigApi
         private Action _providerUnregister;
         private Func<string, Guid, string, int, string, object, object> _openConfig;
         private Func<string, Guid, string, int, string, object, object, object> _saveConfig;
-        private Func<string, Guid, string, int, string, string, object, object> _loadAndSwitchConfig;
         private Guid _registrationId;
         private bool _isDisposed;
         private Exception _lastError;
@@ -173,31 +171,19 @@ namespace Mz.ConfigApi
                 value);
         }
 
-        public T Open<T>(
-            ConfigDefinition<T> definition,
-            ConfigLocation location)
+
+        public T Open<T>(ConfigDefinition<T> definition, ConfigLocation location)
             where T : class
         {
             if (definition == null)
                 throw new ArgumentNullException(nameof(definition));
 
-            return Open(
-                definition.ConfigKey,
-                location,
-                definition.DefaultFile,
-                definition.CreateDefaults());
-        }
-
-        public T Open<T>(
-            string configKey,
-            ConfigLocation location,
-            string file,
-            T currentDefaults)
-            where T : class
-        {
-            var defaults = ConfigClrMapper.ToDocument(currentDefaults);
-            var opened = Open(configKey, location, file, defaults);
-            return ConfigClrMapper.FromDocument<T>(opened);
+            return definition.Deserialize(
+                Open(
+                    definition.ConfigKey,
+                    location,
+                    definition.DefaultFile,
+                    definition.Serialize(definition.CreateDefaults())));
         }
 
         public ConfigDocument Open(
@@ -230,35 +216,20 @@ namespace Mz.ConfigApi
             return ConfigDocumentWireCodec.Decode(payload);
         }
 
-        public T Save<T>(
-            ConfigDefinition<T> definition,
-            ConfigLocation location,
-            T playerValues)
+
+        public T Save<T>(ConfigDefinition<T> definition, ConfigLocation location, T playerValues)
             where T : class
         {
             if (definition == null)
                 throw new ArgumentNullException(nameof(definition));
 
-            return Save(
-                definition.ConfigKey,
-                location,
-                definition.DefaultFile,
-                definition.CreateDefaults(),
-                playerValues);
-        }
-
-        public T Save<T>(
-            string configKey,
-            ConfigLocation location,
-            string file,
-            T currentDefaults,
-            T playerValues)
-            where T : class
-        {
-            var defaults = ConfigClrMapper.ToDocument(currentDefaults);
-            var values = ConfigClrMapper.ToDocument(playerValues);
-            var saved = Save(configKey, location, file, defaults, values);
-            return ConfigClrMapper.FromDocument<T>(saved);
+            return definition.Deserialize(
+                Save(
+                    definition.ConfigKey,
+                    location,
+                    definition.DefaultFile,
+                    definition.Serialize(definition.CreateDefaults()),
+                    definition.Serialize(playerValues)));
         }
 
         public ConfigDocument Save(
@@ -296,37 +267,6 @@ namespace Mz.ConfigApi
             return ConfigDocumentWireCodec.Decode(payload);
         }
 
-        public ConfigDocument LoadAndSwitch(
-            string configKey,
-            ConfigLocation location,
-            string currentFile,
-            string targetFile,
-            ConfigDocument currentDefaults)
-        {
-            ThrowIfDisposed();
-            EnsureConnected();
-
-            if (string.IsNullOrWhiteSpace(configKey))
-                throw new ArgumentException("Config key must not be empty.", nameof(configKey));
-
-            if (string.IsNullOrWhiteSpace(targetFile))
-                throw new ArgumentException("Config file must not be empty.", nameof(targetFile));
-
-            if (currentDefaults == null)
-                throw new ArgumentNullException(nameof(currentDefaults));
-
-            object payload =
-                _loadAndSwitchConfig(
-                    _consumerId,
-                    _registrationId,
-                    configKey.Trim(),
-                    ValidateLocation(location),
-                    currentFile,
-                    targetFile,
-                    ConfigDocumentWireCodec.Encode(currentDefaults));
-
-            return ConfigDocumentWireCodec.Decode(payload);
-        }
         public void Stop()
         {
             ThrowIfDisposed();
@@ -381,15 +321,6 @@ namespace Mz.ConfigApi
                     object,
                     object,
                     object> saveConfig;
-                Func<
-                    string,
-                    Guid,
-                    string,
-                    int,
-                    string,
-                    string,
-                    object,
-                    object> loadAndSwitchConfig;
 
                 if (!eventArgs.Connection.TryGetEndpoint(
                     RegisterConsumerEndpoint,
@@ -414,13 +345,6 @@ namespace Mz.ConfigApi
                     RejectConnection(SaveConfigEndpoint);
                     return;
                 }
-                if (!eventArgs.Connection.TryGetEndpoint(
-                    LoadAndSwitchConfigEndpoint,
-                    out loadAndSwitchConfig))
-                {
-                    RejectConnection(LoadAndSwitchConfigEndpoint);
-                    return;
-                }
 
                 var registrationId = Guid.NewGuid();
 
@@ -437,7 +361,6 @@ namespace Mz.ConfigApi
                 _providerUnregister = unregister;
                 _openConfig = openConfig;
                 _saveConfig = saveConfig;
-                _loadAndSwitchConfig = loadAndSwitchConfig;
                 _registrationId = registrationId;
                 ProviderModVersion = eventArgs.Connection.Provider.Version;
                 ProviderApiVersion = eventArgs.Connection.Descriptor.Version;
@@ -484,7 +407,6 @@ namespace Mz.ConfigApi
             _providerUnregister = null;
             _openConfig = null;
             _saveConfig = null;
-            _loadAndSwitchConfig = null;
             _registrationId = Guid.Empty;
             ProviderModVersion = null;
             ProviderApiVersion = null;

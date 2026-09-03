@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 namespace Mz.ConfigApi
 {
-    internal static class ConfigDocumentWireCodec
+    public static class ConfigDocumentWireCodec
     {
         public static object Encode(
             ConfigDocument document)

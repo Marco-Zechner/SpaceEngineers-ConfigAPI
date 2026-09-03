@@ -14,7 +14,6 @@ namespace MarcoZechner.ConfigAPI.V2.Api
         public const string RegisterConsumerEndpoint = "RegisterConsumer";
         public const string OpenConfigEndpoint = "OpenConfig";
         public const string SaveConfigEndpoint = "SaveConfig";
-        public const string LoadAndSwitchConfigEndpoint = "LoadAndSwitchConfig";
 
         private readonly ApiDiscoveryProvider _provider;
 
@@ -108,17 +107,6 @@ namespace MarcoZechner.ConfigAPI.V2.Api
                 object> saveConfig =
                     persistence.Save;
 
-            Func<
-                string,
-                Guid,
-                string,
-                int,
-                string,
-                string,
-                object,
-                object> loadAndSwitchConfig =
-                    persistence.LoadAndSwitch;
-
             var endpoints =
                 new Dictionary<string, Delegate>(StringComparer.Ordinal)
                 {
@@ -133,10 +121,6 @@ namespace MarcoZechner.ConfigAPI.V2.Api
                     {
                         SaveConfigEndpoint,
                         saveConfig
-                    },
-                    {
-                        LoadAndSwitchConfigEndpoint,
-                        loadAndSwitchConfig
                     }
                 };
 
