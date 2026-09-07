@@ -69,8 +69,6 @@ dotnet_naming_rule.constants_must_be_pascal_case.style = pascal_case
 dotnet_naming_symbols.constants.applicable_kinds = field
 dotnet_naming_symbols.constants.required_modifiers = const
 
-dotnet_naming_style.pascal_case.capitalization = pascal_case
-
 #####################################################
 # 6. Interfaces → IPascalCase
 #####################################################
@@ -105,7 +103,6 @@ dotnet_naming_rule.enum_types_must_be_pascal_case.style = pascal_case
 dotnet_naming_symbols.enum_types.applicable_kinds = enum
 dotnet_naming_symbols.enum_types.applicable_accessibilities = public, internal, protected, private
 
-dotnet_naming_style.pascal_case.capitalization = pascal_case
 
 #####################################################
 # 9. readonly required if possible
